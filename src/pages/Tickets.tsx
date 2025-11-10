@@ -11,12 +11,14 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, AlertCircle } from "lucide-react";
 import { format } from "date-fns";
+import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 
 export default function Tickets() {
   const { profile } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
+  const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["tickets", profile?.id],
@@ -86,7 +88,7 @@ export default function Tickets() {
             <h1 className="text-3xl font-bold text-foreground">Tickets</h1>
             <p className="text-muted-foreground">Gerencie todos os chamados do sistema</p>
           </div>
-          <Button>
+          <Button onClick={() => setIsNewTicketOpen(true)}>
             <Plus className="mr-2 h-4 w-4" />
             Novo Ticket
           </Button>
@@ -190,6 +192,8 @@ export default function Tickets() {
           </Card>
         )}
       </div>
+
+      <NewTicketDialog open={isNewTicketOpen} onOpenChange={setIsNewTicketOpen} />
     </AppLayout>
   );
 }
