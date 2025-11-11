@@ -34,6 +34,7 @@ export default function TenantAdmin() {
   const [newTenant, setNewTenant] = useState({
     name: "",
     cnpj: "",
+    domain: "",
     segments: [] as string[],
     admin_email: "",
     admin_name: "",
@@ -55,7 +56,7 @@ export default function TenantAdmin() {
   });
 
   const handleCreateTenant = async () => {
-    if (!newTenant.name || !newTenant.admin_email || !newTenant.admin_name || newTenant.segments.length === 0) {
+    if (!newTenant.name || !newTenant.domain || !newTenant.admin_email || !newTenant.admin_name || newTenant.segments.length === 0) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
@@ -68,6 +69,7 @@ export default function TenantAdmin() {
         .insert({
           name: newTenant.name,
           cnpj: newTenant.cnpj || null,
+          domain: newTenant.domain,
           tenant_type: "customer",
           segments: newTenant.segments,
           is_active: true,
@@ -90,6 +92,7 @@ export default function TenantAdmin() {
       setNewTenant({
         name: "",
         cnpj: "",
+        domain: "",
         segments: [],
         admin_email: "",
         admin_name: "",
@@ -194,6 +197,19 @@ export default function TenantAdmin() {
                       placeholder="00.000.000/0001-00"
                     />
                   </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="domain">Domínio do Email *</Label>
+                  <Input
+                    id="domain"
+                    value={newTenant.domain}
+                    onChange={(e) => setNewTenant({ ...newTenant, domain: e.target.value.toLowerCase() })}
+                    placeholder="empresa.com.br"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    Usuários com emails deste domínio serão automaticamente associados a este tenant
+                  </p>
                 </div>
 
                 <div className="space-y-2">
