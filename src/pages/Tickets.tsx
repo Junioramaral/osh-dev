@@ -9,9 +9,145 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Search, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
+import { Progress } from "@/components/ui/progress";
+import { Plus, Search, AlertCircle, AlertTriangle, Clock, CheckCircle2, Check } from "lucide-react";
+import { format, differenceInMinutes } from "date-fns";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
+
+type SLAStatus = {
+  type: 'met' | 'on-time' | 'warning' | 'overdue' | 'not-applicable';
+  label: string;
+  color: string;
+  icon: React.ReactNode;
+  timeRemaining?: string;
+  percentage?: number;
+  borderClass?: string;
+};
+
+const formatDuration = (minutes: number): string => {
+  const absMinutes = Math.abs(minutes);
+  const hours = Math.floor(absMinutes / 60);
+  const mins = absMinutes % 60;
+  
+  if (hours > 24) {
+    const days = Math.floor(hours / 24);
+    const remainingHours = hours % 24;
+    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
+  } else if (hours > 0) {
+    return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+  } else {
+    return `${mins}min`;
+  }
+};
+
+const calculateSLAStatus = (ticket: any): SLAStatus => {
+  const now = new Date();
+  
+  // Se o ticket está resolvido ou fechado, verificar se SLA foi atendido
+  if (ticket.status === 'resolvido' || ticket.status === 'fechado') {
+    if (ticket.sla_first_response_met && ticket.sla_resolution_met) {
+      return {
+        type: 'met',
+        label: 'SLA Atendido',
+        color: 'bg-blue-100 text-blue-800 border-blue-300',
+        icon: <Check className="h-3 w-3" />,
+        borderClass: ''
+      };
+    }
+  }
+  
+  // Verificar SLA de primeira resposta (se ainda não foi respondido)
+  if (!ticket.first_response_at && ticket.sla_first_response_deadline) {
+    const deadline = new Date(ticket.sla_first_response_deadline);
+    const createdAt = new Date(ticket.created_at);
+    const totalTime = differenceInMinutes(deadline, createdAt);
+    const elapsed = differenceInMinutes(now, createdAt);
+    const remaining = differenceInMinutes(deadline, now);
+    const percentage = Math.min((elapsed / totalTime) * 100, 100);
+    
+    if (remaining < 0) {
+      return {
+        type: 'overdue',
+        label: 'SLA Vencido',
+        color: 'bg-red-100 text-red-800 border-red-300',
+        icon: <AlertTriangle className="h-3 w-3" />,
+        timeRemaining: `Venceu há ${formatDuration(Math.abs(remaining))}`,
+        percentage: 100,
+        borderClass: 'border-l-4 border-red-500'
+      };
+    } else if (percentage > 75) {
+      return {
+        type: 'warning',
+        label: 'Atenção SLA',
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        icon: <Clock className="h-3 w-3" />,
+        timeRemaining: `${formatDuration(remaining)} restantes`,
+        percentage,
+        borderClass: 'border-l-4 border-yellow-500'
+      };
+    } else {
+      return {
+        type: 'on-time',
+        label: 'No Prazo',
+        color: 'bg-green-100 text-green-800 border-green-300',
+        icon: <CheckCircle2 className="h-3 w-3" />,
+        timeRemaining: `${formatDuration(remaining)} restantes`,
+        percentage,
+        borderClass: 'border-l-4 border-green-300'
+      };
+    }
+  }
+  
+  // Verificar SLA de resolução (se já teve primeira resposta mas ainda não foi resolvido)
+  if (ticket.first_response_at && !ticket.resolved_at && ticket.sla_resolution_deadline) {
+    const deadline = new Date(ticket.sla_resolution_deadline);
+    const createdAt = new Date(ticket.created_at);
+    const totalTime = differenceInMinutes(deadline, createdAt);
+    const elapsed = differenceInMinutes(now, createdAt);
+    const remaining = differenceInMinutes(deadline, now);
+    const percentage = Math.min((elapsed / totalTime) * 100, 100);
+    
+    if (remaining < 0) {
+      return {
+        type: 'overdue',
+        label: 'SLA Vencido',
+        color: 'bg-red-100 text-red-800 border-red-300',
+        icon: <AlertTriangle className="h-3 w-3" />,
+        timeRemaining: `Venceu há ${formatDuration(Math.abs(remaining))}`,
+        percentage: 100,
+        borderClass: 'border-l-4 border-red-500'
+      };
+    } else if (percentage > 80) {
+      return {
+        type: 'warning',
+        label: 'Atenção SLA',
+        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
+        icon: <Clock className="h-3 w-3" />,
+        timeRemaining: `${formatDuration(remaining)} restantes`,
+        percentage,
+        borderClass: 'border-l-4 border-yellow-500'
+      };
+    } else {
+      return {
+        type: 'on-time',
+        label: 'No Prazo',
+        color: 'bg-green-100 text-green-800 border-green-300',
+        icon: <CheckCircle2 className="h-3 w-3" />,
+        timeRemaining: `${formatDuration(remaining)} restantes`,
+        percentage,
+        borderClass: 'border-l-4 border-green-300'
+      };
+    }
+  }
+  
+  return { 
+    type: 'not-applicable', 
+    label: '', 
+    color: '', 
+    icon: null,
+    borderClass: ''
+  };
+};
 
 export default function Tickets() {
   const { profile, tenantId, hasRole } = useAuth();
@@ -27,7 +163,13 @@ export default function Tickets() {
         .from("tickets")
         .select(`
           *,
-          clients(name)
+          clients(name),
+          sla_first_response_deadline,
+          sla_resolution_deadline,
+          sla_first_response_met,
+          sla_resolution_met,
+          first_response_at,
+          resolved_at
         `)
         .order("created_at", { ascending: false });
 
@@ -55,6 +197,12 @@ export default function Tickets() {
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesSegment = segmentFilter === "all" || ticket.segment === segmentFilter;
     return matchesSearch && matchesStatus && matchesSegment;
+  }).sort((a, b) => {
+    // Ordenar por urgência de SLA
+    const slaA = calculateSLAStatus(a);
+    const slaB = calculateSLAStatus(b);
+    const priority = { overdue: 0, warning: 1, 'on-time': 2, met: 3, 'not-applicable': 4 };
+    return priority[slaA.type] - priority[slaB.type];
   });
 
   const getPriorityColor = (priority: string) => {
@@ -142,39 +290,81 @@ export default function Tickets() {
           </div>
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredTickets.map((ticket) => (
-              <Card key={ticket.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="space-y-1">
-                      <CardTitle className="text-lg">{ticket.ticket_number}</CardTitle>
-                      <p className="text-sm text-muted-foreground">{ticket.title}</p>
+            {filteredTickets.map((ticket) => {
+              const slaStatus = calculateSLAStatus(ticket);
+              
+              return (
+                <Card 
+                  key={ticket.id} 
+                  className={`hover:shadow-lg transition-shadow cursor-pointer ${slaStatus.borderClass}`}
+                >
+                  <CardHeader className="pb-3">
+                    <div className="flex items-start justify-between">
+                      <div className="space-y-1 flex-1">
+                        <CardTitle className="text-lg">{ticket.ticket_number}</CardTitle>
+                        <p className="text-sm text-muted-foreground line-clamp-2">{ticket.title}</p>
+                      </div>
+                      <div className="flex flex-col gap-1 items-end ml-2">
+                        <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
+                          {ticket.priority}
+                        </Badge>
+                        {slaStatus.type !== 'not-applicable' && (
+                          <Badge variant="outline" className={`${slaStatus.color} flex items-center gap-1 whitespace-nowrap`}>
+                            {slaStatus.icon}
+                            <span className="text-xs">{slaStatus.label}</span>
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                    <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
-                      {ticket.priority}
-                    </Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge className={getStatusColor(ticket.status)}>
-                      {ticket.status}
-                    </Badge>
-                    <Badge variant="outline">
-                      {ticket.segment}
-                    </Badge>
-                  </div>
-                  <div className="text-sm space-y-1">
-                    <p className="text-muted-foreground">
-                      Cliente: <span className="text-foreground">{ticket.clients?.name}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Criado: {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm")}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
+                  </CardHeader>
+                  <CardContent className="space-y-3">
+                    {/* Indicador de SLA com barra de progresso */}
+                    {slaStatus.type !== 'not-applicable' && slaStatus.percentage !== undefined && (
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between text-xs">
+                          <span className="text-muted-foreground font-medium">
+                            {!ticket.first_response_at ? 'SLA 1ª Resposta' : 'SLA Resolução'}
+                          </span>
+                          <span className={`font-medium ${
+                            slaStatus.type === 'overdue' ? 'text-red-600' : 
+                            slaStatus.type === 'warning' ? 'text-yellow-600' : 
+                            'text-green-600'
+                          }`}>
+                            {slaStatus.timeRemaining}
+                          </span>
+                        </div>
+                        <Progress 
+                          value={slaStatus.percentage} 
+                          className={`h-2 ${
+                            slaStatus.type === 'overdue' ? '[&>div]:bg-red-500' : 
+                            slaStatus.type === 'warning' ? '[&>div]:bg-yellow-500' : 
+                            '[&>div]:bg-green-500'
+                          }`}
+                        />
+                      </div>
+                    )}
+                    
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <Badge className={getStatusColor(ticket.status)}>
+                        {ticket.status}
+                      </Badge>
+                      <Badge variant="outline">
+                        {ticket.segment}
+                      </Badge>
+                    </div>
+                    
+                    <div className="text-sm space-y-1">
+                      <p className="text-muted-foreground">
+                        Cliente: <span className="text-foreground font-medium">{ticket.clients?.name}</span>
+                      </p>
+                      <p className="text-muted-foreground">
+                        Criado: {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm")}
+                      </p>
+                    </div>
+                  </CardContent>
+                </Card>
+              );
+            })}
           </div>
         ) : (
           <Card>
