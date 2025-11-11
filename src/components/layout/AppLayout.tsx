@@ -21,7 +21,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { profile, hasRole, isSuperAdmin, signOut } = useAuth();
+  const { user, profile, hasRole, isSuperAdmin, signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   const navigation = [
@@ -68,7 +68,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       <div className="p-4 border-t border-sidebar-border">
         <div className="mb-3 px-3">
           <p className="text-sm font-medium text-sidebar-foreground">{profile?.full_name}</p>
-          <p className="text-xs text-sidebar-foreground/70 capitalize">
+          <p className="text-xs text-sidebar-foreground/60">{user?.email}</p>
+          <p className="text-xs text-sidebar-foreground/70 capitalize mt-1">
             {isSuperAdmin ? 'Super Admin' : hasRole('tenant_admin') ? 'Tenant Admin' : hasRole('analyst_db') ? 'Analista DB' : hasRole('analyst_app') ? 'Analista APP' : 'Usuário'}
           </p>
         </div>
