@@ -258,42 +258,6 @@ const Dashboard = () => {
             </p>
           </CardContent>
         </Card>
-
-        <Card className="border-dashed">
-          <CardHeader>
-            <CardTitle className="text-sm">🔍 Debug: Estado das Roles</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-3">
-            <pre className="text-xs bg-muted p-3 rounded overflow-auto max-h-48">
-              {JSON.stringify({ 
-                userId: user?.id,
-                email: user?.email,
-                roles: roles,
-                isSuperAdmin,
-                hasRole: {
-                  super_admin: hasRole('super_admin'),
-                  tenant_admin: hasRole('tenant_admin'),
-                  analyst_db: hasRole('analyst_db'),
-                  analyst_app: hasRole('analyst_app'),
-                }
-              }, null, 2)}
-            </pre>
-            <Button 
-              onClick={() => {
-                console.log('🔄 Recarregando página...');
-                window.location.reload();
-              }}
-              variant="outline"
-              size="sm"
-              className="w-full"
-            >
-              Recarregar Página
-            </Button>
-            <p className="text-xs text-muted-foreground">
-              ℹ️ Verifique o console do navegador (F12) para ver os logs detalhados
-            </p>
-          </CardContent>
-        </Card>
       </div>
     </AppLayout>
   );

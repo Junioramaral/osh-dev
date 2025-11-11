@@ -8,6 +8,16 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
 import { Database, Server } from "lucide-react";
+import { z } from "zod";
+
+const signupSchema = z.object({
+  email: z.string().trim().email("Email inválido").max(255, "Email deve ter no máximo 255 caracteres"),
+  password: z.string().min(8, "Senha deve ter no mínimo 8 caracteres").max(100, "Senha deve ter no máximo 100 caracteres"),
+  full_name: z.string().trim().min(1, "Nome é obrigatório").max(100, "Nome deve ter no máximo 100 caracteres"),
+  role: z.enum(["cliente", "analista-db", "analista-app", "admin"], {
+    errorMap: () => ({ message: "Tipo de usuário inválido" })
+  })
+});
 
 const Auth = () => {
   const { signIn, signUp } = useAuth();
@@ -40,20 +50,32 @@ const Auth = () => {
     e.preventDefault();
     setIsLoading(true);
     
-    const { error } = await signUp(
-      signupData.email,
-      signupData.password,
-      signupData.full_name,
-      signupData.role
-    );
-    
-    if (error) {
-      toast.error(error.message);
-    } else {
-      toast.success("Cadastro realizado! Verifique seu email para confirmar.");
+    try {
+      const validatedData = signupSchema.parse(signupData);
+      
+      const { error } = await signUp(
+        validatedData.email,
+        validatedData.password,
+        validatedData.full_name,
+        validatedData.role
+      );
+      
+      if (error) {
+        toast.error(error.message);
+      } else {
+        toast.success("Cadastro realizado! Verifique seu email para confirmar.");
+      }
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        error.errors.forEach((err) => {
+          toast.error(err.message);
+        });
+      } else {
+        toast.error("Erro ao processar cadastro");
+      }
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
   return (

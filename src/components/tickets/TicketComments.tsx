@@ -113,6 +113,16 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
   
   const handleSubmit = () => {
     if (!newComment.trim()) return;
+    
+    if (newComment.length > 10000) {
+      toast({ 
+        title: 'Comentário muito longo', 
+        description: 'O comentário deve ter no máximo 10.000 caracteres',
+        variant: 'destructive' 
+      });
+      return;
+    }
+    
     addCommentMutation.mutate({ content: newComment, is_internal: isInternal });
   };
   
@@ -129,12 +139,18 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
       </ScrollArea>
       
       <Card className="p-4">
-        <Textarea
-          value={newComment}
-          onChange={(e) => setNewComment(e.target.value)}
-          placeholder="Adicionar comentário..."
-          className="min-h-[100px] mb-4"
-        />
+        <div className="space-y-2">
+          <Textarea
+            value={newComment}
+            onChange={(e) => setNewComment(e.target.value)}
+            placeholder="Adicionar comentário..."
+            className="min-h-[100px]"
+            maxLength={10000}
+          />
+          <p className="text-xs text-muted-foreground text-right">
+            {newComment.length} / 10.000 caracteres
+          </p>
+        </div>
         
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
