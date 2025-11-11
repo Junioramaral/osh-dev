@@ -149,6 +149,7 @@ export type Database = {
           contract_end_date: string | null
           contract_start_date: string | null
           created_at: string | null
+          domain: string | null
           id: string
           is_active: boolean | null
           max_users: number | null
@@ -180,6 +181,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string | null
+          domain?: string | null
           id?: string
           is_active?: boolean | null
           max_users?: number | null
@@ -211,6 +213,7 @@ export type Database = {
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string | null
+          domain?: string | null
           id?: string
           is_active?: boolean | null
           max_users?: number | null
@@ -825,6 +828,8 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      extract_domain_from_email: { Args: { _email: string }; Returns: string }
+      get_tenant_by_domain: { Args: { _email: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {
