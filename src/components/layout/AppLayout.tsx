@@ -22,8 +22,19 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, hasRole, isSuperAdmin, signOut } = useAuth();
+  const { user, profile, hasRole, isSuperAdmin, signOut, loading } = useAuth();
   const [open, setOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-background">
+        <div className="text-center space-y-2">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto" />
+          <p className="text-sm text-muted-foreground">Carregando permissões...</p>
+        </div>
+      </div>
+    );
+  }
 
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },

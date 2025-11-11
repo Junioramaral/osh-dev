@@ -77,25 +77,45 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   }, []);
 
   const fetchProfile = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('*')
-      .eq('id', userId)
-      .single();
-    
-    if (data && !error) {
+    try {
+      console.log('[AuthContext] Fetching profile for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single();
+      
+      if (error) {
+        console.error('[AuthContext] Error fetching profile:', error);
+        return;
+      }
+      
+      console.log('[AuthContext] Profile loaded:', data);
       setProfile(data as Profile);
+    } catch (err) {
+      console.error('[AuthContext] Exception fetching profile:', err);
     }
   };
 
   const fetchRoles = async (userId: string) => {
-    const { data, error } = await supabase
-      .from('user_roles')
-      .select('role, tenant_id')
-      .eq('user_id', userId);
-    
-    if (data && !error) {
+    try {
+      console.log('[AuthContext] Fetching roles for user:', userId);
+      
+      const { data, error } = await supabase
+        .from('user_roles')
+        .select('role, tenant_id')
+        .eq('user_id', userId);
+      
+      if (error) {
+        console.error('[AuthContext] Error fetching roles:', error);
+        return;
+      }
+      
+      console.log('[AuthContext] Roles loaded:', data);
       setRoles(data as UserRole[]);
+    } catch (err) {
+      console.error('[AuthContext] Exception fetching roles:', err);
     }
   };
 
