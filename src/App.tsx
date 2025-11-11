@@ -8,6 +8,7 @@ import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Tickets from "./pages/Tickets";
+import TicketDetail from "./pages/TicketDetail";
 import Clients from "./pages/Clients";
 import Databases from "./pages/Databases";
 import Applications from "./pages/Applications";
@@ -31,6 +32,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tickets" element={<Tickets />} />
+            <Route path="/tickets/:ticketId" element={<TicketDetail />} />
             <Route path="/sla-dashboard" element={<SLADashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/databases" element={<Databases />} />

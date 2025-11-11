@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -10,147 +11,14 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Progress } from "@/components/ui/progress";
-import { Plus, Search, AlertCircle, AlertTriangle, Clock, CheckCircle2, Check } from "lucide-react";
-import { format, differenceInMinutes } from "date-fns";
+import { Plus, Search, AlertCircle } from "lucide-react";
+import { format } from "date-fns";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
-
-type SLAStatus = {
-  type: 'met' | 'on-time' | 'warning' | 'overdue' | 'not-applicable';
-  label: string;
-  color: string;
-  icon: React.ReactNode;
-  timeRemaining?: string;
-  percentage?: number;
-  borderClass?: string;
-};
-
-const formatDuration = (minutes: number): string => {
-  const absMinutes = Math.abs(minutes);
-  const hours = Math.floor(absMinutes / 60);
-  const mins = absMinutes % 60;
-  
-  if (hours > 24) {
-    const days = Math.floor(hours / 24);
-    const remainingHours = hours % 24;
-    return remainingHours > 0 ? `${days}d ${remainingHours}h` : `${days}d`;
-  } else if (hours > 0) {
-    return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
-  } else {
-    return `${mins}min`;
-  }
-};
-
-const calculateSLAStatus = (ticket: any): SLAStatus => {
-  const now = new Date();
-  
-  // Se o ticket está resolvido ou fechado, verificar se SLA foi atendido
-  if (ticket.status === 'resolvido' || ticket.status === 'fechado') {
-    if (ticket.sla_first_response_met && ticket.sla_resolution_met) {
-      return {
-        type: 'met',
-        label: 'SLA Atendido',
-        color: 'bg-blue-100 text-blue-800 border-blue-300',
-        icon: <Check className="h-3 w-3" />,
-        borderClass: ''
-      };
-    }
-  }
-  
-  // Verificar SLA de primeira resposta (se ainda não foi respondido)
-  if (!ticket.first_response_at && ticket.sla_first_response_deadline) {
-    const deadline = new Date(ticket.sla_first_response_deadline);
-    const createdAt = new Date(ticket.created_at);
-    const totalTime = differenceInMinutes(deadline, createdAt);
-    const elapsed = differenceInMinutes(now, createdAt);
-    const remaining = differenceInMinutes(deadline, now);
-    const percentage = Math.min((elapsed / totalTime) * 100, 100);
-    
-    if (remaining < 0) {
-      return {
-        type: 'overdue',
-        label: 'SLA Vencido',
-        color: 'bg-red-100 text-red-800 border-red-300',
-        icon: <AlertTriangle className="h-3 w-3" />,
-        timeRemaining: `Venceu há ${formatDuration(Math.abs(remaining))}`,
-        percentage: 100,
-        borderClass: 'border-l-4 border-red-500'
-      };
-    } else if (percentage > 75) {
-      return {
-        type: 'warning',
-        label: 'Atenção SLA',
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-        icon: <Clock className="h-3 w-3" />,
-        timeRemaining: `${formatDuration(remaining)} restantes`,
-        percentage,
-        borderClass: 'border-l-4 border-yellow-500'
-      };
-    } else {
-      return {
-        type: 'on-time',
-        label: 'No Prazo',
-        color: 'bg-green-100 text-green-800 border-green-300',
-        icon: <CheckCircle2 className="h-3 w-3" />,
-        timeRemaining: `${formatDuration(remaining)} restantes`,
-        percentage,
-        borderClass: 'border-l-4 border-green-300'
-      };
-    }
-  }
-  
-  // Verificar SLA de resolução (se já teve primeira resposta mas ainda não foi resolvido)
-  if (ticket.first_response_at && !ticket.resolved_at && ticket.sla_resolution_deadline) {
-    const deadline = new Date(ticket.sla_resolution_deadline);
-    const createdAt = new Date(ticket.created_at);
-    const totalTime = differenceInMinutes(deadline, createdAt);
-    const elapsed = differenceInMinutes(now, createdAt);
-    const remaining = differenceInMinutes(deadline, now);
-    const percentage = Math.min((elapsed / totalTime) * 100, 100);
-    
-    if (remaining < 0) {
-      return {
-        type: 'overdue',
-        label: 'SLA Vencido',
-        color: 'bg-red-100 text-red-800 border-red-300',
-        icon: <AlertTriangle className="h-3 w-3" />,
-        timeRemaining: `Venceu há ${formatDuration(Math.abs(remaining))}`,
-        percentage: 100,
-        borderClass: 'border-l-4 border-red-500'
-      };
-    } else if (percentage > 80) {
-      return {
-        type: 'warning',
-        label: 'Atenção SLA',
-        color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
-        icon: <Clock className="h-3 w-3" />,
-        timeRemaining: `${formatDuration(remaining)} restantes`,
-        percentage,
-        borderClass: 'border-l-4 border-yellow-500'
-      };
-    } else {
-      return {
-        type: 'on-time',
-        label: 'No Prazo',
-        color: 'bg-green-100 text-green-800 border-green-300',
-        icon: <CheckCircle2 className="h-3 w-3" />,
-        timeRemaining: `${formatDuration(remaining)} restantes`,
-        percentage,
-        borderClass: 'border-l-4 border-green-300'
-      };
-    }
-  }
-  
-  return { 
-    type: 'not-applicable', 
-    label: '', 
-    color: '', 
-    icon: null,
-    borderClass: ''
-  };
-};
+import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
 
 export default function Tickets() {
   const { profile, tenantId, hasRole } = useAuth();
+  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
@@ -204,27 +72,6 @@ export default function Tickets() {
     const priority = { overdue: 0, warning: 1, 'on-time': 2, met: 3, 'not-applicable': 4 };
     return priority[slaA.type] - priority[slaB.type];
   });
-
-  const getPriorityColor = (priority: string) => {
-    const colors = {
-      P1: "bg-priority-p1 text-priority-p1-foreground",
-      P2: "bg-priority-p2 text-priority-p2-foreground",
-      P3: "bg-priority-p3 text-priority-p3-foreground",
-      P4: "bg-priority-p4 text-priority-p4-foreground",
-    };
-    return colors[priority as keyof typeof colors] || "bg-muted";
-  };
-
-  const getStatusColor = (status: string) => {
-    const colors = {
-      novo: "bg-status-novo text-status-novo-foreground",
-      "em-atendimento": "bg-status-em-atendimento text-status-em-atendimento-foreground",
-      aguardando: "bg-status-aguardando text-status-aguardando-foreground",
-      resolvido: "bg-status-resolvido text-status-resolvido-foreground",
-      fechado: "bg-status-fechado text-status-fechado-foreground",
-    };
-    return colors[status as keyof typeof colors] || "bg-muted";
-  };
 
   return (
     <AppLayout>
@@ -297,6 +144,7 @@ export default function Tickets() {
                 <Card 
                   key={ticket.id} 
                   className={`hover:shadow-lg transition-shadow cursor-pointer ${slaStatus.borderClass}`}
+                  onClick={() => navigate(`/tickets/${ticket.id}`)}
                 >
                   <CardHeader className="pb-3">
                     <div className="flex items-start justify-between">
