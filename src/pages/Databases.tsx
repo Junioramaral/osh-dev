@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Database, AlertCircle } from "lucide-react";
 
 export default function Databases() {
-  const { profile } = useAuth();
+  const { profile, isSuperAdmin, hasRole } = useAuth();
   const [engineFilter, setEngineFilter] = useState<string>("all");
   const [environmentFilter, setEnvironmentFilter] = useState<string>("all");
 
@@ -54,7 +54,7 @@ export default function Databases() {
             <h1 className="text-3xl font-bold text-foreground">Bancos de Dados</h1>
             <p className="text-muted-foreground">Catálogo de instâncias de banco de dados</p>
           </div>
-          {(profile?.role === "admin" || profile?.role === "analista-db") && (
+          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Nova Instância

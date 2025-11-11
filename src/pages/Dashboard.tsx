@@ -27,7 +27,7 @@ interface DashboardStats {
 }
 
 const Dashboard = () => {
-  const { profile } = useAuth();
+  const { profile, isSuperAdmin, hasRole } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalTickets: 0,
     ticketsAbertosHoje: 0,
@@ -91,7 +91,7 @@ const Dashboard = () => {
 
       // Total clients (if admin or analyst)
       let clientsCount = 0;
-      if (profile?.role && ['admin', 'analista-db', 'analista-app'].includes(profile.role)) {
+      if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
         const { count } = await supabase
           .from('clients')
           .select('*', { count: 'exact', head: true });
@@ -167,7 +167,7 @@ const Dashboard = () => {
     },
   ];
 
-  if (profile?.role && ['admin', 'analista-db', 'analista-app'].includes(profile.role)) {
+  if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
     statCards.push({
       title: "Total de Clientes",
       value: stats.totalClientes,
@@ -245,14 +245,15 @@ const Dashboard = () => {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Tipo de usuário:</span>
               <Badge variant="outline" className="capitalize">
-                {profile?.role?.replace('-', ' ')}
+                {isSuperAdmin ? 'Super Admin' : hasRole('tenant_admin') ? 'Tenant Admin' : hasRole('analyst_db') ? 'Analista DB' : hasRole('analyst_app') ? 'Analista APP' : 'Usuário'}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground">
-              {profile?.role === 'admin' && "Como administrador, você tem acesso total ao sistema."}
-              {profile?.role === 'analista-db' && "Como analista de banco de dados, você pode gerenciar tickets DB."}
-              {profile?.role === 'analista-app' && "Como analista de aplicativos, você pode gerenciar tickets APP."}
-              {profile?.role === 'cliente' && "Como cliente, você pode criar e acompanhar seus tickets."}
+              {isSuperAdmin && "Como super administrador, você tem acesso total ao sistema e pode gerenciar todos os tenants."}
+              {!isSuperAdmin && hasRole('tenant_admin') && "Como administrador do tenant, você pode gerenciar usuários e recursos do seu tenant."}
+              {hasRole('analyst_db') && "Como analista de banco de dados, você pode gerenciar tickets DB."}
+              {hasRole('analyst_app') && "Como analista de aplicativos, você pode gerenciar tickets APP."}
+              {!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app') && "Você pode criar e acompanhar seus tickets."}
             </p>
           </CardContent>
         </Card>

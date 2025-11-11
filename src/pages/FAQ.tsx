@@ -12,7 +12,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Search, BookOpen, AlertCircle, Eye } from "lucide-react";
 
 export default function FAQ() {
-  const { profile } = useAuth();
+  const { profile, isSuperAdmin, hasRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
 
@@ -47,7 +47,7 @@ export default function FAQ() {
             <h1 className="text-3xl font-bold text-foreground">Base de Conhecimento</h1>
             <p className="text-muted-foreground">Artigos e documentação técnica</p>
           </div>
-          {(profile?.role === "admin" || profile?.role === "analista-db" || profile?.role === "analista-app") && (
+          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) && (
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Novo Artigo

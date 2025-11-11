@@ -11,7 +11,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Package, AlertCircle } from "lucide-react";
 
 export default function Applications() {
-  const { profile } = useAuth();
+  const { profile, isSuperAdmin, hasRole } = useAuth();
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["application-products"],
@@ -59,7 +59,7 @@ export default function Applications() {
             <h1 className="text-3xl font-bold text-foreground">Aplicativos</h1>
             <p className="text-muted-foreground">Catálogo de produtos e implantações</p>
           </div>
-          {(profile?.role === "admin" || profile?.role === "analista-app") && (
+          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Nova Implantação

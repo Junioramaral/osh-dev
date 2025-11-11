@@ -14,7 +14,7 @@ import { format } from "date-fns";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 
 export default function Tickets() {
-  const { profile } = useAuth();
+  const { profile, tenantId, hasRole } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
@@ -31,16 +31,14 @@ export default function Tickets() {
         `)
         .order("created_at", { ascending: false });
 
-      // RBAC: Clients only see their own tickets
-      if (profile?.role === "cliente" && profile.client_id) {
-        query = query.eq("client_id", profile.client_id);
-      }
-
+      // RBAC: Filter by tenant_id (RLS handles this automatically now)
+      // But we can still apply filters for specific roles
+      
       // Analysts see only their segment
-      if (profile?.role === "analista-db") {
+      if (hasRole('analyst_db')) {
         query = query.eq("segment", "DB");
       }
-      if (profile?.role === "analista-app") {
+      if (hasRole('analyst_app')) {
         query = query.eq("segment", "APP");
       }
 

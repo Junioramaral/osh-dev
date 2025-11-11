@@ -146,9 +146,14 @@ export type Database = {
       clients: {
         Row: {
           cnpj: string | null
+          contract_end_date: string | null
+          contract_start_date: string | null
           created_at: string | null
           id: string
+          is_active: boolean | null
+          max_users: number | null
           name: string
+          segments: string[] | null
           sla_app_p1_first_response: number | null
           sla_app_p1_resolution: number | null
           sla_app_p2_first_response: number | null
@@ -167,13 +172,19 @@ export type Database = {
           sla_db_p4_resolution: number | null
           status: string | null
           tags: string[] | null
+          tenant_type: string | null
           updated_at: string | null
         }
         Insert: {
           cnpj?: string | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string | null
           id?: string
+          is_active?: boolean | null
+          max_users?: number | null
           name: string
+          segments?: string[] | null
           sla_app_p1_first_response?: number | null
           sla_app_p1_resolution?: number | null
           sla_app_p2_first_response?: number | null
@@ -192,13 +203,19 @@ export type Database = {
           sla_db_p4_resolution?: number | null
           status?: string | null
           tags?: string[] | null
+          tenant_type?: string | null
           updated_at?: string | null
         }
         Update: {
           cnpj?: string | null
+          contract_end_date?: string | null
+          contract_start_date?: string | null
           created_at?: string | null
           id?: string
+          is_active?: boolean | null
+          max_users?: number | null
           name?: string
+          segments?: string[] | null
           sla_app_p1_first_response?: number | null
           sla_app_p1_resolution?: number | null
           sla_app_p2_first_response?: number | null
@@ -217,6 +234,7 @@ export type Database = {
           sla_db_p4_resolution?: number | null
           status?: string | null
           tags?: string[] | null
+          tenant_type?: string | null
           updated_at?: string | null
         }
         Relationships: []
@@ -770,14 +788,60 @@ export type Database = {
           },
         ]
       }
+      user_roles: {
+        Row: {
+          created_at: string | null
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          tenant_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          role: Database["public"]["Enums"]["app_role"]
+          tenant_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          tenant_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
+      app_role:
+        | "super_admin"
+        | "tenant_admin"
+        | "analyst_db"
+        | "analyst_app"
+        | "user"
       business_impact: "nenhum" | "baixo" | "medio" | "alto" | "critico"
       criticality_level: "baixa" | "media" | "alta" | "critica"
       db_engine: "Oracle" | "PostgreSQL" | "MySQL" | "MongoDB" | "SQL Server"
@@ -922,6 +986,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      app_role: [
+        "super_admin",
+        "tenant_admin",
+        "analyst_db",
+        "analyst_app",
+        "user",
+      ],
       business_impact: ["nenhum", "baixo", "medio", "alto", "critico"],
       criticality_level: ["baixa", "media", "alta", "critica"],
       db_engine: ["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"],

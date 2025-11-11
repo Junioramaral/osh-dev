@@ -21,18 +21,19 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { profile, signOut } = useAuth();
+  const { profile, hasRole, isSuperAdmin, signOut } = useAuth();
   const [open, setOpen] = useState(false);
 
   const navigation = [
-    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, roles: ['admin', 'analista-db', 'analista-app', 'cliente'] },
-    { name: "Tickets", href: "/tickets", icon: Ticket, roles: ['admin', 'analista-db', 'analista-app', 'cliente'] },
-    { name: "Clientes", href: "/clients", icon: Users, roles: ['admin', 'analista-db', 'analista-app'] },
-    { name: "Bancos de Dados", href: "/databases", icon: Database, roles: ['admin', 'analista-db'] },
-    { name: "Aplicativos", href: "/applications", icon: AppWindow, roles: ['admin', 'analista-app'] },
-    { name: "Máquinas", href: "/machines", icon: Server, roles: ['admin', 'analista-db', 'analista-app'] },
-    { name: "Base de Conhecimento", href: "/faq", icon: FileText, roles: ['admin', 'analista-db', 'analista-app', 'cliente'] },
-  ].filter(item => profile && item.roles.includes(profile.role));
+    { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
+    { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
+    { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app') },
+    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || hasRole('analyst_db') || hasRole('tenant_admin') },
+    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || hasRole('analyst_app') || hasRole('tenant_admin') },
+    { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app') || hasRole('tenant_admin') },
+    { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
+    { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin },
+  ].filter(item => item.show);
 
   const SidebarContent = () => (
     <>
@@ -67,7 +68,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       <div className="p-4 border-t border-sidebar-border">
         <div className="mb-3 px-3">
           <p className="text-sm font-medium text-sidebar-foreground">{profile?.full_name}</p>
-          <p className="text-xs text-sidebar-foreground/70 capitalize">{profile?.role?.replace('-', ' ')}</p>
+          <p className="text-xs text-sidebar-foreground/70 capitalize">
+            {isSuperAdmin ? 'Super Admin' : hasRole('tenant_admin') ? 'Tenant Admin' : hasRole('analyst_db') ? 'Analista DB' : hasRole('analyst_app') ? 'Analista APP' : 'Usuário'}
+          </p>
         </div>
         <Button
           onClick={signOut}

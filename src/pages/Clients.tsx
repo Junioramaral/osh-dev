@@ -9,8 +9,8 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Building2, AlertCircle } from "lucide-react";
 
 export default function Clients() {
-  const { profile } = useAuth();
-
+  const { profile, isSuperAdmin, hasRole } = useAuth();
+  
   const { data: clients, isLoading } = useQuery({
     queryKey: ["clients"],
     queryFn: async () => {
@@ -22,11 +22,11 @@ export default function Clients() {
       if (error) throw error;
       return data;
     },
-    enabled: profile?.role === "admin" || profile?.role === "analista-db" || profile?.role === "analista-app",
+    enabled: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app'),
   });
 
   // Only admins and analysts can access this page
-  if (profile?.role === "cliente") {
+  if (!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app')) {
     return (
       <AppLayout>
         <Card>
@@ -48,7 +48,7 @@ export default function Clients() {
             <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
             <p className="text-muted-foreground">Gerencie os clientes cadastrados</p>
           </div>
-          {profile?.role === "admin" && (
+          {isSuperAdmin && (
             <Button>
               <Plus className="mr-2 h-4 w-4" />
               Novo Cliente

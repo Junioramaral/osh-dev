@@ -81,7 +81,7 @@ interface NewTicketDialogProps {
 }
 
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
-  const { profile } = useAuth();
+  const { profile, tenantId, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const [segment, setSegment] = useState<"DB" | "APP">("DB");
 
@@ -89,7 +89,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       segment: "DB",
-      client_id: profile?.role === "cliente" ? profile.client_id || "" : "",
+      client_id: tenantId || "",
       frequency: "pontual",
       business_impact: "medio",
       ticket_type: "incidente",
@@ -284,7 +284,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <Select
                 value={watch("client_id")}
                 onValueChange={(value) => setValue("client_id", value)}
-                disabled={profile?.role === "cliente"}
+                disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o cliente" />

@@ -6,18 +6,26 @@ import { useNavigate } from "react-router-dom";
 interface Profile {
   id: string;
   full_name: string;
-  role: 'admin' | 'analista-db' | 'analista-app' | 'cliente';
   client_id: string | null;
   team_id: string | null;
+}
+
+interface UserRole {
+  role: 'super_admin' | 'tenant_admin' | 'analyst_db' | 'analyst_app' | 'user';
+  tenant_id: string | null;
 }
 
 interface AuthContextType {
   user: User | null;
   session: Session | null;
   profile: Profile | null;
+  roles: UserRole[];
   loading: boolean;
+  hasRole: (role: string) => boolean;
+  isSuperAdmin: boolean;
+  tenantId: string | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
-  signUp: (email: string, password: string, full_name: string, role: string) => Promise<{ error: any }>;
+  signUp: (email: string, password: string, full_name: string, tenant_id: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
 }
 
@@ -27,6 +35,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
@@ -38,12 +47,14 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
-          // Fetch profile in a deferred manner
+          // Fetch profile and roles in a deferred manner
           setTimeout(() => {
             fetchProfile(session.user.id);
+            fetchRoles(session.user.id);
           }, 0);
         } else {
           setProfile(null);
+          setRoles([]);
         }
         
         setLoading(false);
@@ -57,6 +68,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       
       if (session?.user) {
         fetchProfile(session.user.id);
+        fetchRoles(session.user.id);
       }
       setLoading(false);
     });
@@ -76,6 +88,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     }
   };
 
+  const fetchRoles = async (userId: string) => {
+    const { data, error } = await supabase
+      .from('user_roles')
+      .select('role, tenant_id')
+      .eq('user_id', userId);
+    
+    if (data && !error) {
+      setRoles(data as UserRole[]);
+    }
+  };
+
+  const hasRole = (role: string) => roles.some(r => r.role === role);
+  const isSuperAdmin = hasRole('super_admin');
+  const tenantId = roles.find(r => r.tenant_id)?.tenant_id || null;
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({
       email,
@@ -89,7 +116,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     return { error };
   };
 
-  const signUp = async (email: string, password: string, full_name: string, role: string) => {
+  const signUp = async (email: string, password: string, full_name: string, tenant_id: string) => {
     const redirectUrl = `${window.location.origin}/dashboard`;
     
     const { error } = await supabase.auth.signUp({
@@ -99,7 +126,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         emailRedirectTo: redirectUrl,
         data: {
           full_name,
-          role,
+          tenant_id,
         }
       }
     });
@@ -112,11 +139,24 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setUser(null);
     setSession(null);
     setProfile(null);
+    setRoles([]);
     navigate('/auth');
   };
 
   return (
-    <AuthContext.Provider value={{ user, session, profile, loading, signIn, signUp, signOut }}>
+    <AuthContext.Provider value={{ 
+      user, 
+      session, 
+      profile, 
+      roles,
+      loading, 
+      hasRole,
+      isSuperAdmin,
+      tenantId,
+      signIn, 
+      signUp, 
+      signOut 
+    }}>
       {children}
     </AuthContext.Provider>
   );
