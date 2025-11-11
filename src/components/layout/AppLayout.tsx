@@ -11,6 +11,7 @@ import {
   FileText,
   LogOut,
   Menu,
+  BarChart3,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -27,6 +28,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
+    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app') },
     { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app') },
     { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || hasRole('analyst_db') || hasRole('tenant_admin') },
     { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || hasRole('analyst_app') || hasRole('tenant_admin') },

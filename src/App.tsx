@@ -14,6 +14,7 @@ import Applications from "./pages/Applications";
 import Machines from "./pages/Machines";
 import FAQ from "./pages/FAQ";
 import TenantAdmin from "./pages/TenantAdmin";
+import SLADashboard from "./pages/SLADashboard";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -30,6 +31,7 @@ const App = () => (
             <Route path="/auth" element={<Auth />} />
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tickets" element={<Tickets />} />
+            <Route path="/sla-dashboard" element={<SLADashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/databases" element={<Databases />} />
             <Route path="/applications" element={<Applications />} />
