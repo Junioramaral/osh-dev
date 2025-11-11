@@ -1,7 +1,8 @@
 import { useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { useNavigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -29,6 +30,8 @@ interface Tenant {
 
 export default function TenantAdmin() {
   const { isSuperAdmin } = useAuth();
+  const queryClient = useQueryClient();
+  const navigate = useNavigate();
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
   const [newTenant, setNewTenant] = useState({
@@ -303,7 +306,11 @@ export default function TenantAdmin() {
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {tenants?.map((tenant) => (
-              <Card key={tenant.id}>
+              <Card 
+                key={tenant.id} 
+                className="hover:shadow-lg transition-all cursor-pointer"
+                onClick={() => navigate(`/admin/tenants/${tenant.id}`)}
+              >
                 <CardHeader>
                   <div className="flex items-start justify-between">
                     <div className="flex items-center gap-2">
@@ -349,7 +356,10 @@ export default function TenantAdmin() {
                       variant={tenant.is_active ? "destructive" : "default"}
                       size="sm"
                       className="w-full"
-                      onClick={() => toggleTenantStatus(tenant.id, tenant.is_active)}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        toggleTenantStatus(tenant.id, tenant.is_active);
+                      }}
                     >
                       {tenant.is_active ? "Desativar" : "Ativar"}
                     </Button>

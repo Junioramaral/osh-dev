@@ -15,6 +15,7 @@ import Applications from "./pages/Applications";
 import Machines from "./pages/Machines";
 import FAQ from "./pages/FAQ";
 import TenantAdmin from "./pages/TenantAdmin";
+import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
 import NotFound from "./pages/NotFound";
 
@@ -40,6 +41,7 @@ const App = () => (
             <Route path="/machines" element={<Machines />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/admin/tenants" element={<TenantAdmin />} />
+            <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
