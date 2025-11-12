@@ -6,9 +6,10 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { toast } from "sonner";
 import { Database, Server } from "lucide-react";
+import ForcePasswordChange from "@/components/auth/ForcePasswordChange";
 
 const Auth = () => {
-  const { signIn } = useAuth();
+  const { signIn, mustChangePassword, clearMustChangePassword } = useAuth();
   const [isLoading, setIsLoading] = useState(false);
   const [loginData, setLoginData] = useState({ email: "", password: "" });
 
@@ -27,6 +28,10 @@ const Auth = () => {
     setIsLoading(false);
   };
 
+
+  if (mustChangePassword) {
+    return <ForcePasswordChange onPasswordChanged={clearMustChangePassword} />;
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">

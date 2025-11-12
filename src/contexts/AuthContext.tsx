@@ -21,12 +21,14 @@ interface AuthContextType {
   profile: Profile | null;
   roles: UserRole[];
   loading: boolean;
+  mustChangePassword: boolean;
   hasRole: (role: string) => boolean;
   isSuperAdmin: boolean;
   tenantId: string | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, full_name: string, tenant_id: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
+  clearMustChangePassword: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -37,6 +39,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [roles, setRoles] = useState<UserRole[]>([]);
   const [loading, setLoading] = useState(true);
+  const [mustChangePassword, setMustChangePassword] = useState(false);
   const navigate = useNavigate();
 
   useEffect(() => {
@@ -47,6 +50,10 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         setUser(session?.user ?? null);
         
         if (session?.user) {
+          // Check if user must change password
+          const mustChange = session.user.user_metadata?.must_change_password === true;
+          setMustChangePassword(mustChange);
+          
           // Fetch profile and roles in a deferred manner
           setTimeout(() => {
             fetchProfile(session.user.id);
@@ -55,6 +62,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
         } else {
           setProfile(null);
           setRoles([]);
+          setMustChangePassword(false);
         }
         
         setLoading(false);
@@ -160,7 +168,12 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setSession(null);
     setProfile(null);
     setRoles([]);
+    setMustChangePassword(false);
     navigate('/auth');
+  };
+
+  const clearMustChangePassword = () => {
+    setMustChangePassword(false);
   };
 
   return (
@@ -169,13 +182,15 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       session, 
       profile, 
       roles,
-      loading, 
+      loading,
+      mustChangePassword,
       hasRole,
       isSuperAdmin,
       tenantId,
       signIn, 
       signUp, 
-      signOut 
+      signOut,
+      clearMustChangePassword
     }}>
       {children}
     </AuthContext.Provider>
