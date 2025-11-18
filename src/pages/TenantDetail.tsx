@@ -40,6 +40,7 @@ const TenantDetail = () => {
   
   const [editForm, setEditForm] = useState({
     max_users: 10,
+    cnpj: "",
     admin_email: "",
     admin_full_name: "",
   });
@@ -109,15 +110,19 @@ const TenantDetail = () => {
   // Mutation para atualizar tenant
   const updateTenantMutation = useMutation({
     mutationFn: async (updates: { 
-      max_users: number; 
+      max_users: number;
+      cnpj?: string;
       admin_user_id?: string;
       admin_email?: string;
       admin_full_name?: string;
     }) => {
-      // Update max_users in tenant
+      // Update max_users and cnpj in tenant
       const { error: tenantError } = await supabase
         .from("clients")
-        .update({ max_users: updates.max_users })
+        .update({ 
+          max_users: updates.max_users,
+          cnpj: updates.cnpj || null
+        })
         .eq("id", tenantId);
       
       if (tenantError) throw tenantError;
@@ -167,6 +172,7 @@ const TenantDetail = () => {
       
       setEditForm({
         max_users: tenant.max_users || 10,
+        cnpj: tenant.cnpj || "",
         admin_email: firstAdmin?.email || "",
         admin_full_name: firstAdmin?.full_name || "",
       });
@@ -198,6 +204,14 @@ const TenantDetail = () => {
     if (editForm.max_users <= 0) {
       toast.error("Erro de validação", {
         description: "Máximo de usuários deve ser maior que zero.",
+      });
+      return;
+    }
+
+    // Validar CNPJ se fornecido
+    if (editForm.cnpj && editForm.cnpj.length !== 14) {
+      toast.error("Erro de validação", {
+        description: "CNPJ deve conter exatamente 14 dígitos.",
       });
       return;
     }
@@ -248,6 +262,7 @@ const TenantDetail = () => {
 
     updateTenantMutation.mutate({ 
       max_users: editForm.max_users,
+      cnpj: editForm.cnpj.trim() || undefined,
       admin_user_id: firstAdminId,
       admin_email: editForm.admin_email,
       admin_full_name: editForm.admin_full_name,
@@ -322,7 +337,7 @@ const TenantDetail = () => {
                 <DialogHeader>
                   <DialogTitle>Editar Tenant: {tenant.name}</DialogTitle>
                   <DialogDescription>
-                    Edite o máximo de usuários e os dados do administrador principal do tenant
+                    Edite o máximo de usuários, CNPJ e os dados do administrador principal do tenant
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -335,11 +350,6 @@ const TenantDetail = () => {
                       <div>
                         <Label className="text-muted-foreground">Nome</Label>
                         <Input value={tenant.name} disabled className="bg-muted/50" />
-                      </div>
-                      
-                      <div>
-                        <Label className="text-muted-foreground">CNPJ</Label>
-                        <Input value={tenant.cnpj || "N/A"} disabled className="bg-muted/50" />
                       </div>
                       
                       <div>
@@ -371,6 +381,24 @@ const TenantDetail = () => {
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         Atualmente: {users?.length || 0} usuário(s) cadastrado(s)
+                      </p>
+                    </div>
+
+                    {/* CNPJ (opcional) */}
+                    <div>
+                      <Label htmlFor="cnpj">CNPJ (opcional)</Label>
+                      <Input
+                        id="cnpj"
+                        value={editForm.cnpj}
+                        onChange={(e) => {
+                          const cleaned = e.target.value.replace(/\D/g, '');
+                          setEditForm(prev => ({ ...prev, cnpj: cleaned }));
+                        }}
+                        placeholder="00000000000000"
+                        maxLength={14}
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Digite apenas os números (14 dígitos)
                       </p>
                     </div>
 
