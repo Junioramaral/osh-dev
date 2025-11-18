@@ -5,9 +5,11 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail } from "lucide-react";
+import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail, Edit, Loader2 } from "lucide-react";
 import { useTenantUsers } from "@/hooks/useTenantUsers";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -19,13 +21,20 @@ import { Skeleton } from "@/components/ui/skeleton";
 const TenantDetail = () => {
   const { tenantId } = useParams();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
   const [inviteForm, setInviteForm] = useState({
     email: "",
     full_name: "",
     role: "user",
+  });
+  
+  const [editForm, setEditForm] = useState({
+    max_users: 10,
+    admin_user_id: "",
   });
 
   const { data: tenant, isLoading: tenantLoading } = useQuery({
@@ -53,6 +62,61 @@ const TenantDetail = () => {
     resendInvite,
     isResending,
   } = useTenantUsers(tenantId);
+  
+  // Query para buscar admins do tenant
+  const { data: tenantAdmins } = useQuery({
+    queryKey: ["tenant-admins", tenantId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select(`
+          id,
+          full_name,
+          user_roles!inner(role)
+        `)
+        .eq("client_id", tenantId)
+        .eq("user_roles.role", "tenant_admin")
+        .eq("is_active", true);
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!tenantId && isEditDialogOpen,
+  });
+  
+  // Mutation para atualizar tenant
+  const updateTenantMutation = useMutation({
+    mutationFn: async (updates: { max_users: number }) => {
+      const { error } = await supabase
+        .from("clients")
+        .update({ max_users: updates.max_users })
+        .eq("id", tenantId);
+      
+      if (error) throw error;
+      return { success: true };
+    },
+    onSuccess: () => {
+      toast.success("Tenant atualizado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["tenant", tenantId] });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      setIsEditDialogOpen(false);
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar tenant", {
+        description: error.message,
+      });
+    },
+  });
+  
+  // Preencher formulário ao abrir dialog
+  useEffect(() => {
+    if (isEditDialogOpen && tenant) {
+      setEditForm({
+        max_users: tenant.max_users || 10,
+        admin_user_id: "",
+      });
+    }
+  }, [isEditDialogOpen, tenant]);
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,6 +126,23 @@ const TenantDetail = () => {
         setInviteForm({ email: "", full_name: "", role: "user" });
       },
     });
+  };
+  
+  const handleEditTenantSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    // Validações
+    if (editForm.max_users < (users?.length || 0)) {
+      toast.error("Máximo de usuários não pode ser menor que o número atual de usuários");
+      return;
+    }
+    
+    if (editForm.max_users <= 0) {
+      toast.error("Máximo de usuários deve ser maior que 0");
+      return;
+    }
+    
+    updateTenantMutation.mutate({ max_users: editForm.max_users });
   };
 
   const getUserStatus = (user: any) => {
@@ -120,9 +201,92 @@ const TenantDetail = () => {
               <p className="text-muted-foreground">CNPJ: {tenant.cnpj || "N/A"}</p>
             </div>
           </div>
-          <Badge variant={tenant.is_active ? "default" : "destructive"}>
-            {tenant.is_active ? "Ativo" : "Inativo"}
-          </Badge>
+          <div className="flex items-center gap-2">
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Edit className="mr-2 h-4 w-4" />
+                  Editar Tenant
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-2xl">
+                <DialogHeader>
+                  <DialogTitle>Editar Tenant: {tenant.name}</DialogTitle>
+                  <DialogDescription>
+                    Edite o máximo de usuários permitidos. Outros campos não são editáveis.
+                  </DialogDescription>
+                </DialogHeader>
+                
+                <form onSubmit={handleEditTenantSubmit} className="space-y-6">
+                  {/* Campos somente leitura */}
+                  <div className="space-y-4 p-4 bg-muted/30 rounded-md border">
+                    <h3 className="font-semibold text-sm">Informações do Tenant (Somente Leitura)</h3>
+                    
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <Label className="text-muted-foreground">Nome</Label>
+                        <Input value={tenant.name} disabled className="bg-muted/50" />
+                      </div>
+                      
+                      <div>
+                        <Label className="text-muted-foreground">CNPJ</Label>
+                        <Input value={tenant.cnpj || "N/A"} disabled className="bg-muted/50" />
+                      </div>
+                      
+                      <div>
+                        <Label className="text-muted-foreground">Domínio</Label>
+                        <Input value={tenant.domain || "N/A"} disabled className="bg-muted/50" />
+                      </div>
+                      
+                      <div>
+                        <Label className="text-muted-foreground">Tipo</Label>
+                        <Input value={tenant.tenant_type || "N/A"} disabled className="bg-muted/50" />
+                      </div>
+                    </div>
+                  </div>
+                  
+                  {/* Campos editáveis */}
+                  <div className="space-y-4">
+                    <h3 className="font-semibold text-sm">Campos Editáveis</h3>
+                    
+                    <div>
+                      <Label htmlFor="max_users">Máximo de Usuários *</Label>
+                      <Input
+                        id="max_users"
+                        type="number"
+                        min="1"
+                        value={editForm.max_users}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, max_users: parseInt(e.target.value) || 0 }))}
+                        required
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Atualmente: {users?.length || 0} usuário(s) cadastrado(s)
+                      </p>
+                    </div>
+                  </div>
+                  
+                  <div className="flex justify-end gap-2 pt-4 border-t">
+                    <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
+                      Cancelar
+                    </Button>
+                    <Button type="submit" disabled={updateTenantMutation.isPending}>
+                      {updateTenantMutation.isPending ? (
+                        <>
+                          <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                          Salvando...
+                        </>
+                      ) : (
+                        "Salvar Alterações"
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </DialogContent>
+            </Dialog>
+            <Badge variant={tenant.is_active ? "default" : "destructive"}>
+              {tenant.is_active ? "Ativo" : "Inativo"}
+            </Badge>
+          </div>
         </div>
 
         <Card>
