@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -7,9 +8,16 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Building2, AlertCircle } from "lucide-react";
+import ClientDialog from "@/components/clients/ClientDialog";
+import type { Tables } from "@/integrations/supabase/types";
+
+type Client = Tables<"clients">;
 
 export default function Clients() {
   const { profile, isSuperAdmin, hasRole } = useAuth();
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
+  const [selectedClient, setSelectedClient] = useState<Client | null>(null);
   
   const { data: clients, isLoading } = useQuery({
     queryKey: ["clients"],
@@ -49,7 +57,13 @@ export default function Clients() {
             <p className="text-muted-foreground">Gerencie os clientes cadastrados</p>
           </div>
           {isSuperAdmin && (
-            <Button>
+            <Button
+              onClick={() => {
+                setDialogMode("create");
+                setSelectedClient(null);
+                setDialogOpen(true);
+              }}
+            >
               <Plus className="mr-2 h-4 w-4" />
               Novo Cliente
             </Button>
@@ -72,7 +86,15 @@ export default function Clients() {
         ) : clients && clients.length > 0 ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
             {clients.map((client) => (
-              <Card key={client.id} className="hover:shadow-lg transition-shadow cursor-pointer">
+              <Card
+                key={client.id}
+                className="hover:shadow-lg transition-shadow cursor-pointer"
+                onClick={() => {
+                  setDialogMode("edit");
+                  setSelectedClient(client);
+                  setDialogOpen(true);
+                }}
+              >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary" />
@@ -112,6 +134,13 @@ export default function Clients() {
             </CardContent>
           </Card>
         )}
+
+        <ClientDialog
+          open={dialogOpen}
+          onOpenChange={setDialogOpen}
+          mode={dialogMode}
+          client={selectedClient}
+        />
       </div>
     </AppLayout>
   );
