@@ -335,7 +335,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                     />
 
                     {/* Grid horizontal para Engines (esquerda) e Produtos (direita) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-[35%_65%] gap-8 lg:gap-10">
                       {/* Coluna da esquerda: Engines de Banco */}
                       <div className="space-y-2 min-w-0">
                         {selectedSegments.includes("DB") && (
