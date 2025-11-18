@@ -40,6 +40,7 @@ const TenantDetail = () => {
   
   const [editForm, setEditForm] = useState({
     max_users: 10,
+    cnpj: "",
     admin_email: "",
     admin_full_name: "",
   });
@@ -109,15 +110,19 @@ const TenantDetail = () => {
   // Mutation para atualizar tenant
   const updateTenantMutation = useMutation({
     mutationFn: async (updates: { 
-      max_users: number; 
+      max_users: number;
+      cnpj?: string;
       admin_user_id?: string;
       admin_email?: string;
       admin_full_name?: string;
     }) => {
-      // Update max_users in tenant
+      // Update max_users and cnpj in tenant
       const { error: tenantError } = await supabase
         .from("clients")
-        .update({ max_users: updates.max_users })
+        .update({ 
+          max_users: updates.max_users,
+          cnpj: updates.cnpj || null,
+        })
         .eq("id", tenantId);
       
       if (tenantError) throw tenantError;
@@ -167,6 +172,7 @@ const TenantDetail = () => {
       
       setEditForm({
         max_users: tenant.max_users || 10,
+        cnpj: tenant.cnpj || "",
         admin_email: firstAdmin?.email || "",
         admin_full_name: firstAdmin?.full_name || "",
       });
@@ -248,6 +254,7 @@ const TenantDetail = () => {
 
     updateTenantMutation.mutate({ 
       max_users: editForm.max_users,
+      cnpj: editForm.cnpj,
       admin_user_id: firstAdminId,
       admin_email: editForm.admin_email,
       admin_full_name: editForm.admin_full_name,
@@ -338,11 +345,6 @@ const TenantDetail = () => {
                       </div>
                       
                       <div>
-                        <Label className="text-muted-foreground">CNPJ</Label>
-                        <Input value={tenant.cnpj || "N/A"} disabled className="bg-muted/50" />
-                      </div>
-                      
-                      <div>
                         <Label className="text-muted-foreground">Domínio</Label>
                         <Input value={tenant.domain || "N/A"} disabled className="bg-muted/50" />
                       </div>
@@ -371,6 +373,20 @@ const TenantDetail = () => {
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         Atualmente: {users?.length || 0} usuário(s) cadastrado(s)
+                      </p>
+                    </div>
+
+                    {/* CNPJ - Opcional */}
+                    <div>
+                      <Label htmlFor="cnpj">CNPJ (Opcional)</Label>
+                      <Input
+                        id="cnpj"
+                        value={editForm.cnpj}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, cnpj: e.target.value }))}
+                        placeholder="00.000.000/0000-00"
+                      />
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Pode ser preenchido ou alterado posteriormente
                       </p>
                     </div>
 
