@@ -378,40 +378,58 @@ export type Database = {
       }
       machines: {
         Row: {
+          additional_users: Json | null
           client_id: string
           created_at: string | null
           criticality: Database["public"]["Enums"]["criticality_level"] | null
+          description: string | null
+          environment: string | null
           hostname: string
           id: string
+          ip_address: string | null
           location: string | null
           machine_type: Database["public"]["Enums"]["machine_type"]
           operating_system: string | null
+          root_password_secret_id: string | null
+          root_username: string | null
           serial_number: string | null
           status: string | null
           updated_at: string | null
         }
         Insert: {
+          additional_users?: Json | null
           client_id: string
           created_at?: string | null
           criticality?: Database["public"]["Enums"]["criticality_level"] | null
+          description?: string | null
+          environment?: string | null
           hostname: string
           id?: string
+          ip_address?: string | null
           location?: string | null
           machine_type: Database["public"]["Enums"]["machine_type"]
           operating_system?: string | null
+          root_password_secret_id?: string | null
+          root_username?: string | null
           serial_number?: string | null
           status?: string | null
           updated_at?: string | null
         }
         Update: {
+          additional_users?: Json | null
           client_id?: string
           created_at?: string | null
           criticality?: Database["public"]["Enums"]["criticality_level"] | null
+          description?: string | null
+          environment?: string | null
           hostname?: string
           id?: string
+          ip_address?: string | null
           location?: string | null
           machine_type?: Database["public"]["Enums"]["machine_type"]
           operating_system?: string | null
+          root_password_secret_id?: string | null
+          root_username?: string | null
           serial_number?: string | null
           status?: string | null
           updated_at?: string | null
