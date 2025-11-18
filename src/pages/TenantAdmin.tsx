@@ -11,10 +11,9 @@ import { Building2, Plus, Users, CheckCircle, XCircle } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Loader2 } from "lucide-react";
 
 interface Tenant {
   id: string;
@@ -39,9 +38,6 @@ export default function TenantAdmin() {
     name: "",
     cnpj: "",
     domain: "",
-    segments: [] as string[],
-    db_engines: [] as string[],
-    app_product_ids: [] as string[],
     admin_email: "",
     admin_name: "",
     max_users: 10,
@@ -61,21 +57,20 @@ export default function TenantAdmin() {
     enabled: isSuperAdmin,
   });
 
-  const { data: appProducts } = useQuery({
-    queryKey: ["application_products"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("application_products")
-        .select("id, name, description")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
 
   const handleCreateTenant = async () => {
-    if (!newTenant.name || !newTenant.domain || !newTenant.admin_email || !newTenant.admin_name || newTenant.segments.length === 0) {
-      toast.error("Preencha todos os campos obrigatórios");
+    if (!newTenant.name || !newTenant.domain || !newTenant.admin_email || !newTenant.admin_name) {
+      toast.error("Preencha todos os campos obrigatórios (Nome, Domínio, Email e Nome do Admin)");
+      return;
+    }
+
+    // Validate admin email domain
+    const emailDomain = newTenant.admin_email.split('@')[1]?.toLowerCase();
+    if (emailDomain !== newTenant.domain.toLowerCase()) {
+      toast.error(
+        `O email do administrador deve pertencer ao domínio ${newTenant.domain}`,
+        { description: `Email fornecido: ${newTenant.admin_email}` }
+      );
       return;
     }
 
@@ -87,11 +82,8 @@ export default function TenantAdmin() {
         .insert({
           name: newTenant.name,
           cnpj: newTenant.cnpj || null,
-          domain: newTenant.domain,
+          domain: newTenant.domain.toLowerCase(),
           tenant_type: "customer",
-          segments: newTenant.segments,
-          db_engines: newTenant.db_engines,
-          app_product_ids: newTenant.app_product_ids,
           is_active: true,
           status: "ativo",
           max_users: newTenant.max_users,
@@ -102,20 +94,33 @@ export default function TenantAdmin() {
 
       if (tenantError) throw tenantError;
 
-      // 2. Criar usuário admin (via Supabase Admin API - requer service role)
-      // Por enquanto, vamos apenas criar o tenant e avisar o usuário
-      toast.success(`Tenant "${newTenant.name}" criado com sucesso!`, {
-        description: `Agora você precisa criar o usuário admin manualmente no Supabase Auth para: ${newTenant.admin_email}`,
+      // 2. Convidar usuário administrador via edge function
+      const { data: inviteData, error: inviteError } = await supabase.functions.invoke('invite-user', {
+        body: {
+          email: newTenant.admin_email,
+          full_name: newTenant.admin_name,
+          tenant_id: tenant.id,
+          role: 'tenant_admin'
+        }
       });
+
+      if (inviteError) {
+        console.error('Erro ao enviar convite:', inviteError);
+        toast.warning(
+          `Tenant "${newTenant.name}" criado, mas houve um erro ao enviar o email de convite para ${newTenant.admin_email}`,
+          { description: 'Você pode reenviar o convite manualmente.' }
+        );
+      } else {
+        toast.success(`Tenant "${newTenant.name}" criado com sucesso!`, {
+          description: `Email de convite enviado para ${newTenant.admin_email}`,
+        });
+      }
 
       setIsCreateDialogOpen(false);
       setNewTenant({
         name: "",
         cnpj: "",
         domain: "",
-        segments: [],
-        db_engines: [],
-        app_product_ids: [],
         admin_email: "",
         admin_name: "",
         max_users: 10,
@@ -149,21 +154,6 @@ export default function TenantAdmin() {
     }
   };
 
-  const handleSegmentToggle = (segment: string) => {
-    setNewTenant(prev => {
-      const newSegments = prev.segments.includes(segment)
-        ? prev.segments.filter(s => s !== segment)
-        : [...prev.segments, segment];
-      
-      // Clear related selections when segment is deselected
-      return {
-        ...prev,
-        segments: newSegments,
-        db_engines: newSegments.includes("DB") ? prev.db_engines : [],
-        app_product_ids: newSegments.includes("APP") ? prev.app_product_ids : [],
-      };
-    });
-  };
 
   if (!isSuperAdmin) {
     return (
@@ -203,171 +193,106 @@ export default function TenantAdmin() {
               <DialogHeader>
                 <DialogTitle>Criar Novo Tenant</DialogTitle>
                 <DialogDescription>
-                  Preencha as informações para criar um novo tenant e seu usuário administrador
+                  Crie um novo cliente/tenant no sistema. Um email de convite será enviado automaticamente para o administrador inicial.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label htmlFor="name">Nome do Tenant *</Label>
-                    <Input
-                      id="name"
-                      value={newTenant.name}
-                      onChange={(e) => setNewTenant({ ...newTenant, name: e.target.value })}
-                      placeholder="Nome da Empresa"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label htmlFor="cnpj">CNPJ</Label>
-                    <Input
-                      id="cnpj"
-                      value={newTenant.cnpj}
-                      onChange={(e) => setNewTenant({ ...newTenant, cnpj: e.target.value })}
-                      placeholder="00.000.000/0001-00"
-                    />
-                  </div>
+                {/* Nome do Tenant */}
+                <div className="space-y-2">
+                  <Label htmlFor="tenant-name">Nome do Tenant *</Label>
+                  <Input
+                    id="tenant-name"
+                    value={newTenant.name}
+                    onChange={(e) => setNewTenant(prev => ({ ...prev, name: e.target.value }))}
+                    placeholder="Ex: Sec4File"
+                    required
+                  />
                 </div>
 
+                {/* CNPJ */}
                 <div className="space-y-2">
-                  <Label htmlFor="domain">Domínio do Email *</Label>
+                  <Label htmlFor="tenant-cnpj">CNPJ (opcional)</Label>
                   <Input
-                    id="domain"
+                    id="tenant-cnpj"
+                    value={newTenant.cnpj}
+                    onChange={(e) => setNewTenant(prev => ({ ...prev, cnpj: e.target.value }))}
+                    placeholder="00.000.000/0000-00"
+                  />
+                </div>
+
+                {/* Domínio */}
+                <div className="space-y-2">
+                  <Label htmlFor="tenant-domain">Domínio do Email *</Label>
+                  <Input
+                    id="tenant-domain"
                     value={newTenant.domain}
-                    onChange={(e) => setNewTenant({ ...newTenant, domain: e.target.value.toLowerCase() })}
-                    placeholder="empresa.com.br"
+                    onChange={(e) => setNewTenant(prev => ({ ...prev, domain: e.target.value.toLowerCase() }))}
+                    placeholder="Ex: sec4file.com"
+                    required
                   />
                   <p className="text-xs text-muted-foreground">
-                    Usuários com emails deste domínio serão automaticamente associados a este tenant
+                    Usuários com este domínio serão automaticamente associados a este tenant
                   </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label>Segmentos Contratados *</Label>
-                  <div className="flex gap-4">
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="db"
-                        checked={newTenant.segments.includes("DB")}
-                        onCheckedChange={() => handleSegmentToggle("DB")}
-                      />
-                      <label htmlFor="db" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Banco de Dados (DB)
-                      </label>
-                    </div>
-                    <div className="flex items-center space-x-2">
-                      <Checkbox
-                        id="app"
-                        checked={newTenant.segments.includes("APP")}
-                        onCheckedChange={() => handleSegmentToggle("APP")}
-                      />
-                      <label htmlFor="app" className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70">
-                        Aplicações (APP)
-                      </label>
-                    </div>
+                {/* Administrador Inicial */}
+                <div className="border-t pt-4 space-y-4">
+                  <h3 className="font-semibold text-sm">Administrador Inicial</h3>
+                  
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-email">Email do Admin *</Label>
+                    <Input
+                      id="admin-email"
+                      type="email"
+                      value={newTenant.admin_email}
+                      onChange={(e) => setNewTenant(prev => ({ ...prev, admin_email: e.target.value.toLowerCase() }))}
+                      placeholder="admin@sec4file.com"
+                      required
+                    />
                   </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-name">Nome Completo do Admin *</Label>
+                    <Input
+                      id="admin-name"
+                      value={newTenant.admin_name}
+                      onChange={(e) => setNewTenant(prev => ({ ...prev, admin_name: e.target.value }))}
+                      placeholder="João Silva"
+                      required
+                    />
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    ℹ️ Um email de convite será enviado automaticamente para este endereço após a criação do tenant.
+                  </p>
                 </div>
 
-                {newTenant.segments.includes("DB") && (
-                  <div className="space-y-2">
-                    <Label>Engines de Banco de Dados Contratados ({newTenant.db_engines.length})</Label>
-                    <div className="space-y-2 border rounded-md p-3">
-                      {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
-                        <div key={engine} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`engine-${engine}`}
-                            checked={newTenant.db_engines.includes(engine)}
-                            onCheckedChange={(checked) => {
-                              setNewTenant(prev => ({
-                                ...prev,
-                                db_engines: checked
-                                  ? [...prev.db_engines, engine]
-                                  : prev.db_engines.filter(e => e !== engine)
-                              }));
-                            }}
-                          />
-                          <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
-                            {engine}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
-                {newTenant.segments.includes("APP") && (
-                  <div className="space-y-2">
-                    <Label>Produtos de Aplicação Contratados ({newTenant.app_product_ids.length})</Label>
-                    <div className="space-y-2 border rounded-md p-3 max-h-60 overflow-y-auto">
-                      {appProducts?.map((product) => (
-                        <div key={product.id} className="flex items-center space-x-2">
-                          <Checkbox
-                            id={`app-${product.id}`}
-                            checked={newTenant.app_product_ids.includes(product.id)}
-                            onCheckedChange={(checked) => {
-                              setNewTenant(prev => ({
-                                ...prev,
-                                app_product_ids: checked
-                                  ? [...prev.app_product_ids, product.id]
-                                  : prev.app_product_ids.filter(id => id !== product.id)
-                              }));
-                            }}
-                          />
-                          <label htmlFor={`app-${product.id}`} className="text-sm cursor-pointer">
-                            <div className="font-medium">{product.name}</div>
-                            {product.description && (
-                              <div className="text-xs text-muted-foreground">{product.description}</div>
-                            )}
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                )}
-
+                {/* Máximo de Usuários */}
                 <div className="space-y-2">
-                  <Label htmlFor="max_users">Máximo de Usuários</Label>
+                  <Label htmlFor="max-users">Máximo de Usuários</Label>
                   <Input
-                    id="max_users"
+                    id="max-users"
                     type="number"
+                    min="1"
                     value={newTenant.max_users}
-                    onChange={(e) => setNewTenant({ ...newTenant, max_users: parseInt(e.target.value) || 10 })}
+                    onChange={(e) => setNewTenant(prev => ({ ...prev, max_users: parseInt(e.target.value) || 10 }))}
                   />
                 </div>
+              </div>
 
-                <div className="border-t pt-4">
-                  <h4 className="font-medium mb-3">Usuário Administrador Inicial</h4>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="admin_name">Nome Completo *</Label>
-                      <Input
-                        id="admin_name"
-                        value={newTenant.admin_name}
-                        onChange={(e) => setNewTenant({ ...newTenant, admin_name: e.target.value })}
-                        placeholder="João Silva"
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="admin_email">Email *</Label>
-                      <Input
-                        id="admin_email"
-                        type="email"
-                        value={newTenant.admin_email}
-                        onChange={(e) => setNewTenant({ ...newTenant, admin_email: e.target.value })}
-                        placeholder="admin@empresa.com"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-end gap-2">
-                  <Button variant="outline" onClick={() => setIsCreateDialogOpen(false)}>
-                    Cancelar
-                  </Button>
-                  <Button onClick={handleCreateTenant} disabled={isCreating}>
-                    {isCreating ? "Criando..." : "Criar Tenant"}
-                  </Button>
-                </div>
+              <div className="flex justify-end gap-2 mt-6">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsCreateDialogOpen(false)}
+                  disabled={isCreating}
+                >
+                  Cancelar
+                </Button>
+                <Button onClick={handleCreateTenant} disabled={isCreating}>
+                  {isCreating ? "Criando..." : "Criar Tenant"}
+                </Button>
               </div>
             </DialogContent>
           </Dialog>
