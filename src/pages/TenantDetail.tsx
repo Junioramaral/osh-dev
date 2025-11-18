@@ -40,7 +40,6 @@ const TenantDetail = () => {
   
   const [editForm, setEditForm] = useState({
     max_users: 10,
-    admin_user_id: "",
     admin_email: "",
     admin_full_name: "",
   });
@@ -161,31 +160,18 @@ const TenantDetail = () => {
     },
   });
   
-  // Preencher formulário ao abrir dialog
+  // Preencher formulário ao abrir dialog e carregar primeiro admin automaticamente
   useEffect(() => {
     if (isEditDialogOpen && tenant) {
+      const firstAdmin = tenantAdmins?.[0];
+      
       setEditForm({
         max_users: tenant.max_users || 10,
-        admin_user_id: "",
-        admin_email: "",
-        admin_full_name: "",
+        admin_email: firstAdmin?.email || "",
+        admin_full_name: firstAdmin?.full_name || "",
       });
     }
-  }, [isEditDialogOpen, tenant]);
-
-  // Fill admin data when admin is selected
-  useEffect(() => {
-    if (editForm.admin_user_id && tenantAdmins) {
-      const selectedAdmin = tenantAdmins.find(admin => admin.id === editForm.admin_user_id);
-      if (selectedAdmin) {
-        setEditForm(prev => ({
-          ...prev,
-          admin_email: selectedAdmin.email,
-          admin_full_name: selectedAdmin.full_name,
-        }));
-      }
-    }
-  }, [editForm.admin_user_id, tenantAdmins]);
+  }, [isEditDialogOpen, tenant, tenantAdmins]);
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -216,48 +202,55 @@ const TenantDetail = () => {
       return;
     }
 
-    // Validate admin info if selected
-    if (editForm.admin_user_id) {
-      if (!editForm.admin_full_name?.trim()) {
+    // Validar dados do admin
+    if (!editForm.admin_full_name?.trim()) {
+      toast.error("Erro de validação", {
+        description: "Nome completo do admin é obrigatório.",
+      });
+      return;
+    }
+
+    if (!editForm.admin_email?.trim()) {
+      toast.error("Erro de validação", {
+        description: "Email do admin é obrigatório.",
+      });
+      return;
+    }
+
+    // Validate email format
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(editForm.admin_email)) {
+      toast.error("Erro de validação", {
+        description: "Formato de email inválido.",
+      });
+      return;
+    }
+
+    // Validate email domain if tenant has domain configured
+    if (tenant?.domain) {
+      const emailDomain = editForm.admin_email.split('@')[1]?.toLowerCase();
+      if (emailDomain !== tenant.domain.toLowerCase()) {
         toast.error("Erro de validação", {
-          description: "Nome completo do admin é obrigatório.",
+          description: `Email deve ser do domínio ${tenant.domain}.`,
         });
         return;
       }
+    }
 
-      if (!editForm.admin_email?.trim()) {
-        toast.error("Erro de validação", {
-          description: "Email do admin é obrigatório.",
-        });
-        return;
-      }
-
-      // Validate email format
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      if (!emailRegex.test(editForm.admin_email)) {
-        toast.error("Erro de validação", {
-          description: "Formato de email inválido.",
-        });
-        return;
-      }
-
-      // Validate email domain if tenant has domain configured
-      if (tenant?.domain) {
-        const emailDomain = editForm.admin_email.split('@')[1]?.toLowerCase();
-        if (emailDomain !== tenant.domain.toLowerCase()) {
-          toast.error("Erro de validação", {
-            description: `Email deve ser do domínio ${tenant.domain}.`,
-          });
-          return;
-        }
-      }
+    // Pegar ID do primeiro admin
+    const firstAdminId = tenantAdmins?.[0]?.id;
+    if (!firstAdminId) {
+      toast.error("Erro de validação", {
+        description: "Nenhum administrador encontrado para este tenant.",
+      });
+      return;
     }
 
     updateTenantMutation.mutate({ 
       max_users: editForm.max_users,
-      admin_user_id: editForm.admin_user_id || undefined,
-      admin_email: editForm.admin_email || undefined,
-      admin_full_name: editForm.admin_full_name || undefined,
+      admin_user_id: firstAdminId,
+      admin_email: editForm.admin_email,
+      admin_full_name: editForm.admin_full_name,
     });
   };
 
@@ -329,7 +322,7 @@ const TenantDetail = () => {
                 <DialogHeader>
                   <DialogTitle>Editar Tenant: {tenant.name}</DialogTitle>
                   <DialogDescription>
-                    Edite o máximo de usuários e os dados dos administradores do tenant
+                    Edite o máximo de usuários e os dados do administrador principal do tenant
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -381,65 +374,48 @@ const TenantDetail = () => {
                       </p>
                     </div>
 
-                    {/* Seleção de Admin */}
+                  </div>
+
+                  {/* Dados do Administrador */}
+                  <div className="border-t pt-4 space-y-4">
+                    <h3 className="font-semibold text-sm">Dados do Administrador</h3>
+                    
                     <div>
-                      <Label htmlFor="admin_select">Selecione o Admin para Editar (Opcional)</Label>
-                      <Select
-                        value={editForm.admin_user_id}
-                        onValueChange={(value) => setEditForm(prev => ({ 
-                          ...prev, 
-                          admin_user_id: value,
-                        }))}
-                      >
-                        <SelectTrigger id="admin_select">
-                          <SelectValue placeholder="Selecione um administrador" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          {tenantAdmins?.map((admin) => (
-                            <SelectItem key={admin.id} value={admin.id}>
-                              {admin.full_name} ({admin.email})
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Apenas usuários com role "tenant_admin" aparecem nesta lista
+                      <Label htmlFor="admin_full_name">Nome Completo do Admin *</Label>
+                      <Input
+                        id="admin_full_name"
+                        type="text"
+                        value={editForm.admin_full_name}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, admin_full_name: e.target.value }))}
+                        placeholder="João Silva"
+                        required
+                      />
+                    </div>
+
+                    <div>
+                      <Label htmlFor="admin_email">Email do Admin *</Label>
+                      <Input
+                        id="admin_email"
+                        type="email"
+                        value={editForm.admin_email}
+                        onChange={(e) => setEditForm(prev => ({ ...prev, admin_email: e.target.value.toLowerCase() }))}
+                        placeholder="admin@sec4file.com"
+                        required
+                      />
+                      {tenant?.domain && (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Email deve ser do domínio: @{tenant.domain}
+                        </p>
+                      )}
+                      <p className="text-xs text-amber-600 mt-1">
+                        ⚠️ Alterar o email invalidará a sessão do usuário
                       </p>
                     </div>
 
-                    {/* Campos do Admin - aparecem apenas após seleção */}
-                    {editForm.admin_user_id && (
-                      <>
-                        <div>
-                          <Label htmlFor="admin_full_name">Nome Completo do Admin *</Label>
-                          <Input
-                            id="admin_full_name"
-                            type="text"
-                            value={editForm.admin_full_name}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, admin_full_name: e.target.value }))}
-                            required
-                          />
-                        </div>
-
-                        <div>
-                          <Label htmlFor="admin_email">Email do Admin *</Label>
-                          <Input
-                            id="admin_email"
-                            type="email"
-                            value={editForm.admin_email}
-                            onChange={(e) => setEditForm(prev => ({ ...prev, admin_email: e.target.value }))}
-                            required
-                          />
-                          {tenant?.domain && (
-                            <p className="text-xs text-muted-foreground mt-1">
-                              Email deve ser do domínio: @{tenant.domain}
-                            </p>
-                          )}
-                          <p className="text-xs text-amber-600 mt-1">
-                            ⚠️ Alterar o email invalidará a sessão do usuário
-                          </p>
-                        </div>
-                      </>
+                    {tenantAdmins && tenantAdmins.length > 0 && (
+                      <p className="text-xs text-muted-foreground">
+                        ℹ️ Editando: {tenantAdmins[0]?.full_name} ({tenantAdmins[0]?.email})
+                      </p>
                     )}
                   </div>
                   
