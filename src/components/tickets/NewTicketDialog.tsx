@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -100,6 +100,37 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const selectedClientId = watch("client_id");
   const selectedDbEngine = watch("db_engine");
   const selectedAppProductId = watch("app_product_id");
+
+  // Fetch current tenant data to get segments
+  const { data: currentTenant } = useQuery({
+    queryKey: ["current-tenant", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, segments")
+        .eq("id", tenantId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!tenantId,
+  });
+
+  // Determine available segments
+  const availableSegments = currentTenant?.segments || [];
+  const hasOnlyOneSegment = availableSegments.length === 1;
+
+  // Auto-set segment if tenant has only one
+  useEffect(() => {
+    if (currentTenant && availableSegments.length > 0) {
+      const initialSegment = availableSegments[0] as "DB" | "APP";
+      setSegment(initialSegment);
+      setValue("segment", initialSegment);
+    }
+  }, [currentTenant, setValue]);
 
   // Fetch clients
   const { data: clients } = useQuery({
@@ -264,18 +295,38 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* Segment Selection */}
-          <div className="space-y-2">
-            <Label>Segmento *</Label>
-            <Select value={segment} onValueChange={handleSegmentChange}>
-              <SelectTrigger>
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="DB">Banco de Dados</SelectItem>
-                <SelectItem value="APP">Aplicação</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+          {hasOnlyOneSegment ? (
+            <div className="space-y-2">
+              <Label>Segmento *</Label>
+              <div className="flex items-center gap-2">
+                <Input 
+                  value={segment === "DB" ? "Banco de Dados" : "Aplicação"}
+                  disabled
+                  className="bg-muted cursor-not-allowed"
+                />
+                <p className="text-xs text-muted-foreground">
+                  (Segmento único disponível)
+                </p>
+              </div>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              <Label>Segmento *</Label>
+              <Select value={segment} onValueChange={handleSegmentChange}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableSegments.includes("DB") && (
+                    <SelectItem value="DB">Banco de Dados</SelectItem>
+                  )}
+                  {availableSegments.includes("APP") && (
+                    <SelectItem value="APP">Aplicação</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* Common Fields */}
           <div className="grid grid-cols-2 gap-4">
