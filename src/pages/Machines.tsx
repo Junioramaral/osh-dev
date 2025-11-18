@@ -9,10 +9,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Server, AlertCircle } from "lucide-react";
+import MachineDialog from "@/components/machines/MachineDialog";
 
 export default function Machines() {
   const { profile, isSuperAdmin, hasRole } = useAuth();
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const { data: machines, isLoading } = useQuery({
     queryKey: ["machines"],
@@ -53,7 +55,7 @@ export default function Machines() {
             <p className="text-muted-foreground">Catálogo de ativos de infraestrutura</p>
           </div>
           {isSuperAdmin && (
-            <Button>
+            <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Máquina
             </Button>
@@ -143,6 +145,8 @@ export default function Machines() {
           </Card>
         )}
       </div>
+
+      <MachineDialog open={isDialogOpen} onOpenChange={setIsDialogOpen} />
     </AppLayout>
   );
 }
