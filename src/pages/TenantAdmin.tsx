@@ -60,7 +60,7 @@ export default function TenantAdmin() {
 
   const handleCreateTenant = async () => {
     if (!newTenant.name || !newTenant.domain || !newTenant.admin_email || !newTenant.admin_name) {
-      toast.error("Preencha todos os campos obrigatórios (Nome, Domínio, Email e Nome do Admin)");
+      toast.error("Preencha todos os campos obrigatórios (Nome, Domínio, Email e Nome do Contato)");
       return;
     }
 
@@ -68,7 +68,7 @@ export default function TenantAdmin() {
     const emailDomain = newTenant.admin_email.split('@')[1]?.toLowerCase();
     if (emailDomain !== newTenant.domain.toLowerCase()) {
       toast.error(
-        `O email do administrador deve pertencer ao domínio ${newTenant.domain}`,
+        `O email do contato deve pertencer ao domínio ${newTenant.domain}`,
         { description: `Email fornecido: ${newTenant.admin_email}` }
       );
       return;
@@ -236,24 +236,12 @@ export default function TenantAdmin() {
                   </p>
                 </div>
 
-                {/* Administrador Inicial */}
+                {/* Contato do Cliente */}
                 <div className="border-t pt-4 space-y-4">
-                  <h3 className="font-semibold text-sm">Administrador Inicial</h3>
+                  <h3 className="font-semibold text-sm">Contato do Cliente</h3>
                   
                   <div className="space-y-2">
-                    <Label htmlFor="admin-email">Email do Admin *</Label>
-                    <Input
-                      id="admin-email"
-                      type="email"
-                      value={newTenant.admin_email}
-                      onChange={(e) => setNewTenant(prev => ({ ...prev, admin_email: e.target.value.toLowerCase() }))}
-                      placeholder="admin@sec4file.com"
-                      required
-                    />
-                  </div>
-
-                  <div className="space-y-2">
-                    <Label htmlFor="admin-name">Nome Completo do Admin *</Label>
+                    <Label htmlFor="admin-name">Nome Completo *</Label>
                     <Input
                       id="admin-name"
                       value={newTenant.admin_name}
@@ -263,21 +251,32 @@ export default function TenantAdmin() {
                     />
                   </div>
 
-                  <p className="text-xs text-muted-foreground">
-                    ℹ️ Um email de convite será enviado automaticamente para este endereço após a criação do tenant.
-                  </p>
-                </div>
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-email">Email *</Label>
+                    <Input
+                      id="admin-email"
+                      type="email"
+                      value={newTenant.admin_email}
+                      onChange={(e) => setNewTenant(prev => ({ ...prev, admin_email: e.target.value.toLowerCase() }))}
+                      placeholder="contato@sec4file.com"
+                      required
+                    />
+                  </div>
 
-                {/* Máximo de Usuários */}
-                <div className="space-y-2">
-                  <Label htmlFor="max-users">Máximo de Usuários</Label>
-                  <Input
-                    id="max-users"
-                    type="number"
-                    min="1"
-                    value={newTenant.max_users}
-                    onChange={(e) => setNewTenant(prev => ({ ...prev, max_users: parseInt(e.target.value) || 10 }))}
-                  />
+                  <div className="space-y-2">
+                    <Label htmlFor="max-users">Máximo de Usuários *</Label>
+                    <Input
+                      id="max-users"
+                      type="number"
+                      min="1"
+                      value={newTenant.max_users}
+                      onChange={(e) => setNewTenant(prev => ({ ...prev, max_users: parseInt(e.target.value) || 10 }))}
+                    />
+                  </div>
+
+                  <p className="text-xs text-muted-foreground">
+                    ℹ️ Um email de convite será enviado automaticamente para este contato após a criação do tenant.
+                  </p>
                 </div>
               </div>
 
