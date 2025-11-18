@@ -26,6 +26,12 @@ const TenantDetail = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
+  type TenantAdmin = {
+    id: string;
+    full_name: string;
+    email: string;
+  };
+  
   const [inviteForm, setInviteForm] = useState({
     email: "",
     full_name: "",
@@ -35,6 +41,8 @@ const TenantDetail = () => {
   const [editForm, setEditForm] = useState({
     max_users: 10,
     admin_user_id: "",
+    admin_email: "",
+    admin_full_name: "",
   });
 
   const { data: tenant, isLoading: tenantLoading } = useQuery({
@@ -64,10 +72,10 @@ const TenantDetail = () => {
   } = useTenantUsers(tenantId);
   
   // Query para buscar admins do tenant
-  const { data: tenantAdmins } = useQuery({
+  const { data: tenantAdmins } = useQuery<TenantAdmin[]>({
     queryKey: ["tenant-admins", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
         .select(`
           id,
@@ -78,21 +86,66 @@ const TenantDetail = () => {
         .eq("user_roles.role", "tenant_admin")
         .eq("is_active", true);
       
-      if (error) throw error;
-      return data;
+      if (profilesError) throw profilesError;
+
+      // Fetch emails from auth.users for each admin
+      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
+      if (usersError) throw usersError;
+
+      // Combine profile data with email
+      const adminsWithEmail: TenantAdmin[] = (profiles || []).map(profile => {
+        const authUser = users?.find((u: any) => u.id === profile.id);
+        return {
+          id: profile.id,
+          full_name: profile.full_name,
+          email: authUser?.email || "",
+        };
+      });
+
+      return adminsWithEmail;
     },
     enabled: !!tenantId && isEditDialogOpen,
   });
   
   // Mutation para atualizar tenant
   const updateTenantMutation = useMutation({
-    mutationFn: async (updates: { max_users: number }) => {
-      const { error } = await supabase
+    mutationFn: async (updates: { 
+      max_users: number; 
+      admin_user_id?: string;
+      admin_email?: string;
+      admin_full_name?: string;
+    }) => {
+      // Update max_users in tenant
+      const { error: tenantError } = await supabase
         .from("clients")
         .update({ max_users: updates.max_users })
         .eq("id", tenantId);
       
-      if (error) throw error;
+      if (tenantError) throw tenantError;
+
+      // Update admin info if provided
+      if (updates.admin_user_id) {
+        // Update full_name in profiles
+        if (updates.admin_full_name) {
+          const { error: profileError } = await supabase
+            .from("profiles")
+            .update({ full_name: updates.admin_full_name })
+            .eq("id", updates.admin_user_id);
+          
+          if (profileError) throw profileError;
+        }
+
+        // Update email in auth.users
+        if (updates.admin_email) {
+          const { error: emailError } = await supabase.auth.admin.updateUserById(
+            updates.admin_user_id,
+            { email: updates.admin_email }
+          );
+          
+          if (emailError) throw emailError;
+        }
+      }
+      
       return { success: true };
     },
     onSuccess: () => {
@@ -114,9 +167,25 @@ const TenantDetail = () => {
       setEditForm({
         max_users: tenant.max_users || 10,
         admin_user_id: "",
+        admin_email: "",
+        admin_full_name: "",
       });
     }
   }, [isEditDialogOpen, tenant]);
+
+  // Fill admin data when admin is selected
+  useEffect(() => {
+    if (editForm.admin_user_id && tenantAdmins) {
+      const selectedAdmin = tenantAdmins.find(admin => admin.id === editForm.admin_user_id);
+      if (selectedAdmin) {
+        setEditForm(prev => ({
+          ...prev,
+          admin_email: selectedAdmin.email,
+          admin_full_name: selectedAdmin.full_name,
+        }));
+      }
+    }
+  }, [editForm.admin_user_id, tenantAdmins]);
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,18 +200,65 @@ const TenantDetail = () => {
   const handleEditTenantSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
-    // Validações
-    if (editForm.max_users < (users?.length || 0)) {
-      toast.error("Máximo de usuários não pode ser menor que o número atual de usuários");
+    // Validação de max_users
+    const currentUserCount = users?.length || 0;
+    if (editForm.max_users < currentUserCount) {
+      toast.error("Erro de validação", {
+        description: `Máximo de usuários não pode ser menor que o número atual de usuários cadastrados (${currentUserCount}).`,
+      });
       return;
     }
-    
+
     if (editForm.max_users <= 0) {
-      toast.error("Máximo de usuários deve ser maior que 0");
+      toast.error("Erro de validação", {
+        description: "Máximo de usuários deve ser maior que zero.",
+      });
       return;
     }
-    
-    updateTenantMutation.mutate({ max_users: editForm.max_users });
+
+    // Validate admin info if selected
+    if (editForm.admin_user_id) {
+      if (!editForm.admin_full_name?.trim()) {
+        toast.error("Erro de validação", {
+          description: "Nome completo do admin é obrigatório.",
+        });
+        return;
+      }
+
+      if (!editForm.admin_email?.trim()) {
+        toast.error("Erro de validação", {
+          description: "Email do admin é obrigatório.",
+        });
+        return;
+      }
+
+      // Validate email format
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(editForm.admin_email)) {
+        toast.error("Erro de validação", {
+          description: "Formato de email inválido.",
+        });
+        return;
+      }
+
+      // Validate email domain if tenant has domain configured
+      if (tenant?.domain) {
+        const emailDomain = editForm.admin_email.split('@')[1]?.toLowerCase();
+        if (emailDomain !== tenant.domain.toLowerCase()) {
+          toast.error("Erro de validação", {
+            description: `Email deve ser do domínio ${tenant.domain}.`,
+          });
+          return;
+        }
+      }
+    }
+
+    updateTenantMutation.mutate({ 
+      max_users: editForm.max_users,
+      admin_user_id: editForm.admin_user_id || undefined,
+      admin_email: editForm.admin_email || undefined,
+      admin_full_name: editForm.admin_full_name || undefined,
+    });
   };
 
   const getUserStatus = (user: any) => {
@@ -213,7 +329,7 @@ const TenantDetail = () => {
                 <DialogHeader>
                   <DialogTitle>Editar Tenant: {tenant.name}</DialogTitle>
                   <DialogDescription>
-                    Edite o máximo de usuários permitidos. Outros campos não são editáveis.
+                    Edite o máximo de usuários e os dados dos administradores do tenant
                   </DialogDescription>
                 </DialogHeader>
                 
@@ -249,6 +365,7 @@ const TenantDetail = () => {
                   <div className="space-y-4">
                     <h3 className="font-semibold text-sm">Campos Editáveis</h3>
                     
+                    {/* Máximo de Usuários */}
                     <div>
                       <Label htmlFor="max_users">Máximo de Usuários *</Label>
                       <Input
@@ -263,6 +380,67 @@ const TenantDetail = () => {
                         Atualmente: {users?.length || 0} usuário(s) cadastrado(s)
                       </p>
                     </div>
+
+                    {/* Seleção de Admin */}
+                    <div>
+                      <Label htmlFor="admin_select">Selecione o Admin para Editar (Opcional)</Label>
+                      <Select
+                        value={editForm.admin_user_id}
+                        onValueChange={(value) => setEditForm(prev => ({ 
+                          ...prev, 
+                          admin_user_id: value,
+                        }))}
+                      >
+                        <SelectTrigger id="admin_select">
+                          <SelectValue placeholder="Selecione um administrador" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {tenantAdmins?.map((admin) => (
+                            <SelectItem key={admin.id} value={admin.id}>
+                              {admin.full_name} ({admin.email})
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        Apenas usuários com role "tenant_admin" aparecem nesta lista
+                      </p>
+                    </div>
+
+                    {/* Campos do Admin - aparecem apenas após seleção */}
+                    {editForm.admin_user_id && (
+                      <>
+                        <div>
+                          <Label htmlFor="admin_full_name">Nome Completo do Admin *</Label>
+                          <Input
+                            id="admin_full_name"
+                            type="text"
+                            value={editForm.admin_full_name}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, admin_full_name: e.target.value }))}
+                            required
+                          />
+                        </div>
+
+                        <div>
+                          <Label htmlFor="admin_email">Email do Admin *</Label>
+                          <Input
+                            id="admin_email"
+                            type="email"
+                            value={editForm.admin_email}
+                            onChange={(e) => setEditForm(prev => ({ ...prev, admin_email: e.target.value }))}
+                            required
+                          />
+                          {tenant?.domain && (
+                            <p className="text-xs text-muted-foreground mt-1">
+                              Email deve ser do domínio: @{tenant.domain}
+                            </p>
+                          )}
+                          <p className="text-xs text-amber-600 mt-1">
+                            ⚠️ Alterar o email invalidará a sessão do usuário
+                          </p>
+                        </div>
+                      </>
+                    )}
                   </div>
                   
                   <div className="flex justify-end gap-2 pt-4 border-t">
