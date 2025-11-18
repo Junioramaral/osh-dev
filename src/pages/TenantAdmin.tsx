@@ -14,6 +14,7 @@ import { Label } from "@/components/ui/label";
 import { Checkbox } from "@/components/ui/checkbox";
 import { toast } from "sonner";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 
 interface Tenant {
   id: string;
@@ -39,6 +40,8 @@ export default function TenantAdmin() {
     cnpj: "",
     domain: "",
     segments: [] as string[],
+    db_engines: [] as string[],
+    app_product_ids: [] as string[],
     admin_email: "",
     admin_name: "",
     max_users: 10,
@@ -58,6 +61,18 @@ export default function TenantAdmin() {
     enabled: isSuperAdmin,
   });
 
+  const { data: appProducts } = useQuery({
+    queryKey: ["application_products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("application_products")
+        .select("id, name, description")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   const handleCreateTenant = async () => {
     if (!newTenant.name || !newTenant.domain || !newTenant.admin_email || !newTenant.admin_name || newTenant.segments.length === 0) {
       toast.error("Preencha todos os campos obrigatórios");
@@ -75,6 +90,8 @@ export default function TenantAdmin() {
           domain: newTenant.domain,
           tenant_type: "customer",
           segments: newTenant.segments,
+          db_engines: newTenant.db_engines,
+          app_product_ids: newTenant.app_product_ids,
           is_active: true,
           status: "ativo",
           max_users: newTenant.max_users,
@@ -97,11 +114,14 @@ export default function TenantAdmin() {
         cnpj: "",
         domain: "",
         segments: [],
+        db_engines: [],
+        app_product_ids: [],
         admin_email: "",
         admin_name: "",
         max_users: 10,
       });
-      refetch();
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
     } catch (error: any) {
       toast.error("Erro ao criar tenant", {
         description: error.message,
@@ -130,12 +150,19 @@ export default function TenantAdmin() {
   };
 
   const handleSegmentToggle = (segment: string) => {
-    setNewTenant(prev => ({
-      ...prev,
-      segments: prev.segments.includes(segment)
+    setNewTenant(prev => {
+      const newSegments = prev.segments.includes(segment)
         ? prev.segments.filter(s => s !== segment)
-        : [...prev.segments, segment]
-    }));
+        : [...prev.segments, segment];
+      
+      // Clear related selections when segment is deselected
+      return {
+        ...prev,
+        segments: newSegments,
+        db_engines: newSegments.includes("DB") ? prev.db_engines : [],
+        app_product_ids: newSegments.includes("APP") ? prev.app_product_ids : [],
+      };
+    });
   };
 
   if (!isSuperAdmin) {
@@ -240,6 +267,63 @@ export default function TenantAdmin() {
                     </div>
                   </div>
                 </div>
+
+                {newTenant.segments.includes("DB") && (
+                  <div className="space-y-2">
+                    <Label>Engines de Banco de Dados Contratados ({newTenant.db_engines.length})</Label>
+                    <div className="space-y-2 border rounded-md p-3">
+                      {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
+                        <div key={engine} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`engine-${engine}`}
+                            checked={newTenant.db_engines.includes(engine)}
+                            onCheckedChange={(checked) => {
+                              setNewTenant(prev => ({
+                                ...prev,
+                                db_engines: checked
+                                  ? [...prev.db_engines, engine]
+                                  : prev.db_engines.filter(e => e !== engine)
+                              }));
+                            }}
+                          />
+                          <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
+                            {engine}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {newTenant.segments.includes("APP") && (
+                  <div className="space-y-2">
+                    <Label>Produtos de Aplicação Contratados ({newTenant.app_product_ids.length})</Label>
+                    <div className="space-y-2 border rounded-md p-3 max-h-60 overflow-y-auto">
+                      {appProducts?.map((product) => (
+                        <div key={product.id} className="flex items-center space-x-2">
+                          <Checkbox
+                            id={`app-${product.id}`}
+                            checked={newTenant.app_product_ids.includes(product.id)}
+                            onCheckedChange={(checked) => {
+                              setNewTenant(prev => ({
+                                ...prev,
+                                app_product_ids: checked
+                                  ? [...prev.app_product_ids, product.id]
+                                  : prev.app_product_ids.filter(id => id !== product.id)
+                              }));
+                            }}
+                          />
+                          <label htmlFor={`app-${product.id}`} className="text-sm cursor-pointer">
+                            <div className="font-medium">{product.name}</div>
+                            {product.description && (
+                              <div className="text-xs text-muted-foreground">{product.description}</div>
+                            )}
+                          </label>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="max_users">Máximo de Usuários</Label>

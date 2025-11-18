@@ -33,6 +33,18 @@ export default function Clients() {
     enabled: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app'),
   });
 
+  const { data: appProducts } = useQuery({
+    queryKey: ["application_products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("application_products")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Only admins and analysts can access this page
   if (!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app')) {
     return (
@@ -119,6 +131,35 @@ export default function Clients() {
                           {tag}
                         </Badge>
                       ))}
+                    </div>
+                  )}
+
+                  {client.segments?.includes("DB") && client.db_engines && client.db_engines.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground">Bancos:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {client.db_engines.map((engine) => (
+                          <Badge key={engine} variant="outline" className="text-xs">
+                            {engine}
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {client.segments?.includes("APP") && client.app_product_ids && client.app_product_ids.length > 0 && (
+                    <div className="space-y-1">
+                      <span className="text-xs font-semibold text-muted-foreground">Aplicações:</span>
+                      <div className="flex flex-wrap gap-1">
+                        {client.app_product_ids.map((productId) => {
+                          const product = appProducts?.find(p => p.id === productId);
+                          return product ? (
+                            <Badge key={productId} variant="outline" className="text-xs">
+                              {product.name}
+                            </Badge>
+                          ) : null;
+                        })}
+                      </div>
                     </div>
                   )}
                 </CardContent>
