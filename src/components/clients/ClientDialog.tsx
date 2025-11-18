@@ -64,10 +64,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
   const { data: appProducts } = useQuery({
     queryKey: ["application_products"],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("application_products")
-        .select("id, name, description")
-        .order("name");
+      const { data, error } = await supabase.from("application_products").select("id, name, description").order("name");
       if (error) throw error;
       return data;
     },
@@ -175,9 +172,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>
-            {mode === "create" ? "Novo Cliente" : `Editar Cliente: ${client?.name}`}
-          </DialogTitle>
+          <DialogTitle>{mode === "create" ? "Novo Cliente" : `Editar Cliente: ${client?.name}`}</DialogTitle>
         </DialogHeader>
 
         <Form {...form}>
@@ -335,7 +330,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                     />
 
                     {/* Grid horizontal para Engines (esquerda) e Produtos (direita) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-[35%_65%] gap-8 lg:gap-10">
+                    <div className="grid grid-cols-1 lg:grid-cols-[35%_85%] gap-8 lg:gap-10">
                       {/* Coluna da esquerda: Engines de Banco */}
                       <div className="space-y-2 min-w-0">
                         {selectedSegments.includes("DB") && (
@@ -344,7 +339,9 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                             name="db_engines"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="whitespace-nowrap">Engines de Banco ({field.value.length})</FormLabel>
+                                <FormLabel className="whitespace-nowrap">
+                                  Engines de Banco ({field.value.length})
+                                </FormLabel>
                                 <div className="space-y-3 border rounded-md p-4 bg-muted/20">
                                   {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
                                     <div key={engine} className="flex items-center space-x-2">
@@ -379,7 +376,9 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                             name="app_product_ids"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="whitespace-nowrap">Produtos de Aplicação ({field.value.length})</FormLabel>
+                                <FormLabel className="whitespace-nowrap">
+                                  Produtos de Aplicação ({field.value.length})
+                                </FormLabel>
                                 <div className="space-y-3 border rounded-md p-4 bg-muted/20 max-h-96 overflow-y-auto">
                                   {appProducts?.map((product) => (
                                     <div key={product.id} className="flex items-start space-x-3 min-w-0">
@@ -394,7 +393,10 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                         }}
                                         className="mt-1"
                                       />
-                                      <label htmlFor={`app-${product.id}`} className="text-sm cursor-pointer flex-1 min-w-0 leading-relaxed">
+                                      <label
+                                        htmlFor={`app-${product.id}`}
+                                        className="text-sm cursor-pointer flex-1 min-w-0 leading-relaxed"
+                                      >
                                         <div className="font-medium">{product.name}</div>
                                         {product.description && (
                                           <div className="text-xs text-muted-foreground">{product.description}</div>
