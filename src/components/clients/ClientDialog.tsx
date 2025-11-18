@@ -1,13 +1,16 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { useQuery } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2 } from "lucide-react";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClientMutations";
 import type { Tables } from "@/integrations/supabase/types";
@@ -20,6 +23,9 @@ const clientSchema = z.object({
   domain: z.string().nullable().optional(),
   status: z.string().default("ativo"),
   tenant_type: z.string().default("customer"),
+  segments: z.array(z.string()).default([]),
+  db_engines: z.array(z.string()).default([]),
+  app_product_ids: z.array(z.string()).default([]),
   max_users: z.coerce.number().min(1, "Mínimo 1 usuário").default(10),
   contract_start_date: z.string().nullable().optional(),
   contract_end_date: z.string().nullable().optional(),
@@ -53,6 +59,19 @@ interface ClientDialogProps {
 export default function ClientDialog({ open, onOpenChange, mode, client }: ClientDialogProps) {
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
+  const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
+
+  const { data: appProducts } = useQuery({
+    queryKey: ["application_products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("application_products")
+        .select("id, name, description")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const form = useForm<ClientFormData>({
     resolver: zodResolver(clientSchema),
@@ -62,6 +81,9 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
       domain: "",
       status: "ativo",
       tenant_type: "customer",
+      segments: [],
+      db_engines: [],
+      app_product_ids: [],
       max_users: 10,
       contract_start_date: "",
       contract_end_date: "",
@@ -86,12 +108,16 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
 
   useEffect(() => {
     if (mode === "edit" && client) {
+      setSelectedSegments(client.segments || []);
       form.reset({
         name: client.name,
         cnpj: client.cnpj || "",
         domain: client.domain || "",
         status: client.status || "ativo",
         tenant_type: client.tenant_type || "customer",
+        segments: client.segments || [],
+        db_engines: client.db_engines || [],
+        app_product_ids: client.app_product_ids || [],
         max_users: client.max_users || 10,
         contract_start_date: client.contract_start_date || "",
         contract_end_date: client.contract_end_date || "",
@@ -113,6 +139,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         sla_app_p4_resolution: client.sla_app_p4_resolution || 1920,
       });
     } else {
+      setSelectedSegments([]);
       form.reset();
     }
   }, [mode, client, form]);
@@ -123,6 +150,9 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         ...data,
         cnpj: data.cnpj || null,
         domain: data.domain || null,
+        segments: data.segments || [],
+        db_engines: data.db_engines || [],
+        app_product_ids: data.app_product_ids || [],
         contract_start_date: data.contract_start_date || null,
         contract_end_date: data.contract_end_date || null,
       };
@@ -250,6 +280,124 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                       </FormItem>
                     )}
                   />
+
+                  <FormField
+                    control={form.control}
+                    name="segments"
+                    render={({ field }) => (
+                      <FormItem>
+                        <FormLabel>Segmentos</FormLabel>
+                        <div className="flex gap-4">
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="segment-db"
+                              checked={field.value.includes("DB")}
+                              onCheckedChange={(checked) => {
+                                const newSegments = checked
+                                  ? [...field.value, "DB"]
+                                  : field.value.filter((s) => s !== "DB");
+                                field.onChange(newSegments);
+                                setSelectedSegments(newSegments);
+                                if (!checked) {
+                                  form.setValue("db_engines", []);
+                                }
+                              }}
+                            />
+                            <label htmlFor="segment-db" className="text-sm cursor-pointer">
+                              Banco de Dados (DB)
+                            </label>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <Checkbox
+                              id="segment-app"
+                              checked={field.value.includes("APP")}
+                              onCheckedChange={(checked) => {
+                                const newSegments = checked
+                                  ? [...field.value, "APP"]
+                                  : field.value.filter((s) => s !== "APP");
+                                field.onChange(newSegments);
+                                setSelectedSegments(newSegments);
+                                if (!checked) {
+                                  form.setValue("app_product_ids", []);
+                                }
+                              }}
+                            />
+                            <label htmlFor="segment-app" className="text-sm cursor-pointer">
+                              Aplicação (APP)
+                            </label>
+                          </div>
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+
+                  {selectedSegments.includes("DB") && (
+                    <FormField
+                      control={form.control}
+                      name="db_engines"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Engines de Banco ({field.value.length})</FormLabel>
+                          <div className="space-y-2 border rounded-md p-3">
+                            {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
+                              <div key={engine} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`engine-${engine}`}
+                                  checked={field.value.includes(engine)}
+                                  onCheckedChange={(checked) => {
+                                    const newEngines = checked
+                                      ? [...field.value, engine]
+                                      : field.value.filter((e) => e !== engine);
+                                    field.onChange(newEngines);
+                                  }}
+                                />
+                                <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
+                                  {engine}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
+
+                  {selectedSegments.includes("APP") && (
+                    <FormField
+                      control={form.control}
+                      name="app_product_ids"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Produtos de Aplicação ({field.value.length})</FormLabel>
+                          <div className="space-y-2 border rounded-md p-3 max-h-60 overflow-y-auto">
+                            {appProducts?.map((product) => (
+                              <div key={product.id} className="flex items-center space-x-2">
+                                <Checkbox
+                                  id={`app-${product.id}`}
+                                  checked={field.value.includes(product.id)}
+                                  onCheckedChange={(checked) => {
+                                    const newProducts = checked
+                                      ? [...field.value, product.id]
+                                      : field.value.filter((id) => id !== product.id);
+                                    field.onChange(newProducts);
+                                  }}
+                                />
+                                <label htmlFor={`app-${product.id}`} className="text-sm cursor-pointer">
+                                  <div className="font-medium">{product.name}</div>
+                                  {product.description && (
+                                    <div className="text-xs text-muted-foreground">{product.description}</div>
+                                  )}
+                                </label>
+                              </div>
+                            ))}
+                          </div>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  )}
                 </div>
               </TabsContent>
 

@@ -145,10 +145,12 @@ export type Database = {
       }
       clients: {
         Row: {
+          app_product_ids: string[] | null
           cnpj: string | null
           contract_end_date: string | null
           contract_start_date: string | null
           created_at: string | null
+          db_engines: string[] | null
           domain: string | null
           id: string
           is_active: boolean | null
@@ -177,10 +179,12 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          app_product_ids?: string[] | null
           cnpj?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string | null
+          db_engines?: string[] | null
           domain?: string | null
           id?: string
           is_active?: boolean | null
@@ -209,10 +213,12 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          app_product_ids?: string[] | null
           cnpj?: string | null
           contract_end_date?: string | null
           contract_start_date?: string | null
           created_at?: string | null
+          db_engines?: string[] | null
           domain?: string | null
           id?: string
           is_active?: boolean | null
