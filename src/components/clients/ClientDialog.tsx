@@ -335,17 +335,17 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                     />
 
                     {/* Grid horizontal para Engines (esquerda) e Produtos (direita) */}
-                    <div className="grid grid-cols-2 gap-6">
+                    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 lg:gap-10">
                       {/* Coluna da esquerda: Engines de Banco */}
-                      <div className="space-y-2">
+                      <div className="space-y-2 min-w-0">
                         {selectedSegments.includes("DB") && (
                           <FormField
                             control={form.control}
                             name="db_engines"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Engines de Banco ({field.value.length})</FormLabel>
-                                <div className="space-y-2 border rounded-md p-3 bg-muted/20">
+                                <FormLabel className="whitespace-nowrap">Engines de Banco ({field.value.length})</FormLabel>
+                                <div className="space-y-3 border rounded-md p-4 bg-muted/20">
                                   {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
                                     <div key={engine} className="flex items-center space-x-2">
                                       <Checkbox
@@ -372,15 +372,15 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                       </div>
 
                       {/* Coluna da direita: Produtos de Aplicação */}
-                      <div className="space-y-2">
+                      <div className="space-y-2 min-w-0">
                         {selectedSegments.includes("APP") && (
                           <FormField
                             control={form.control}
                             name="app_product_ids"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel>Produtos de Aplicação ({field.value.length})</FormLabel>
-                                <div className="space-y-2 border rounded-md p-3 bg-muted/20 max-h-60 overflow-y-auto">
+                                <FormLabel className="whitespace-nowrap">Produtos de Aplicação ({field.value.length})</FormLabel>
+                                <div className="space-y-3 border rounded-md p-4 bg-muted/20 max-h-60 overflow-y-auto">
                                   {appProducts?.map((product) => (
                                     <div key={product.id} className="flex items-center space-x-2">
                                       <Checkbox
