@@ -382,7 +382,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                 <FormLabel className="whitespace-nowrap">Produtos de Aplicação ({field.value.length})</FormLabel>
                                 <div className="space-y-3 border rounded-md p-4 bg-muted/20 max-h-60 overflow-y-auto">
                                   {appProducts?.map((product) => (
-                                    <div key={product.id} className="flex items-center space-x-2">
+                                    <div key={product.id} className="flex items-center space-x-3 min-w-0">
                                       <Checkbox
                                         id={`app-${product.id}`}
                                         checked={field.value.includes(product.id)}
@@ -393,10 +393,10 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                           field.onChange(newProducts);
                                         }}
                                       />
-                                      <label htmlFor={`app-${product.id}`} className="text-sm cursor-pointer">
-                                        <div className="font-medium">{product.name}</div>
+                                      <label htmlFor={`app-${product.id}`} className="text-sm cursor-pointer flex-1 min-w-0">
+                                        <div className="font-medium truncate">{product.name}</div>
                                         {product.description && (
-                                          <div className="text-xs text-muted-foreground">{product.description}</div>
+                                          <div className="text-xs text-muted-foreground truncate">{product.description}</div>
                                         )}
                                       </label>
                                     </div>
