@@ -28,6 +28,7 @@ const TenantDetail = () => {
   const queryClient = useQueryClient();
   const [isInviteDialogOpen, setIsInviteDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [isOpeningEditDialog, setIsOpeningEditDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
   
   type TenantAdmin = {
@@ -77,7 +78,7 @@ const TenantDetail = () => {
   } = useTenantUsers(tenantId);
   
   // Query para buscar admins do tenant
-  const { data: tenantAdmins, isLoading: isLoadingAdmins } = useQuery<TenantAdmin[]>({
+  const { data: tenantAdmins, isLoading: isLoadingAdmins, refetch: refetchAdmins } = useQuery<TenantAdmin[]>({
     queryKey: ["tenant-admins", tenantId],
     queryFn: async () => {
       const { data: profiles, error: profilesError } = await supabase
@@ -110,8 +111,26 @@ const TenantDetail = () => {
       
       return adminsWithEmail;
     },
-    enabled: !!tenantId && isEditDialogOpen,
+    enabled: !!tenantId,
+    staleTime: 30000, // Cache por 30s
   });
+  
+  // Função para abrir dialog com prefetch dos dados
+  const handleOpenEditDialog = async () => {
+    setIsOpeningEditDialog(true);
+    
+    try {
+      // Força refetch dos dados mais recentes
+      await refetchAdmins();
+      
+      // Só abre o dialog quando os dados estiverem prontos
+      setIsEditDialogOpen(true);
+    } catch (error) {
+      toast.error("Erro ao carregar dados do tenant");
+    } finally {
+      setIsOpeningEditDialog(false);
+    }
+  };
   
   // Mutation para atualizar tenant
   const updateTenantMutation = useMutation({
@@ -173,8 +192,8 @@ const TenantDetail = () => {
   
   // Preencher formulário ao abrir dialog e carregar primeiro admin automaticamente
   useEffect(() => {
-    // Só preencher quando o dialog abrir E os dados estiverem carregados
-    if (isEditDialogOpen && tenant && !isLoadingAdmins) {
+    // Preencher quando o dialog abrir (dados já estarão carregados via prefetch)
+    if (isEditDialogOpen && tenant) {
       const firstAdmin = tenantAdmins?.[0];
       
       setEditForm({
@@ -184,7 +203,7 @@ const TenantDetail = () => {
         admin_full_name: firstAdmin?.full_name || "",
       });
     }
-  }, [isEditDialogOpen, tenant, tenantAdmins, isLoadingAdmins]);
+  }, [isEditDialogOpen, tenant, tenantAdmins]);
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -357,13 +376,25 @@ const TenantDetail = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
+            <Button 
+              variant="outline" 
+              onClick={handleOpenEditDialog}
+              disabled={isOpeningEditDialog}
+            >
+              {isOpeningEditDialog ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Carregando...
+                </>
+              ) : (
+                <>
                   <Edit className="mr-2 h-4 w-4" />
                   Editar Tenant
-                </Button>
-              </DialogTrigger>
+                </>
+              )}
+            </Button>
+            
+            <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
                   <DialogTitle>Editar Tenant: {tenant.name}</DialogTitle>
@@ -372,16 +403,7 @@ const TenantDetail = () => {
                   </DialogDescription>
                 </DialogHeader>
                 
-                {/* Mostrar skeleton enquanto carrega dados do admin */}
-                {isLoadingAdmins ? (
-                  <div className="space-y-4 p-4">
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                    <Skeleton className="h-10 w-full" />
-                  </div>
-                ) : (
-                  <form onSubmit={handleEditTenantSubmit} className="space-y-6">
+                <form onSubmit={handleEditTenantSubmit} className="space-y-6">
                   {/* Campos somente leitura */}
                   <div className="space-y-4 p-4 bg-muted/30 rounded-md border">
                     <h3 className="font-semibold text-sm">Informações do Tenant (Somente Leitura)</h3>
@@ -499,7 +521,6 @@ const TenantDetail = () => {
                     </Button>
                   </div>
                 </form>
-                )}
               </DialogContent>
             </Dialog>
             <Badge variant={tenant.is_active ? "default" : "destructive"}>
