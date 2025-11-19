@@ -14,7 +14,7 @@ interface InviteUserRequest {
   full_name: string;
   phone?: string;
   tenant_id: string;
-  role: string;
+  role: 'super_admin' | 'user';
 }
 
 serve(async (req) => {
@@ -63,7 +63,7 @@ serve(async (req) => {
 
     console.log("✅ Current user:", user.id);
 
-    // Check if user is super_admin or tenant_admin of the specified tenant
+    // Check if user is super_admin
     const { data: userRoles, error: rolesError } = await userClient
       .from("user_roles")
       .select("role, tenant_id")
@@ -78,10 +78,9 @@ serve(async (req) => {
     }
 
     const isSuperAdmin = userRoles?.some((r) => r.role === "super_admin");
-    const isTenantAdmin = userRoles?.some((r) => r.role === "tenant_admin" && r.tenant_id === tenant_id);
 
-    if (!isSuperAdmin && !isTenantAdmin) {
-      console.error("❌ User does not have permission to invite users for this tenant");
+    if (!isSuperAdmin) {
+      console.error("❌ User does not have permission to invite users");
       return new Response(JSON.stringify({ error: "Insufficient permissions" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
