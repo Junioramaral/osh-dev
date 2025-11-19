@@ -108,14 +108,19 @@ serve(async (req) => {
       );
     }
 
-    // Validate email domain matches tenant domain
-    const emailDomain = email.split('@')[1].toLowerCase();
-    if (tenant.domain && emailDomain !== tenant.domain.toLowerCase()) {
-      console.error('❌ Email domain mismatch:', { emailDomain, tenantDomain: tenant.domain });
-      return new Response(
-        JSON.stringify({ error: `Email domain must be @${tenant.domain}` }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    // Validate email domain matches tenant domain (only for tenant_admins, super_admins can invite anyone)
+    if (!isSuperAdmin && tenant.domain) {
+      const emailDomain = email.split('@')[1].toLowerCase();
+      const tenantDomain = tenant.domain.toLowerCase();
+      
+      // Check if email domain matches or is a subdomain of tenant domain
+      if (emailDomain !== tenantDomain && !emailDomain.endsWith(`.${tenantDomain}`)) {
+        console.error('❌ Email domain mismatch:', { emailDomain, tenantDomain: tenant.domain });
+        return new Response(
+          JSON.stringify({ error: `Email domain must be @${tenant.domain} or a subdomain` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        );
+      }
     }
 
     // Check max_users limit
