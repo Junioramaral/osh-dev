@@ -6,6 +6,7 @@ import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
+import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Tickets from "./pages/Tickets";
 import TicketDetail from "./pages/TicketDetail";
@@ -29,9 +30,10 @@ const App = () => (
       <BrowserRouter>
         <AuthProvider>
           <Routes>
-            <Route path="/" element={<Index />} />
-            <Route path="/auth" element={<Auth />} />
-            <Route path="/dashboard" element={<Dashboard />} />
+              <Route path="/" element={<Index />} />
+              <Route path="/auth" element={<Auth />} />
+              <Route path="/auth/reset-password" element={<ResetPassword />} />
+              <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/tickets/:ticketId" element={<TicketDetail />} />
             <Route path="/sla-dashboard" element={<SLADashboard />} />

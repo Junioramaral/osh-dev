@@ -29,6 +29,8 @@ interface AuthContextType {
   signUp: (email: string, password: string, full_name: string, tenant_id: string) => Promise<{ error: any }>;
   signOut: () => Promise<void>;
   clearMustChangePassword: () => void;
+  resetPassword: (email: string) => Promise<{ error: any }>;
+  updatePassword: (newPassword: string) => Promise<{ error: any }>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -176,6 +178,28 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setMustChangePassword(false);
   };
 
+  const resetPassword = async (email: string) => {
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(email, {
+        redirectTo: `${window.location.origin}/auth/reset-password`,
+      });
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  };
+
+  const updatePassword = async (newPassword: string) => {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      return { error };
+    } catch (error) {
+      return { error };
+    }
+  };
+
   return (
     <AuthContext.Provider value={{ 
       user, 
@@ -190,7 +214,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       signIn, 
       signUp, 
       signOut,
-      clearMustChangePassword
+      clearMustChangePassword,
+      resetPassword,
+      updatePassword
     }}>
       {children}
     </AuthContext.Provider>
