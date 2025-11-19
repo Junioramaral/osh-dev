@@ -77,7 +77,7 @@ const TenantDetail = () => {
   } = useTenantUsers(tenantId);
   
   // Query para buscar admins do tenant
-  const { data: tenantAdmins } = useQuery<TenantAdmin[]>({
+  const { data: tenantAdmins, isLoading: isLoadingAdmins } = useQuery<TenantAdmin[]>({
     queryKey: ["tenant-admins", tenantId],
     queryFn: async () => {
       const { data: profiles, error: profilesError } = await supabase
@@ -172,7 +172,8 @@ const TenantDetail = () => {
   
   // Preencher formulário ao abrir dialog e carregar primeiro admin automaticamente
   useEffect(() => {
-    if (isEditDialogOpen && tenant) {
+    // Só preencher quando o dialog abrir E os dados estiverem carregados
+    if (isEditDialogOpen && tenant && !isLoadingAdmins) {
       const firstAdmin = tenantAdmins?.[0];
       
       setEditForm({
@@ -182,7 +183,7 @@ const TenantDetail = () => {
         admin_full_name: firstAdmin?.full_name || "",
       });
     }
-  }, [isEditDialogOpen, tenant, tenantAdmins]);
+  }, [isEditDialogOpen, tenant, tenantAdmins, isLoadingAdmins]);
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -370,7 +371,16 @@ const TenantDetail = () => {
                   </DialogDescription>
                 </DialogHeader>
                 
-                <form onSubmit={handleEditTenantSubmit} className="space-y-6">
+                {/* Mostrar skeleton enquanto carrega dados do admin */}
+                {isLoadingAdmins ? (
+                  <div className="space-y-4 p-4">
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                    <Skeleton className="h-10 w-full" />
+                  </div>
+                ) : (
+                  <form onSubmit={handleEditTenantSubmit} className="space-y-6">
                   {/* Campos somente leitura */}
                   <div className="space-y-4 p-4 bg-muted/30 rounded-md border">
                     <h3 className="font-semibold text-sm">Informações do Tenant (Somente Leitura)</h3>
@@ -488,6 +498,7 @@ const TenantDetail = () => {
                     </Button>
                   </div>
                 </form>
+                )}
               </DialogContent>
             </Dialog>
             <Badge variant={tenant.is_active ? "default" : "destructive"}>
