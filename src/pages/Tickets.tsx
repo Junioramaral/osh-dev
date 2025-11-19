@@ -22,7 +22,44 @@ export default function Tickets() {
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
+  const [clientFilter, setClientFilter] = useState<string>("all");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
+
+  // Check if user is from Otimizzo tenant
+  const { data: currentTenant } = useQuery({
+    queryKey: ["current-tenant", tenantId],
+    queryFn: async () => {
+      if (!tenantId) return null;
+      
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, tenant_type")
+        .eq("id", tenantId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!tenantId,
+  });
+
+  const isOtimizzoUser = currentTenant?.tenant_type === 'otimizzo';
+
+  // Fetch all clients (only for Otimizzo users)
+  const { data: allClients } = useQuery({
+    queryKey: ["all-clients"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name");
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOtimizzoUser,
+  });
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["tickets", profile?.id],
@@ -64,7 +101,8 @@ export default function Tickets() {
       ticket.title.toLowerCase().includes(searchTerm.toLowerCase());
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesSegment = segmentFilter === "all" || ticket.segment === segmentFilter;
-    return matchesSearch && matchesStatus && matchesSegment;
+    const matchesClient = clientFilter === "all" || ticket.client_id === clientFilter;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient;
   }).sort((a, b) => {
     // Ordenar por urgência de SLA
     const slaA = calculateSLAStatus(a);
@@ -120,6 +158,22 @@ export default function Tickets() {
               <SelectItem value="APP">APP</SelectItem>
             </SelectContent>
           </Select>
+
+          {isOtimizzoUser && (
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todos os clientes" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os clientes</SelectItem>
+                {allClients?.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
         </div>
 
         {isLoading ? (
