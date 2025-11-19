@@ -17,6 +17,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { TenantUserReport } from "@/components/tenants/TenantUserReport";
 
 const TenantDetail = () => {
   const { tenantId } = useParams();
@@ -487,159 +489,179 @@ const TenantDetail = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <div className="flex items-center justify-between">
-              <div>
-                <CardTitle>Usuários</CardTitle>
-                <CardDescription>
-                  {users?.length || 0} usuário(s) {tenant.max_users ? `de ${tenant.max_users}` : ""}
-                </CardDescription>
-              </div>
-              <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
-                <DialogTrigger asChild>
-                  <Button>
-                    <UserPlus className="mr-2 h-4 w-4" />
-                    Convidar Usuário
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Convidar Novo Usuário</DialogTitle>
-                    <DialogDescription>
-                      Um email de confirmação será enviado para o usuário.
-                      {tenant.domain && ` O email deve ser do domínio @${tenant.domain}`}
-                    </DialogDescription>
-                  </DialogHeader>
-                  <form onSubmit={handleInviteSubmit} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="full_name">Nome Completo</Label>
-                      <Input
-                        id="full_name"
-                        value={inviteForm.full_name}
-                        onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="email">Email</Label>
-                      <Input
-                        id="email"
-                        type="email"
-                        value={inviteForm.email}
-                        onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
-                        placeholder={tenant.domain ? `usuario@${tenant.domain}` : "usuario@exemplo.com"}
-                        required
-                      />
-                    </div>
-                    <div className="space-y-2">
-                      <Label htmlFor="role">Função</Label>
-                      <Select
-                        value={inviteForm.role}
-                        onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}
-                      >
-                        <SelectTrigger id="role">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="user">Usuário</SelectItem>
-                          <SelectItem value="analyst_db">Analista DB</SelectItem>
-                          <SelectItem value="analyst_app">Analista APP</SelectItem>
-                          <SelectItem value="tenant_admin">Admin do Tenant</SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
-                    <Button type="submit" className="w-full" disabled={isInviting}>
-                      {isInviting ? "Enviando convite..." : "Enviar Convite"}
-                    </Button>
-                  </form>
-                </DialogContent>
-              </Dialog>
-            </div>
-          </CardHeader>
-          <CardContent>
-            {usersLoading ? (
-              <div className="space-y-2">
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-                <Skeleton className="h-12 w-full" />
-              </div>
-            ) : users && users.length > 0 ? (
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Email</TableHead>
-                    <TableHead>Função</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead className="text-right">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {users.map((user) => {
-                    const status = getUserStatus(user);
-                    const StatusIcon = status.icon;
-                    return (
-                      <TableRow key={user.id}>
-                        <TableCell className="font-medium">{user.full_name}</TableCell>
-                        <TableCell>{user.email}</TableCell>
-                        <TableCell>{getRoleLabel(user.role)}</TableCell>
-                        <TableCell>
-                          <Badge variant={status.variant}>
-                            <StatusIcon className="mr-1 h-3 w-3" />
-                            {status.label}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <div className="flex justify-end gap-2">
-                            {!user.email_confirmed_at && user.is_active && (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => resendInvite(user.id)}
-                                disabled={isResending}
-                              >
-                                <Mail className="h-4 w-4" />
-                              </Button>
-                            )}
-                            {user.is_active ? (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => deactivateUser(user.id)}
-                              >
-                                <ShieldOff className="h-4 w-4" />
-                              </Button>
-                            ) : (
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => reactivateUser(user.id)}
-                              >
-                                <ShieldCheck className="h-4 w-4" />
-                              </Button>
-                            )}
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => setUserToDelete(user.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
-                        </TableCell>
+        <Tabs defaultValue="manage" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 max-w-md">
+            <TabsTrigger value="manage">Gerenciar Usuários</TabsTrigger>
+            <TabsTrigger value="report">Relatório</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="manage">
+            <Card>
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <CardTitle>Usuários</CardTitle>
+                    <CardDescription>
+                      {users?.length || 0} usuário(s) {tenant.max_users ? `de ${tenant.max_users}` : ""}
+                    </CardDescription>
+                  </div>
+                  <Dialog open={isInviteDialogOpen} onOpenChange={setIsInviteDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button>
+                        <UserPlus className="mr-2 h-4 w-4" />
+                        Convidar Usuário
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Convidar Novo Usuário</DialogTitle>
+                        <DialogDescription>
+                          Um email de confirmação será enviado para o usuário.
+                          {tenant.domain && ` O email deve ser do domínio @${tenant.domain}`}
+                        </DialogDescription>
+                      </DialogHeader>
+                      <form onSubmit={handleInviteSubmit} className="space-y-4">
+                        <div className="space-y-2">
+                          <Label htmlFor="full_name">Nome Completo</Label>
+                          <Input
+                            id="full_name"
+                            value={inviteForm.full_name}
+                            onChange={(e) => setInviteForm({ ...inviteForm, full_name: e.target.value })}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="email">Email</Label>
+                          <Input
+                            id="email"
+                            type="email"
+                            value={inviteForm.email}
+                            onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
+                            placeholder={tenant.domain ? `usuario@${tenant.domain}` : "usuario@exemplo.com"}
+                            required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="role">Função</Label>
+                          <Select
+                            value={inviteForm.role}
+                            onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="user">Usuário</SelectItem>
+                              <SelectItem value="analyst_db">Analista DB</SelectItem>
+                              <SelectItem value="analyst_app">Analista APP</SelectItem>
+                              <SelectItem value="tenant_admin">Administrador</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <Button type="submit" className="w-full" disabled={isInviting}>
+                          {isInviting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Convidando...
+                            </>
+                          ) : (
+                            "Enviar Convite"
+                          )}
+                        </Button>
+                      </form>
+                    </DialogContent>
+                  </Dialog>
+                </div>
+              </CardHeader>
+              <CardContent>
+                {usersLoading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map((i) => (
+                      <Skeleton key={i} className="h-12 w-full" />
+                    ))}
+                  </div>
+                ) : users && users.length > 0 ? (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Email</TableHead>
+                        <TableHead>Função</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            ) : (
-              <div className="text-center py-8 text-muted-foreground">
-                Nenhum usuário cadastrado neste tenant.
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                    </TableHeader>
+                    <TableBody>
+                      {users.map((user) => {
+                        const status = getUserStatus(user);
+                        const StatusIcon = status.icon;
+                        return (
+                          <TableRow key={user.id}>
+                            <TableCell className="font-medium">{user.full_name}</TableCell>
+                            <TableCell>{user.email}</TableCell>
+                            <TableCell>{getRoleLabel(user.role)}</TableCell>
+                            <TableCell>
+                              <Badge variant={status.variant}>
+                                <StatusIcon className="mr-1 h-3 w-3" />
+                                {status.label}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                {!user.email_confirmed_at && user.is_active && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => resendInvite(user.id)}
+                                    disabled={isResending}
+                                  >
+                                    <Mail className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                {user.is_active ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => deactivateUser(user.id)}
+                                  >
+                                    <ShieldOff className="h-4 w-4" />
+                                  </Button>
+                                ) : (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => reactivateUser(user.id)}
+                                  >
+                                    <ShieldCheck className="h-4 w-4" />
+                                  </Button>
+                                )}
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => setUserToDelete(user.id)}
+                                >
+                                  <Trash2 className="h-4 w-4 text-destructive" />
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                ) : (
+                  <div className="text-center py-8 text-muted-foreground">
+                    Nenhum usuário cadastrado neste tenant.
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="report">
+            <TenantUserReport tenantId={tenantId!} />
+          </TabsContent>
+        </Tabs>
       </div>
 
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
