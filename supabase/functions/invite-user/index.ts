@@ -12,6 +12,7 @@ const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 interface InviteUserRequest {
   email: string;
   full_name: string;
+  phone?: string;
   tenant_id: string;
   role: string;
 }
@@ -35,9 +36,9 @@ serve(async (req) => {
     // Admin client for user creation
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email, full_name, tenant_id, role }: InviteUserRequest = await req.json();
+    const { email, full_name, phone, tenant_id, role }: InviteUserRequest = await req.json();
 
-    console.log("🔍 Invite user request:", { email, full_name, tenant_id, role });
+    console.log("🔍 Invite user request:", { email, full_name, phone, tenant_id, role });
 
     // Validate input
     if (!email || !full_name || !tenant_id || !role) {
@@ -180,6 +181,7 @@ serve(async (req) => {
     const { error: profileError } = await adminClient.from("profiles").insert({
       id: newUser.user!.id,
       full_name,
+      phone: phone || null,
       client_id: tenant_id,
       is_active: true,
     });
@@ -225,6 +227,7 @@ serve(async (req) => {
           client_id: tenant_id,
           name: full_name,
           email: email,
+          phone: phone || null,
           role: role,
           is_primary: isPrimaryContact,
         });

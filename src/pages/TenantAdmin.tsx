@@ -41,6 +41,7 @@ export default function TenantAdmin() {
     domain: "",
     admin_email: "",
     admin_name: "",
+    admin_phone: "",
     max_users: 10,
   });
   const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
@@ -103,6 +104,7 @@ export default function TenantAdmin() {
         body: {
           email: newTenant.admin_email,
           full_name: newTenant.admin_name,
+          phone: newTenant.admin_phone || undefined,
           tenant_id: tenant.id,
           role: 'tenant_admin'
         }
@@ -128,6 +130,7 @@ export default function TenantAdmin() {
         admin_email: "",
         admin_name: "",
         max_users: 10,
+        admin_phone: "",
       });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
@@ -362,6 +365,17 @@ export default function TenantAdmin() {
                       onChange={(e) => setNewTenant(prev => ({ ...prev, admin_email: e.target.value.toLowerCase() }))}
                       placeholder="contato@sec4file.com"
                       required
+                    />
+                  </div>
+
+                  <div className="space-y-2">
+                    <Label htmlFor="admin-phone">Telefone (opcional)</Label>
+                    <Input
+                      id="admin-phone"
+                      type="tel"
+                      value={newTenant.admin_phone}
+                      onChange={(e) => setNewTenant(prev => ({ ...prev, admin_phone: e.target.value }))}
+                      placeholder="(00) 00000-0000"
                     />
                   </div>
 
