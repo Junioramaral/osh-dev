@@ -12,6 +12,7 @@ import {
   LogOut,
   Menu,
   BarChart3,
+  Shield,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -46,6 +47,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
     { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin },
+    { name: "Permissões", href: "/admin/permissions", icon: Shield, show: isSuperAdmin },
   ].filter(item => item.show);
 
   const SidebarContent = () => (
