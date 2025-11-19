@@ -92,21 +92,22 @@ const TenantDetail = () => {
         .eq("is_active", true);
       
       if (profilesError) throw profilesError;
+      if (!profiles || profiles.length === 0) return [];
 
-      // Fetch emails from auth.users for each admin
-      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-      if (usersError) throw usersError;
-
-      // Combine profile data with email
-      const adminsWithEmail: TenantAdmin[] = (profiles || []).map(profile => {
-        const authUser = users?.find((u: any) => u.id === profile.id);
+      // Fetch email for each admin specifically in parallel (optimized)
+      const adminPromises = profiles.map(async (profile) => {
+        const { data: { user }, error } = await supabase.auth.admin.getUserById(profile.id);
+        
         return {
           id: profile.id,
           full_name: profile.full_name,
-          email: authUser?.email || "",
+          email: user?.email || "",
         };
       });
 
+      // Wait for all parallel requests
+      const adminsWithEmail = await Promise.all(adminPromises);
+      
       return adminsWithEmail;
     },
     enabled: !!tenantId && isEditDialogOpen,
