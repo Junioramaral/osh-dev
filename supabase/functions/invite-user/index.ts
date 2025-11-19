@@ -267,7 +267,7 @@ serve(async (req) => {
       `;
 
       const { error: emailError } = await resend.emails.send({
-        from: 'Otimizzo Service Hub <noreply@sec4file.com>',
+        from: 'Otimizzo Service Hub <noreply@otimizzo.com>',
         to: [email],
         subject: 'Bem-vindo à Plataforma - Suas Credenciais de Acesso',
         html: emailHtml,
