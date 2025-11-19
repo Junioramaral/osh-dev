@@ -29,8 +29,6 @@ import { format } from "date-fns";
 const ticketSchema = z.object({
   segment: z.enum(["DB", "APP"]),
   client_id: z.string().uuid("Selecione um cliente"),
-  contact_name: z.string().min(1, "Nome do contato é obrigatório"),
-  contact_email: z.string().email("Email inválido"),
   title: z.string().min(1, "Título é obrigatório").max(100, "Máximo 100 caracteres"),
   description: z.string().optional(),
   ticket_type: z.enum(["incidente", "duvida", "solicitacao"]),
@@ -143,21 +141,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
-  // Fetch contacts for selected client
-  const { data: contacts } = useQuery({
-    queryKey: ["client-contacts", selectedClientId],
-    queryFn: async () => {
-      if (!selectedClientId) return [];
-      const { data, error } = await supabase
-        .from("client_contacts")
-        .select("name, email")
-        .eq("client_id", selectedClientId);
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!selectedClientId,
-  });
-
   // Fetch DB instances
   const { data: dbInstances } = useQuery({
     queryKey: ["db-instances", selectedClientId, selectedDbEngine],
@@ -222,11 +205,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: TicketFormData) => {
+      // Get current user data
+      const { data: { user } } = await supabase.auth.getUser();
+      
+      if (!user) {
+        throw new Error("Erro ao identificar usuário");
+      }
+
       const ticketData: any = {
         segment: data.segment,
         client_id: data.client_id,
-        contact_name: data.contact_name,
-        contact_email: data.contact_email,
+        contact_name: profile?.full_name || user.email || "Usuário",
+        contact_email: user.email || "",
         title: data.title,
         description: data.description,
         ticket_type: data.ticket_type,
@@ -354,29 +344,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="contact_name">Contato *</Label>
-              <Select
-                value={watch("contact_name")}
-                onValueChange={(value) => {
-                  const contact = contacts?.find((c) => c.name === value);
-                  setValue("contact_name", value);
-                  if (contact) setValue("contact_email", contact.email);
-                }}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o contato" />
-                </SelectTrigger>
-                <SelectContent>
-                  {contacts?.map((contact) => (
-                    <SelectItem key={contact.email} value={contact.name}>
-                      {contact.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.contact_name && <p className="text-sm text-destructive">{errors.contact_name.message}</p>}
-            </div>
           </div>
 
           <div className="space-y-2">

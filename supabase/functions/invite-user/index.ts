@@ -199,6 +199,46 @@ serve(async (req) => {
       console.error("❌ Error creating user role:", roleError);
     }
 
+    // Create contact entry automatically
+    console.log("📇 Creating contact entry for user");
+
+    // Check if this is the first contact for the tenant
+    const { count: contactCount, error: contactCountError } = await adminClient
+      .from("client_contacts")
+      .select("*", { count: "exact", head: true })
+      .eq("client_id", tenant_id);
+
+    const isPrimaryContact = !contactCountError && (contactCount === 0);
+
+    // Check if contact already exists
+    const { data: existingContact } = await adminClient
+      .from("client_contacts")
+      .select("id")
+      .eq("client_id", tenant_id)
+      .eq("email", email)
+      .maybeSingle();
+
+    if (!existingContact) {
+      const { error: contactError } = await adminClient
+        .from("client_contacts")
+        .insert({
+          client_id: tenant_id,
+          name: full_name,
+          email: email,
+          role: role,
+          is_primary: isPrimaryContact,
+        });
+
+      if (contactError) {
+        console.error("⚠️ Error creating contact (non-critical):", contactError);
+        // Don't block user creation if contact fails
+      } else {
+        console.log("✅ Contact entry created successfully");
+      }
+    } else {
+      console.log("ℹ️ Contact already exists, skipping creation");
+    }
+
     // Send custom email in Portuguese via Resend
     try {
       console.log("📧 Sending welcome email...");
