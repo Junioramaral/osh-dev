@@ -109,7 +109,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, segments")
+        .select("id, name, segments, tenant_type")
         .eq("id", tenantId)
         .single();
       
@@ -122,6 +122,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   // Determine available segments
   const availableSegments = currentTenant?.segments || [];
   const hasOnlyOneSegment = availableSegments.length === 1;
+  const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
 
   // Auto-set segment if tenant has only one
   useEffect(() => {
@@ -330,26 +331,28 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
           {/* Common Fields */}
           <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label htmlFor="client_id">Cliente *</Label>
-              <Select
-                value={watch("client_id")}
-                onValueChange={(value) => setValue("client_id", value)}
-                disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
-            </div>
+            {isOtimizzoTenant && (
+              <div className="space-y-2">
+                <Label htmlFor="client_id">Cliente *</Label>
+                <Select
+                  value={watch("client_id")}
+                  onValueChange={(value) => setValue("client_id", value)}
+                  disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {clients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
+              </div>
+            )}
 
             <div className="space-y-2">
               <Label htmlFor="contact_name">Contato *</Label>
