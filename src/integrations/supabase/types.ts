@@ -112,6 +112,7 @@ export type Database = {
           name: string
           phone: string | null
           role: string | null
+          updated_at: string | null
         }
         Insert: {
           client_id: string
@@ -122,6 +123,7 @@ export type Database = {
           name: string
           phone?: string | null
           role?: string | null
+          updated_at?: string | null
         }
         Update: {
           client_id?: string
@@ -132,6 +134,7 @@ export type Database = {
           name?: string
           phone?: string | null
           role?: string | null
+          updated_at?: string | null
         }
         Relationships: [
           {
@@ -451,6 +454,7 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean | null
+          phone: string | null
           team_id: string | null
           updated_at: string | null
         }
@@ -460,6 +464,7 @@ export type Database = {
           full_name: string
           id: string
           is_active?: boolean | null
+          phone?: string | null
           team_id?: string | null
           updated_at?: string | null
         }
@@ -469,6 +474,7 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean | null
+          phone?: string | null
           team_id?: string | null
           updated_at?: string | null
         }

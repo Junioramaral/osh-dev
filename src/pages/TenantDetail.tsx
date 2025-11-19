@@ -37,6 +37,7 @@ const TenantDetail = () => {
   const [inviteForm, setInviteForm] = useState({
     email: "",
     full_name: "",
+    phone: "",
     role: "user",
   });
   
@@ -186,7 +187,7 @@ const TenantDetail = () => {
     inviteUser(inviteForm, {
       onSuccess: () => {
         setIsInviteDialogOpen(false);
-        setInviteForm({ email: "", full_name: "", role: "user" });
+        setInviteForm({ email: "", full_name: "", phone: "", role: "user" });
       },
     });
   };
@@ -539,6 +540,16 @@ const TenantDetail = () => {
                             onChange={(e) => setInviteForm({ ...inviteForm, email: e.target.value })}
                             placeholder={tenant.domain ? `usuario@${tenant.domain}` : "usuario@exemplo.com"}
                             required
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label htmlFor="phone">Telefone (opcional)</Label>
+                          <Input
+                            id="phone"
+                            type="tel"
+                            value={inviteForm.phone}
+                            onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
+                            placeholder="(00) 00000-0000"
                           />
                         </div>
                         <div className="space-y-2">
