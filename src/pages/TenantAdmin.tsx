@@ -7,8 +7,9 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { Building2, Plus, Users, CheckCircle, XCircle } from "lucide-react";
+import { Building2, Plus, Users, CheckCircle, XCircle, AlertTriangle, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
@@ -42,6 +43,9 @@ export default function TenantAdmin() {
     admin_name: "",
     max_users: 10,
   });
+  const [tenantToDelete, setTenantToDelete] = useState<Tenant | null>(null);
+  const [isDeleteDialogOpen, setIsDeleteDialogOpen] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
 
   const { data: tenants, isLoading, refetch } = useQuery({
     queryKey: ["tenants"],
@@ -152,6 +156,75 @@ export default function TenantAdmin() {
         description: error.message,
       });
     }
+  };
+
+  const deleteTenantMutation = useMutation({
+    mutationFn: async (tenantId: string) => {
+      // 1. Primeiro, remover associação de client_id dos profiles
+      const { error: profilesError } = await supabase
+        .from("profiles")
+        .update({ client_id: null })
+        .eq("client_id", tenantId);
+
+      if (profilesError) throw profilesError;
+
+      // 2. Deletar o tenant (CASCADE irá deletar o resto)
+      const { error: deleteError } = await supabase
+        .from("clients")
+        .delete()
+        .eq("id", tenantId);
+
+      if (deleteError) throw deleteError;
+
+      return tenantId;
+    },
+    onSuccess: () => {
+      toast.success("Tenant removido com sucesso", {
+        description: "Todos os dados relacionados foram deletados.",
+      });
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao remover tenant", {
+        description: error.message,
+      });
+    },
+  });
+
+  const handleDeleteClick = (tenant: Tenant, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setTenantToDelete(tenant);
+    setConfirmText("");
+    setIsDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!tenantToDelete) return;
+
+    if (!isSuperAdmin) {
+      toast.error("Acesso negado", {
+        description: "Apenas super administradores podem remover tenants."
+      });
+      return;
+    }
+
+    if (tenantToDelete.tenant_type === 'otimizzo') {
+      toast.error("Ação não permitida", {
+        description: "O tenant Otimizzo não pode ser removido."
+      });
+      return;
+    }
+
+    if (confirmText !== tenantToDelete.name) {
+      toast.error("O nome digitado não corresponde ao tenant");
+      return;
+    }
+
+    await deleteTenantMutation.mutateAsync(tenantToDelete.id);
+    setIsDeleteDialogOpen(false);
+    setTenantToDelete(null);
+    setConfirmText("");
   };
 
 
@@ -360,17 +433,28 @@ export default function TenantAdmin() {
                   )}
 
                   {tenant.tenant_type !== 'otimizzo' && (
-                    <Button
-                      variant={tenant.is_active ? "destructive" : "default"}
-                      size="sm"
-                      className="w-full"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        toggleTenantStatus(tenant.id, tenant.is_active);
-                      }}
-                    >
-                      {tenant.is_active ? "Desativar" : "Ativar"}
-                    </Button>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={tenant.is_active ? "outline" : "default"}
+                        size="sm"
+                        className="flex-1"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          toggleTenantStatus(tenant.id, tenant.is_active);
+                        }}
+                      >
+                        {tenant.is_active ? "Desativar" : "Ativar"}
+                      </Button>
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="flex-1"
+                        onClick={(e) => handleDeleteClick(tenant, e)}
+                      >
+                        <Trash2 className="h-4 w-4 mr-1" />
+                        Remover
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
@@ -378,6 +462,57 @@ export default function TenantAdmin() {
           </div>
         )}
       </div>
+
+      <AlertDialog open={isDeleteDialogOpen} onOpenChange={setIsDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Confirmar Remoção de Tenant
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-3">
+              <p className="font-semibold text-foreground">
+                Você está prestes a remover o tenant "{tenantToDelete?.name}".
+              </p>
+              
+              <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3 space-y-2">
+                <p className="font-medium text-destructive text-sm">⚠️ Esta ação é IRREVERSÍVEL e irá deletar:</p>
+                <ul className="text-xs space-y-1 text-muted-foreground ml-4">
+                  <li>• Todos os tickets do tenant</li>
+                  <li>• Todas as máquinas cadastradas</li>
+                  <li>• Todas as instâncias de banco de dados</li>
+                  <li>• Todas as instâncias de aplicação</li>
+                  <li>• Todos os contatos cadastrados</li>
+                  <li>• Todas as associações de usuários (roles)</li>
+                </ul>
+              </div>
+
+              <p className="text-sm">
+                Para confirmar, digite o nome do tenant:{" "}
+                <span className="font-mono font-bold text-foreground">{tenantToDelete?.name}</span>
+              </p>
+
+              <Input
+                placeholder={`Digite "${tenantToDelete?.name}" para confirmar`}
+                value={confirmText}
+                onChange={(e) => setConfirmText(e.target.value)}
+                className="font-mono"
+              />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={deleteTenantMutation.isPending}>Cancelar</AlertDialogCancel>
+            <Button
+              variant="destructive"
+              onClick={handleConfirmDelete}
+              disabled={confirmText !== tenantToDelete?.name || deleteTenantMutation.isPending}
+            >
+              {deleteTenantMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remover Permanentemente
+            </Button>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }
