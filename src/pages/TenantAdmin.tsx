@@ -90,6 +90,8 @@ export default function TenantAdmin() {
     }
 
     setIsCreating(true);
+    const toastId = toast.loading("Criando tenant e enviando convite...");
+    
     try {
       // 1. Criar tenant
       const { data: tenant, error: tenantError } = await supabase
@@ -120,18 +122,31 @@ export default function TenantAdmin() {
         }
       });
 
+      // 3. Invalidar cache para atualizar a lista
+      queryClient.invalidateQueries({ queryKey: ["tenants"] });
+      queryClient.invalidateQueries({ queryKey: ["clients"] });
+
+      // 4. Feedback e navegação
       if (inviteError) {
         console.error('Erro ao enviar convite:', inviteError);
         toast.warning(
-          `Tenant "${newTenant.name}" criado, mas houve um erro ao enviar o email de convite para ${newTenant.admin_email}`,
-          { description: 'Você pode reenviar o convite manualmente.' }
+          `Tenant "${newTenant.name}" criado! Redirecionando...`,
+          { 
+            id: toastId,
+            description: 'Houve um erro ao enviar o convite. Você pode reenviá-lo na página do tenant.'
+          }
         );
       } else {
-        toast.success(`Tenant "${newTenant.name}" criado com sucesso!`, {
-          description: `Email de convite enviado para ${newTenant.admin_email}`,
-        });
+        toast.success(
+          `Tenant "${newTenant.name}" criado com sucesso! Redirecionando...`, 
+          {
+            id: toastId,
+            description: `Email de convite enviado para ${newTenant.admin_email}`,
+          }
+        );
       }
 
+      // 5. Fechar dialog e resetar form
       setIsCreateDialogOpen(false);
       setNewTenant({
         name: "",
@@ -142,10 +157,15 @@ export default function TenantAdmin() {
         max_users: 10,
         admin_phone: "",
       });
-      queryClient.invalidateQueries({ queryKey: ["tenants"] });
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
+
+      // 6. Navegar para a página do tenant criado
+      setTimeout(() => {
+        navigate(`/admin/tenants/${tenant.id}`);
+      }, 1500);
+
     } catch (error: any) {
       toast.error("Erro ao criar tenant", {
+        id: toastId,
         description: error.message,
       });
     } finally {
