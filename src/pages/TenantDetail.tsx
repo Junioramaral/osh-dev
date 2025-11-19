@@ -10,13 +10,29 @@ import { useTenantUsers } from "@/hooks/useTenantUsers";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -30,20 +46,20 @@ const TenantDetail = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isOpeningEditDialog, setIsOpeningEditDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
-  
+
   type TenantAdmin = {
     id: string;
     full_name: string;
     email: string;
   };
-  
+
   const [inviteForm, setInviteForm] = useState({
     email: "",
     full_name: "",
     phone: "",
     role: "user",
   });
-  
+
   const [editForm, setEditForm] = useState({
     max_users: 10,
     cnpj: "",
@@ -54,11 +70,7 @@ const TenantDetail = () => {
   const { data: tenant, isLoading: tenantLoading } = useQuery({
     queryKey: ["tenant", tenantId],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("clients")
-        .select("*")
-        .eq("id", tenantId)
-        .single();
+      const { data, error } = await supabase.from("clients").select("*").eq("id", tenantId).single();
 
       if (error) throw error;
       return data;
@@ -76,29 +88,38 @@ const TenantDetail = () => {
     resendInvite,
     isResending,
   } = useTenantUsers(tenantId);
-  
+
   // Query para buscar admins do tenant
-  const { data: tenantAdmins, isLoading: isLoadingAdmins, refetch: refetchAdmins } = useQuery<TenantAdmin[]>({
+  const {
+    data: tenantAdmins,
+    isLoading: isLoadingAdmins,
+    refetch: refetchAdmins,
+  } = useQuery<TenantAdmin[]>({
     queryKey: ["tenant-admins", tenantId],
     queryFn: async () => {
       const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .select(`
+        .select(
+          `
           id,
           full_name,
           user_roles!inner(role)
-        `)
+        `,
+        )
         .eq("client_id", tenantId)
         .eq("user_roles.role", "super_admin")
         .eq("is_active", true);
-      
+
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) return [];
 
       // Fetch email for each admin specifically in parallel (optimized)
       const adminPromises = profiles.map(async (profile) => {
-        const { data: { user }, error } = await supabase.auth.admin.getUserById(profile.id);
-        
+        const {
+          data: { user },
+          error,
+        } = await supabase.auth.admin.getUserById(profile.id);
+
         return {
           id: profile.id,
           full_name: profile.full_name,
@@ -108,21 +129,21 @@ const TenantDetail = () => {
 
       // Wait for all parallel requests
       const adminsWithEmail = await Promise.all(adminPromises);
-      
+
       return adminsWithEmail;
     },
     enabled: !!tenantId,
     staleTime: 30000, // Cache por 30s
   });
-  
+
   // Função para abrir dialog com prefetch dos dados
   const handleOpenEditDialog = async () => {
     setIsOpeningEditDialog(true);
-    
+
     try {
       // Força refetch dos dados mais recentes
       await refetchAdmins();
-      
+
       // Só abre o dialog quando os dados estiverem prontos
       setIsEditDialogOpen(true);
     } catch (error) {
@@ -131,10 +152,10 @@ const TenantDetail = () => {
       setIsOpeningEditDialog(false);
     }
   };
-  
+
   // Mutation para atualizar tenant
   const updateTenantMutation = useMutation({
-    mutationFn: async (updates: { 
+    mutationFn: async (updates: {
       max_users: number;
       cnpj?: string;
       admin_user_id?: string;
@@ -144,12 +165,12 @@ const TenantDetail = () => {
       // Update max_users and cnpj in tenant
       const { error: tenantError } = await supabase
         .from("clients")
-        .update({ 
+        .update({
           max_users: updates.max_users,
           cnpj: updates.cnpj || null,
         })
         .eq("id", tenantId);
-      
+
       if (tenantError) throw tenantError;
 
       // Update admin info if provided
@@ -160,21 +181,20 @@ const TenantDetail = () => {
             .from("profiles")
             .update({ full_name: updates.admin_full_name })
             .eq("id", updates.admin_user_id);
-          
+
           if (profileError) throw profileError;
         }
 
         // Update email in auth.users
         if (updates.admin_email) {
-          const { error: emailError } = await supabase.auth.admin.updateUserById(
-            updates.admin_user_id,
-            { email: updates.admin_email }
-          );
-          
+          const { error: emailError } = await supabase.auth.admin.updateUserById(updates.admin_user_id, {
+            email: updates.admin_email,
+          });
+
           if (emailError) throw emailError;
         }
       }
-      
+
       return { success: true };
     },
     onSuccess: () => {
@@ -189,13 +209,13 @@ const TenantDetail = () => {
       });
     },
   });
-  
+
   // Preencher formulário ao abrir dialog e carregar primeiro admin automaticamente
   useEffect(() => {
     // Preencher quando o dialog abrir (dados já estarão carregados via prefetch)
     if (isEditDialogOpen && tenant) {
       const firstAdmin = tenantAdmins?.[0];
-      
+
       setEditForm({
         max_users: tenant.max_users || 10,
         cnpj: tenant.cnpj || "",
@@ -207,28 +227,27 @@ const TenantDetail = () => {
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!inviteForm.email || !inviteForm.full_name) {
       toast.error("Preencha todos os campos obrigatórios");
       return;
     }
 
     // Validate email domain
-    const emailDomain = inviteForm.email.split('@')[1]?.toLowerCase();
+    const emailDomain = inviteForm.email.split("@")[1]?.toLowerCase();
     const tenantDomain = tenant?.domain?.toLowerCase();
-    
+
     if (emailDomain !== tenantDomain) {
-      toast.error(
-        `O email deve pertencer ao domínio ${tenantDomain}`,
-        { description: `Email fornecido: ${inviteForm.email}` }
-      );
+      toast.error(`O email deve pertencer ao domínio ${tenantDomain}`, {
+        description: `Email fornecido: ${inviteForm.email}`,
+      });
       return;
     }
 
     // Validate phone if provided
     if (inviteForm.phone && !isValidPhone(inviteForm.phone)) {
       toast.error("Telefone inválido", {
-        description: "O telefone deve ter 10 ou 11 dígitos"
+        description: "O telefone deve ter 10 ou 11 dígitos",
       });
       return;
     }
@@ -246,10 +265,10 @@ const TenantDetail = () => {
       },
     });
   };
-  
+
   const handleEditTenantSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     // Validação de max_users
     const currentUserCount = users?.length || 0;
     if (editForm.max_users < currentUserCount) {
@@ -292,7 +311,7 @@ const TenantDetail = () => {
 
     // Validate email domain if tenant has domain configured
     if (tenant?.domain) {
-      const emailDomain = editForm.admin_email.split('@')[1]?.toLowerCase();
+      const emailDomain = editForm.admin_email.split("@")[1]?.toLowerCase();
       if (emailDomain !== tenant.domain.toLowerCase()) {
         toast.error("Erro de validação", {
           description: `Email deve ser do domínio ${tenant.domain}.`,
@@ -310,7 +329,7 @@ const TenantDetail = () => {
       return;
     }
 
-    updateTenantMutation.mutate({ 
+    updateTenantMutation.mutate({
       max_users: editForm.max_users,
       cnpj: editForm.cnpj,
       admin_user_id: firstAdminId,
@@ -376,11 +395,7 @@ const TenantDetail = () => {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <Button 
-              variant="outline" 
-              onClick={handleOpenEditDialog}
-              disabled={isOpeningEditDialog}
-            >
+            <Button variant="outline" onClick={handleOpenEditDialog} disabled={isOpeningEditDialog}>
               {isOpeningEditDialog ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
@@ -393,7 +408,7 @@ const TenantDetail = () => {
                 </>
               )}
             </Button>
-            
+
             <Dialog open={isEditDialogOpen} onOpenChange={setIsEditDialogOpen}>
               <DialogContent className="max-w-2xl">
                 <DialogHeader>
@@ -402,34 +417,34 @@ const TenantDetail = () => {
                     Edite o máximo de usuários e os dados do administrador principal do tenant
                   </DialogDescription>
                 </DialogHeader>
-                
+
                 <form onSubmit={handleEditTenantSubmit} className="space-y-6">
                   {/* Campos somente leitura */}
                   <div className="space-y-4 p-4 bg-muted/30 rounded-md border">
                     <h3 className="font-semibold text-sm">Informações do Tenant (Somente Leitura)</h3>
-                    
+
                     <div className="grid grid-cols-2 gap-4">
                       <div>
                         <Label className="text-muted-foreground">Nome</Label>
                         <Input value={tenant.name} disabled className="bg-muted/50" />
                       </div>
-                      
+
                       <div>
                         <Label className="text-muted-foreground">Domínio</Label>
                         <Input value={tenant.domain || "N/A"} disabled className="bg-muted/50" />
                       </div>
-                      
+
                       <div>
                         <Label className="text-muted-foreground">Tipo</Label>
                         <Input value={tenant.tenant_type || "N/A"} disabled className="bg-muted/50" />
                       </div>
                     </div>
                   </div>
-                  
+
                   {/* Campos editáveis */}
                   <div className="space-y-4">
                     <h3 className="font-semibold text-sm">Campos Editáveis</h3>
-                    
+
                     {/* Máximo de Usuários */}
                     <div>
                       <Label htmlFor="max_users">Máximo de Usuários *</Label>
@@ -438,7 +453,7 @@ const TenantDetail = () => {
                         type="number"
                         min="1"
                         value={editForm.max_users}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, max_users: parseInt(e.target.value) || 0 }))}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, max_users: parseInt(e.target.value) || 0 }))}
                         required
                       />
                       <p className="text-xs text-muted-foreground mt-1">
@@ -452,27 +467,26 @@ const TenantDetail = () => {
                       <Input
                         id="cnpj"
                         value={editForm.cnpj}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, cnpj: e.target.value }))}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, cnpj: e.target.value }))}
                         placeholder="00.000.000/0000-00"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         Pode ser preenchido ou alterado posteriormente
                       </p>
                     </div>
-
                   </div>
 
                   {/* Dados do Administrador */}
                   <div className="border-t pt-4 space-y-4">
                     <h3 className="font-semibold text-sm">Dados do Administrador</h3>
-                    
+
                     <div>
                       <Label htmlFor="admin_full_name">Nome Completo do Admin *</Label>
                       <Input
                         id="admin_full_name"
                         type="text"
                         value={editForm.admin_full_name}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, admin_full_name: e.target.value }))}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, admin_full_name: e.target.value }))}
                         placeholder="João Silva"
                         required
                       />
@@ -484,8 +498,10 @@ const TenantDetail = () => {
                         id="admin_email"
                         type="email"
                         value={editForm.admin_email}
-                        onChange={(e) => setEditForm(prev => ({ ...prev, admin_email: e.target.value.toLowerCase() }))}
-                        placeholder="admin@sec4file.com"
+                        onChange={(e) =>
+                          setEditForm((prev) => ({ ...prev, admin_email: e.target.value.toLowerCase() }))
+                        }
+                        placeholder="contato@otimizzo.com"
                         required
                       />
                       {tenant?.domain && (
@@ -493,9 +509,7 @@ const TenantDetail = () => {
                           Email deve ser do domínio: @{tenant.domain}
                         </p>
                       )}
-                      <p className="text-xs text-amber-600 mt-1">
-                        ⚠️ Alterar o email invalidará a sessão do usuário
-                      </p>
+                      <p className="text-xs text-amber-600 mt-1">⚠️ Alterar o email invalidará a sessão do usuário</p>
                     </div>
 
                     {tenantAdmins && tenantAdmins.length > 0 && (
@@ -504,7 +518,7 @@ const TenantDetail = () => {
                       </p>
                     )}
                   </div>
-                  
+
                   <div className="flex justify-end gap-2 pt-4 border-t">
                     <Button type="button" variant="outline" onClick={() => setIsEditDialogOpen(false)}>
                       Cancelar
@@ -546,7 +560,9 @@ const TenantDetail = () => {
               <p className="text-sm text-muted-foreground">Segmentos</p>
               <div className="flex gap-2 mt-1">
                 {tenant.segments?.map((seg: string) => (
-                  <Badge key={seg} variant="outline">{seg}</Badge>
+                  <Badge key={seg} variant="outline">
+                    {seg}
+                  </Badge>
                 ))}
               </div>
             </div>
@@ -696,27 +712,15 @@ const TenantDetail = () => {
                                   </Button>
                                 )}
                                 {user.is_active ? (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => deactivateUser(user.id)}
-                                  >
+                                  <Button variant="ghost" size="sm" onClick={() => deactivateUser(user.id)}>
                                     <ShieldOff className="h-4 w-4" />
                                   </Button>
                                 ) : (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => reactivateUser(user.id)}
-                                  >
+                                  <Button variant="ghost" size="sm" onClick={() => reactivateUser(user.id)}>
                                     <ShieldCheck className="h-4 w-4" />
                                   </Button>
                                 )}
-                                <Button
-                                  variant="ghost"
-                                  size="sm"
-                                  onClick={() => setUserToDelete(user.id)}
-                                >
+                                <Button variant="ghost" size="sm" onClick={() => setUserToDelete(user.id)}>
                                   <Trash2 className="h-4 w-4 text-destructive" />
                                 </Button>
                               </div>
@@ -727,9 +731,7 @@ const TenantDetail = () => {
                     </TableBody>
                   </Table>
                 ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Nenhum usuário cadastrado neste tenant.
-                  </div>
+                  <div className="text-center py-8 text-muted-foreground">Nenhum usuário cadastrado neste tenant.</div>
                 )}
               </CardContent>
             </Card>
@@ -746,9 +748,8 @@ const TenantDetail = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Remover Usuário Permanentemente?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. O usuário será removido permanentemente do sistema,
-              incluindo todos os seus dados de autenticação. Tickets e comentários criados por este
-              usuário serão preservados.
+              Esta ação não pode ser desfeita. O usuário será removido permanentemente do sistema, incluindo todos os
+              seus dados de autenticação. Tickets e comentários criados por este usuário serão preservados.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
