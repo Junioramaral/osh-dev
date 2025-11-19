@@ -160,15 +160,44 @@ export default function TenantAdmin() {
 
   const deleteTenantMutation = useMutation({
     mutationFn: async (tenantId: string) => {
-      // 1. Primeiro, remover associação de client_id dos profiles
-      const { error: profilesError } = await supabase
+      // 1. Buscar todos os profiles associados ao tenant
+      const { data: profiles, error: profilesError } = await supabase
         .from("profiles")
-        .update({ client_id: null })
+        .select("id, full_name")
         .eq("client_id", tenantId);
 
       if (profilesError) throw profilesError;
 
-      // 2. Deletar o tenant (CASCADE irá deletar o resto)
+      // 2. Deletar cada usuário do Supabase Auth
+      let deletedUsersCount = 0;
+      if (profiles && profiles.length > 0) {
+        for (const profile of profiles) {
+          try {
+            // Deletar do Auth (isso também deleta o profile via CASCADE)
+            const { error: authDeleteError } = await supabase.auth.admin.deleteUser(
+              profile.id
+            );
+            
+            if (authDeleteError) {
+              console.error(`Erro ao deletar usuário ${profile.full_name}:`, authDeleteError);
+            } else {
+              deletedUsersCount++;
+            }
+          } catch (err) {
+            console.error(`Erro ao deletar usuário ${profile.full_name}:`, err);
+          }
+        }
+      }
+
+      // 3. Deletar user_roles órfãos (se houver)
+      const { error: rolesError } = await supabase
+        .from("user_roles")
+        .delete()
+        .eq("tenant_id", tenantId);
+
+      if (rolesError) console.error("Erro ao deletar user_roles:", rolesError);
+
+      // 4. Deletar o tenant (CASCADE irá deletar o resto)
       const { error: deleteError } = await supabase
         .from("clients")
         .delete()
@@ -176,11 +205,11 @@ export default function TenantAdmin() {
 
       if (deleteError) throw deleteError;
 
-      return tenantId;
+      return { tenantId, deletedUsers: deletedUsersCount };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       toast.success("Tenant removido com sucesso", {
-        description: "Todos os dados relacionados foram deletados.",
+        description: `Tenant e ${data.deletedUsers} usuário(s) foram deletados permanentemente.`,
       });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
