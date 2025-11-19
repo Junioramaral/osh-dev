@@ -11,8 +11,10 @@ import { Building2, Plus, Users, CheckCircle, XCircle, AlertTriangle, Trash2 } f
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
+import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 
@@ -79,6 +81,14 @@ export default function TenantAdmin() {
       return;
     }
 
+    // Validate phone if provided
+    if (newTenant.admin_phone && !isValidPhone(newTenant.admin_phone)) {
+      toast.error("Telefone inválido", {
+        description: "O telefone deve ter 10 ou 11 dígitos"
+      });
+      return;
+    }
+
     setIsCreating(true);
     try {
       // 1. Criar tenant
@@ -104,7 +114,7 @@ export default function TenantAdmin() {
         body: {
           email: newTenant.admin_email,
           full_name: newTenant.admin_name,
-          phone: newTenant.admin_phone || undefined,
+          phone: newTenant.admin_phone ? cleanPhone(newTenant.admin_phone) : undefined,
           tenant_id: tenant.id,
           role: 'tenant_admin'
         }
@@ -370,9 +380,8 @@ export default function TenantAdmin() {
 
                   <div className="space-y-2">
                     <Label htmlFor="admin-phone">Telefone (opcional)</Label>
-                    <Input
+                    <PhoneInput
                       id="admin-phone"
-                      type="tel"
                       value={newTenant.admin_phone}
                       onChange={(e) => setNewTenant(prev => ({ ...prev, admin_phone: e.target.value }))}
                       placeholder="(00) 00000-0000"

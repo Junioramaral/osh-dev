@@ -12,7 +12,9 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
+import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -184,7 +186,39 @@ const TenantDetail = () => {
 
   const handleInviteSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    inviteUser(inviteForm, {
+    
+    if (!inviteForm.email || !inviteForm.full_name) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    // Validate email domain
+    const emailDomain = inviteForm.email.split('@')[1]?.toLowerCase();
+    const tenantDomain = tenant?.domain?.toLowerCase();
+    
+    if (emailDomain !== tenantDomain) {
+      toast.error(
+        `O email deve pertencer ao domínio ${tenantDomain}`,
+        { description: `Email fornecido: ${inviteForm.email}` }
+      );
+      return;
+    }
+
+    // Validate phone if provided
+    if (inviteForm.phone && !isValidPhone(inviteForm.phone)) {
+      toast.error("Telefone inválido", {
+        description: "O telefone deve ter 10 ou 11 dígitos"
+      });
+      return;
+    }
+
+    // Clean phone before sending
+    const cleanedForm = {
+      ...inviteForm,
+      phone: inviteForm.phone ? cleanPhone(inviteForm.phone) : undefined,
+    };
+
+    inviteUser(cleanedForm, {
       onSuccess: () => {
         setIsInviteDialogOpen(false);
         setInviteForm({ email: "", full_name: "", phone: "", role: "user" });
@@ -544,9 +578,8 @@ const TenantDetail = () => {
                         </div>
                         <div className="space-y-2">
                           <Label htmlFor="phone">Telefone (opcional)</Label>
-                          <Input
+                          <PhoneInput
                             id="phone"
-                            type="tel"
                             value={inviteForm.phone}
                             onChange={(e) => setInviteForm({ ...inviteForm, phone: e.target.value })}
                             placeholder="(00) 00000-0000"
