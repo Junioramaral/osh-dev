@@ -10,8 +10,10 @@ interface Profile {
   team_id: string | null;
 }
 
+export type UserRoleType = 'super_admin' | 'user';
+
 interface UserRole {
-  role: 'super_admin' | 'tenant_admin' | 'analyst_db' | 'analyst_app' | 'user';
+  role: UserRoleType;
   tenant_id: string | null;
 }
 
@@ -24,6 +26,7 @@ interface AuthContextType {
   mustChangePassword: boolean;
   hasRole: (role: string) => boolean;
   isSuperAdmin: boolean;
+  isOtimizzoUser: boolean;
   tenantId: string | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
   signUp: (email: string, password: string, full_name: string, tenant_id: string) => Promise<{ error: any }>;
@@ -131,6 +134,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const hasRole = (role: string) => roles.some(r => r.role === role);
   const isSuperAdmin = hasRole('super_admin');
+  const isOtimizzoUser = roles.some(r => r.tenant_id === '00000000-0000-0000-0000-000000000001');
   const tenantId = roles.find(r => r.tenant_id)?.tenant_id || null;
 
   const signIn = async (email: string, password: string) => {
@@ -210,6 +214,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mustChangePassword,
       hasRole,
       isSuperAdmin,
+      isOtimizzoUser,
       tenantId,
       signIn, 
       signUp, 

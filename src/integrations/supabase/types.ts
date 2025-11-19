@@ -909,15 +909,11 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_otimizzo_user: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
     }
     Enums: {
-      app_role:
-        | "super_admin"
-        | "tenant_admin"
-        | "analyst_db"
-        | "analyst_app"
-        | "user"
+      app_role: "super_admin" | "user"
       business_impact: "nenhum" | "baixo" | "medio" | "alto" | "critico"
       criticality_level: "baixa" | "media" | "alta" | "critica"
       db_engine: "Oracle" | "PostgreSQL" | "MySQL" | "MongoDB" | "SQL Server"
@@ -1062,13 +1058,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: [
-        "super_admin",
-        "tenant_admin",
-        "analyst_db",
-        "analyst_app",
-        "user",
-      ],
+      app_role: ["super_admin", "user"],
       business_impact: ["nenhum", "baixo", "medio", "alto", "critico"],
       criticality_level: ["baixa", "media", "alta", "critica"],
       db_engine: ["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"],

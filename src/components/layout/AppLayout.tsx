@@ -22,7 +22,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, hasRole, isSuperAdmin, signOut, loading } = useAuth();
+  const { user, profile, isSuperAdmin, isOtimizzoUser, signOut, loading } = useAuth();
   const [open, setOpen] = useState(false);
 
   if (loading) {
@@ -39,11 +39,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const navigation = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
-    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app') },
-    { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app') },
-    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || hasRole('analyst_db') || hasRole('tenant_admin') },
-    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || hasRole('analyst_app') || hasRole('tenant_admin') },
-    { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app') || hasRole('tenant_admin') },
+    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
     { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin },
   ].filter(item => item.show);
@@ -83,7 +83,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           <p className="text-sm font-medium text-sidebar-foreground">{profile?.full_name}</p>
           <p className="text-xs text-sidebar-foreground/60">{user?.email}</p>
           <p className="text-xs text-sidebar-foreground/70 capitalize mt-1">
-            {isSuperAdmin ? 'Super Admin' : hasRole('tenant_admin') ? 'Tenant Admin' : hasRole('analyst_db') ? 'Analista DB' : hasRole('analyst_app') ? 'Analista APP' : 'Usuário'}
+            {isSuperAdmin ? 'Super Admin' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
           </p>
         </div>
         <Button

@@ -116,7 +116,7 @@ export default function TenantAdmin() {
           full_name: newTenant.admin_name,
           phone: newTenant.admin_phone ? cleanPhone(newTenant.admin_phone) : undefined,
           tenant_id: tenant.id,
-          role: 'tenant_admin'
+          role: 'user'
         }
       });
 

@@ -88,7 +88,7 @@ const TenantDetail = () => {
           user_roles!inner(role)
         `)
         .eq("client_id", tenantId)
-        .eq("user_roles.role", "tenant_admin")
+        .eq("user_roles.role", "super_admin")
         .eq("is_active", true);
       
       if (profilesError) throw profilesError;
