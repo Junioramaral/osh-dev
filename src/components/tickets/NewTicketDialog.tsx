@@ -95,6 +95,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       business_impact: "medio",
       ticket_type: "incidente",
       priority: "P3",
+      started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     },
   });
 
@@ -141,6 +142,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         business_impact: "medio",
         ticket_type: "incidente",
         priority: "P3",
+        started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       });
     }
   }, [currentTenant, availableSegments, segment, reset, tenantId]);
@@ -314,6 +316,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   });
 
   const onSubmit = (data: TicketFormData) => {
+    console.log("📝 Criando ticket com dados:", data);
+    console.log("❌ Erros de validação:", errors);
     createTicketMutation.mutate(data);
   };
 
@@ -638,7 +642,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   <Input
                     type="datetime-local"
                     {...register("started_at")}
-                    defaultValue={format(new Date(), "yyyy-MM-dd'T'HH:mm")}
                   />
                   {errors.started_at && <p className="text-sm text-destructive">{errors.started_at.message}</p>}
                 </div>
@@ -686,6 +689,22 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               </div>
             </div>
           </div>
+
+          {/* Debug: mostrar todos os erros */}
+          {Object.keys(errors).length > 0 && (
+            <div className="bg-destructive/10 border border-destructive/20 rounded-lg p-4">
+              <p className="font-semibold text-destructive mb-2">
+                ⚠️ Corrija os seguintes erros:
+              </p>
+              <ul className="list-disc list-inside space-y-1 text-sm text-destructive">
+                {Object.entries(errors).map(([field, error]) => (
+                  <li key={field}>
+                    <strong>{field}:</strong> {error.message}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
 
           <div className="flex justify-end gap-2 pt-4">
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
