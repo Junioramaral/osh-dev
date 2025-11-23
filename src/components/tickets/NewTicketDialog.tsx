@@ -160,9 +160,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   // Fetch APP products filtrados por cliente
   const { data: appProducts } = useQuery({
-    queryKey: ["app-products", selectedClientId],
+    queryKey: ["app-products", selectedClientId, segment],
     queryFn: async () => {
-      if (!selectedClientId || segment !== "APP") return [];
+      if (!selectedClientId) return [];
       
       // Buscar os product_ids do cliente
       const { data: clientData, error: clientError } = await supabase
@@ -233,6 +233,15 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       setValue("app_instance_id", appInstances[0].id);
     }
   }, [appInstances, segment, setValue]);
+
+  // Resetar queries quando o dialog abre
+  useEffect(() => {
+    if (open && tenantId) {
+      setValue("client_id", tenantId);
+      queryClient.invalidateQueries({ queryKey: ["app-products"] });
+      queryClient.invalidateQueries({ queryKey: ["app-instances"] });
+    }
+  }, [open, tenantId, setValue, queryClient]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: TicketFormData) => {
