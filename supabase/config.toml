@@ -1,1 +1,7 @@
 project_id = "ukrgzsntvddzwtmccwbf"
+
+[functions.invite-user]
+verify_jwt = false
+
+[functions.sla-monitor]
+verify_jwt = false
