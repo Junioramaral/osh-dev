@@ -1,29 +1,47 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
-import { Progress } from "@/components/ui/progress";
+import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Search, AlertCircle } from "lucide-react";
-import { format } from "date-fns";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
-import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
+import { TicketRow } from "@/components/tickets/TicketRow";
+import { calculateSLAStatus } from "@/lib/ticketUtils";
 
 export default function Tickets() {
   const { profile, tenantId, hasRole } = useAuth();
-  const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
+  const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
+
+  const toggleTicketSelection = (ticketId: string) => {
+    setSelectedTickets(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(ticketId)) {
+        newSet.delete(ticketId);
+      } else {
+        newSet.add(ticketId);
+      }
+      return newSet;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedTickets.size === filteredTickets?.length) {
+      setSelectedTickets(new Set());
+    } else {
+      setSelectedTickets(new Set(filteredTickets?.map(t => t.id) || []));
+    }
+  };
 
   // Check if user is from Otimizzo tenant
   const { data: currentTenant } = useQuery({
@@ -142,8 +160,8 @@ export default function Tickets() {
             <SelectContent>
               <SelectItem value="all">Todos Status</SelectItem>
               <SelectItem value="novo">Novo</SelectItem>
-              <SelectItem value="em-atendimento">Em Atendimento</SelectItem>
-              <SelectItem value="aguardando">Aguardando</SelectItem>
+              <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
+              <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
               <SelectItem value="resolvido">Resolvido</SelectItem>
               <SelectItem value="fechado">Fechado</SelectItem>
             </SelectContent>
@@ -177,97 +195,48 @@ export default function Tickets() {
         </div>
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {[1, 2, 3, 4, 5, 6].map((i) => (
-              <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-4 w-[200px]" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-20 w-full" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+          <Card>
+            <div className="p-8 space-y-4">
+              {[1, 2, 3, 4, 5].map((i) => (
+                <div key={i} className="flex items-center gap-4">
+                  <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                  <div className="h-4 flex-1 bg-muted rounded animate-pulse" />
+                </div>
+              ))}
+            </div>
+          </Card>
         ) : filteredTickets && filteredTickets.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredTickets.map((ticket) => {
-              const slaStatus = calculateSLAStatus(ticket);
-              
-              return (
-                <Card 
-                  key={ticket.id} 
-                  className={`hover:shadow-lg transition-shadow cursor-pointer ${slaStatus.borderClass}`}
-                  onClick={() => navigate(`/tickets/${ticket.id}`)}
-                >
-                  <CardHeader className="pb-3">
-                    <div className="flex items-start justify-between">
-                      <div className="space-y-1 flex-1">
-                        <CardTitle className="text-lg">{ticket.ticket_number}</CardTitle>
-                        <p className="text-sm text-muted-foreground line-clamp-2">{ticket.title}</p>
-                      </div>
-                      <div className="flex flex-col gap-1 items-end ml-2">
-                        <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
-                          {ticket.priority}
-                        </Badge>
-                        {slaStatus.type !== 'not-applicable' && (
-                          <Badge variant="outline" className={`${slaStatus.color} flex items-center gap-1 whitespace-nowrap`}>
-                            {slaStatus.icon}
-                            <span className="text-xs">{slaStatus.label}</span>
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </CardHeader>
-                  <CardContent className="space-y-3">
-                    {/* Indicador de SLA com barra de progresso */}
-                    {slaStatus.type !== 'not-applicable' && slaStatus.percentage !== undefined && (
-                      <div className="space-y-2">
-                        <div className="flex items-center justify-between text-xs">
-                          <span className="text-muted-foreground font-medium">
-                            {!ticket.first_response_at ? 'SLA 1ª Resposta' : 'SLA Resolução'}
-                          </span>
-                          <span className={`font-medium ${
-                            slaStatus.type === 'overdue' ? 'text-red-600' : 
-                            slaStatus.type === 'warning' ? 'text-yellow-600' : 
-                            'text-green-600'
-                          }`}>
-                            {slaStatus.timeRemaining}
-                          </span>
-                        </div>
-                        <Progress 
-                          value={slaStatus.percentage} 
-                          className={`h-2 ${
-                            slaStatus.type === 'overdue' ? '[&>div]:bg-red-500' : 
-                            slaStatus.type === 'warning' ? '[&>div]:bg-yellow-500' : 
-                            '[&>div]:bg-green-500'
-                          }`}
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <Badge className={getStatusColor(ticket.status)}>
-                        {ticket.status}
-                      </Badge>
-                      <Badge variant="outline">
-                        {ticket.segment}
-                      </Badge>
-                    </div>
-                    
-                    <div className="text-sm space-y-1">
-                      <p className="text-muted-foreground">
-                        Cliente: <span className="text-foreground font-medium">{ticket.clients?.name}</span>
-                      </p>
-                      <p className="text-muted-foreground">
-                        Criado: {format(new Date(ticket.created_at), "dd/MM/yyyy HH:mm")}
-                      </p>
-                    </div>
-                  </CardContent>
-                </Card>
-              );
-            })}
-          </div>
+          <Card>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-12">
+                    <Checkbox 
+                      checked={selectedTickets.size === filteredTickets.length && filteredTickets.length > 0}
+                      onCheckedChange={toggleSelectAll}
+                    />
+                  </TableHead>
+                  <TableHead>Número</TableHead>
+                  <TableHead>Tempo de Vida</TableHead>
+                  <TableHead>Título</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead>Prioridade</TableHead>
+                  <TableHead>Status</TableHead>
+                  <TableHead>SLA</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {filteredTickets.map((ticket) => (
+                  <TicketRow 
+                    key={ticket.id} 
+                    ticket={ticket}
+                    isSelected={selectedTickets.has(ticket.id)}
+                    onToggleSelect={() => toggleTicketSelection(ticket.id)}
+                  />
+                ))}
+              </TableBody>
+            </Table>
+          </Card>
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">

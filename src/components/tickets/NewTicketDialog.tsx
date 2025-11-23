@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { TicketCreatedDialog } from "./TicketCreatedDialog";
 import {
   Dialog,
   DialogContent,
@@ -82,6 +83,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const { profile, tenantId, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const [segment, setSegment] = useState<"DB" | "APP" | null>(null);
+  const [showSuccessDialog, setShowSuccessDialog] = useState(false);
+  const [createdTicket, setCreatedTicket] = useState<any>(null);
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -295,11 +298,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       if (error) throw error;
       return ticket;
     },
-    onSuccess: () => {
-      toast({
-        title: "Ticket criado com sucesso!",
-        description: "O ticket foi registrado e será atendido em breve.",
-      });
+    onSuccess: (ticket) => {
+      setCreatedTicket(ticket);
+      setShowSuccessDialog(true);
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
       onOpenChange(false);
     },
@@ -322,6 +323,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   };
 
   return (
+    <>
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
@@ -697,5 +699,15 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         </form>
       </DialogContent>
     </Dialog>
+
+    {createdTicket && (
+      <TicketCreatedDialog
+        open={showSuccessDialog}
+        onOpenChange={setShowSuccessDialog}
+        ticketNumber={createdTicket.ticket_number}
+        ticketId={createdTicket.id}
+      />
+    )}
+    </>
   );
 }
