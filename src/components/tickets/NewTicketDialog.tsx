@@ -158,18 +158,35 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!selectedClientId && !!selectedDbEngine && segment === "DB",
   });
 
-  // Fetch APP products
+  // Fetch APP products filtrados por cliente
   const { data: appProducts } = useQuery({
-    queryKey: ["app-products"],
+    queryKey: ["app-products", selectedClientId],
     queryFn: async () => {
+      if (!selectedClientId || segment !== "APP") return [];
+      
+      // Buscar os product_ids do cliente
+      const { data: clientData, error: clientError } = await supabase
+        .from("clients")
+        .select("app_product_ids")
+        .eq("id", selectedClientId)
+        .single();
+      
+      if (clientError) throw clientError;
+      
+      const productIds = clientData?.app_product_ids || [];
+      if (productIds.length === 0) return [];
+      
+      // Buscar apenas os produtos do cliente
       const { data, error } = await supabase
         .from("application_products")
         .select("id, name")
+        .in("id", productIds)
         .order("name");
+      
       if (error) throw error;
       return data;
     },
-    enabled: segment === "APP",
+    enabled: !!selectedClientId && segment === "APP",
   });
 
   // Fetch APP instances
@@ -202,6 +219,20 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
     enabled: !!selectedClientId,
   });
+
+  // Auto-selecionar produto quando houver apenas 1
+  useEffect(() => {
+    if (appProducts && appProducts.length === 1 && segment === "APP") {
+      setValue("app_product_id", appProducts[0].id);
+    }
+  }, [appProducts, segment, setValue]);
+
+  // Auto-selecionar instância quando houver apenas 1
+  useEffect(() => {
+    if (appInstances && appInstances.length === 1 && segment === "APP") {
+      setValue("app_instance_id", appInstances[0].id);
+    }
+  }, [appInstances, segment, setValue]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: TicketFormData) => {
@@ -472,22 +503,39 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           {segment === "APP" && (
             <>
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="app_product_id">Produto *</Label>
-                  <Select value={watch("app_product_id")} onValueChange={(value) => setValue("app_product_id", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o produto" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {appProducts?.map((product) => (
-                        <SelectItem key={product.id} value={product.id}>
-                          {product.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                  {errors.app_product_id && <p className="text-sm text-destructive">{errors.app_product_id.message}</p>}
-                </div>
+                {/* Produto: esconder se houver apenas 1 */}
+                {appProducts && appProducts.length === 1 ? (
+                  <div className="space-y-2">
+                    <Label>Produto *</Label>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        value={appProducts[0].name}
+                        disabled
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">
+                        (Produto único)
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="app_product_id">Produto *</Label>
+                    <Select value={watch("app_product_id")} onValueChange={(value) => setValue("app_product_id", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o produto" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {appProducts?.map((product) => (
+                          <SelectItem key={product.id} value={product.id}>
+                            {product.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.app_product_id && <p className="text-sm text-destructive">{errors.app_product_id.message}</p>}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="app_instance_id">Instância APP *</Label>
