@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge";
 import { useNavigate } from "react-router-dom";
 import { useTicketAge } from "@/hooks/useTicketAge";
 import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
+import { cn } from "@/lib/utils";
 
 interface TicketRowProps {
   ticket: any;
@@ -24,7 +25,10 @@ export function TicketRow({ ticket, isSelected, onToggleSelect }: TicketRowProps
   
   return (
     <TableRow 
-      className="cursor-pointer hover:bg-muted/50"
+      className={cn(
+        "cursor-pointer hover:bg-muted/50",
+        isSelected && "bg-primary/5 border-l-4 border-l-primary"
+      )}
       onClick={handleRowClick}
     >
       <TableCell onClick={(e) => e.stopPropagation()}>
