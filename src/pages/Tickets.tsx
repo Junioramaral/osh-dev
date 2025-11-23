@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -13,15 +13,28 @@ import { Plus, Search, AlertCircle } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import { TicketRow } from "@/components/tickets/TicketRow";
 import { calculateSLAStatus } from "@/lib/ticketUtils";
+import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
+import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystDialog";
+import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
+import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function Tickets() {
-  const { profile, tenantId, hasRole } = useAuth();
+  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser } = useAuth();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
+  const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
+  const [showAssignTeamDialog, setShowAssignTeamDialog] = useState(false);
+
+  const {
+    bulkAssignAnalyst,
+    bulkAssignTeam,
+    bulkChangeStatus,
+    bulkChangePriority,
+  } = useBulkTicketActions();
 
   const toggleTicketSelection = (ticketId: string) => {
     setSelectedTickets(prev => {
@@ -43,6 +56,52 @@ export default function Tickets() {
     }
   };
 
+  const handleBulkAssignAnalyst = (analystId: string) => {
+    bulkAssignAnalyst.mutate({
+      ticketIds: Array.from(selectedTickets),
+      analystId,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  const handleBulkAssignTeam = (teamId: string) => {
+    bulkAssignTeam.mutate({
+      ticketIds: Array.from(selectedTickets),
+      teamId,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  const handleBulkChangeStatus = (status: string) => {
+    bulkChangeStatus.mutate({
+      ticketIds: Array.from(selectedTickets),
+      status,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  const handleBulkChangePriority = (priority: "P1" | "P2" | "P3" | "P4") => {
+    bulkChangePriority.mutate({
+      ticketIds: Array.from(selectedTickets),
+      priority,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  // Limpar seleção com ESC
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && selectedTickets.size > 0) {
+        setSelectedTickets(new Set());
+      }
+    };
+    
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [selectedTickets]);
+
+  const canUseBulkActions = isOtimizzoUser || isSuperAdmin;
+
   // Check if user is from Otimizzo tenant
   const { data: currentTenant } = useQuery({
     queryKey: ["current-tenant", tenantId],
@@ -60,8 +119,6 @@ export default function Tickets() {
     },
     enabled: !!tenantId,
   });
-
-  const isOtimizzoUser = currentTenant?.tenant_type === 'otimizzo';
 
   // Fetch all clients (only for Otimizzo users)
   const { data: allClients } = useQuery({
@@ -253,6 +310,31 @@ export default function Tickets() {
       </div>
 
       <NewTicketDialog open={isNewTicketOpen} onOpenChange={setIsNewTicketOpen} />
+
+      {canUseBulkActions && selectedTickets.size > 0 && (
+        <BulkActionsBar
+          selectedCount={selectedTickets.size}
+          onClearSelection={() => setSelectedTickets(new Set())}
+          onAssignAnalyst={() => setShowAssignAnalystDialog(true)}
+          onAssignTeam={() => setShowAssignTeamDialog(true)}
+          onChangeStatus={handleBulkChangeStatus}
+          onChangePriority={handleBulkChangePriority}
+        />
+      )}
+
+      <BulkAssignAnalystDialog
+        open={showAssignAnalystDialog}
+        onOpenChange={setShowAssignAnalystDialog}
+        onConfirm={handleBulkAssignAnalyst}
+        selectedCount={selectedTickets.size}
+      />
+
+      <BulkAssignTeamDialog
+        open={showAssignTeamDialog}
+        onOpenChange={setShowAssignTeamDialog}
+        onConfirm={handleBulkAssignTeam}
+        selectedCount={selectedTickets.size}
+      />
     </AppLayout>
   );
 }
