@@ -7,6 +7,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { TicketCreatedDialog } from "./TicketCreatedDialog";
+import { FileUploadZone, FileWithPreview } from "./FileUploadZone";
 import {
   Dialog,
   DialogContent,
@@ -85,6 +86,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const [segment, setSegment] = useState<"DB" | "APP" | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<any>(null);
+  const [uploadFiles, setUploadFiles] = useState<FileWithPreview[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -315,11 +318,99 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
-  const onSubmit = (data: TicketFormData) => {
+  const onSubmit = async (data: TicketFormData) => {
     console.log("📝 Criando ticket com dados:", data);
     console.log("❌ Erros de validação:", errors);
-    createTicketMutation.mutate(data);
+
+    try {
+      const ticket = await createTicketMutation.mutateAsync(data);
+      
+      if (!ticket) {
+        throw new Error("Ticket não foi criado");
+      }
+
+      if (uploadFiles.length > 0) {
+        setIsUploading(true);
+        console.log(`📤 Fazendo upload de ${uploadFiles.length} arquivos...`);
+
+        const uploadedEvidences = await uploadTicketFiles(
+          ticket.client_id,
+          ticket.ticket_number,
+          uploadFiles
+        );
+
+        const { error: updateError } = await supabase
+          .from("tickets")
+          .update({ evidences: uploadedEvidences as any })
+          .eq("id", ticket.id);
+
+        if (updateError) throw updateError;
+
+        console.log("✅ Evidências salvas com sucesso!");
+      }
+
+      setCreatedTicket(ticket);
+      setShowSuccessDialog(true);
+      setUploadFiles([]);
+      onOpenChange(false);
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    } catch (error: any) {
+      console.error("❌ Erro:", error);
+      toast({
+        title: "Erro ao criar ticket",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
+
+  interface Evidence {
+    name: string;
+    url: string;
+    type: string;
+    size: number;
+    uploaded_at: string;
+  }
+
+  async function uploadTicketFiles(
+    clientId: string,
+    ticketNumber: string,
+    files: FileWithPreview[]
+  ): Promise<Evidence[]> {
+    const evidences: Evidence[] = [];
+
+    for (const fileItem of files) {
+      const filePath = `${clientId}/${ticketNumber}/${fileItem.file.name}`;
+
+      const { data, error } = await supabase.storage
+        .from("tickets")
+        .upload(filePath, fileItem.file, {
+          cacheControl: "3600",
+          upsert: false,
+        });
+
+      if (error) {
+        console.error(`❌ Erro ao fazer upload de ${fileItem.file.name}:`, error);
+        throw error;
+      }
+
+      const { data: publicUrl } = supabase.storage
+        .from("tickets")
+        .getPublicUrl(filePath);
+
+      evidences.push({
+        name: fileItem.file.name,
+        url: publicUrl.publicUrl,
+        type: fileItem.file.type,
+        size: fileItem.file.size,
+        uploaded_at: new Date().toISOString(),
+      });
+    }
+
+    return evidences;
+  }
 
   const handleSegmentChange = (value: "DB" | "APP") => {
     setSegment(value);
@@ -688,6 +779,20 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 <Textarea {...register("workaround")} placeholder="Existe alguma forma de contornar o problema temporariamente? (opcional)" />
               </div>
             </div>
+          </div>
+
+          {/* Seção de Upload de Evidências */}
+          <div className="space-y-2">
+            <Label>Anexos / Evidências (Opcional)</Label>
+            <p className="text-xs text-muted-foreground mb-2">
+              Adicione capturas de tela, logs ou documentos que ajudem a entender o problema
+            </p>
+            <FileUploadZone
+              files={uploadFiles}
+              onFilesChange={setUploadFiles}
+              maxFiles={10}
+              maxSizeMB={10}
+            />
           </div>
 
           {/* Debug: mostrar todos os erros */}
