@@ -480,6 +480,47 @@ export type Database = {
         }
         Relationships: []
       }
+      sla_notifications: {
+        Row: {
+          alert_type: Database["public"]["Enums"]["sla_alert_type"]
+          created_at: string | null
+          email_content: Json | null
+          id: string
+          recipients: string[]
+          sent_at: string
+          sla_type: string
+          ticket_id: string
+        }
+        Insert: {
+          alert_type: Database["public"]["Enums"]["sla_alert_type"]
+          created_at?: string | null
+          email_content?: Json | null
+          id?: string
+          recipients: string[]
+          sent_at?: string
+          sla_type: string
+          ticket_id: string
+        }
+        Update: {
+          alert_type?: Database["public"]["Enums"]["sla_alert_type"]
+          created_at?: string | null
+          email_content?: Json | null
+          id?: string
+          recipients?: string[]
+          sent_at?: string
+          sla_type?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sla_notifications_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       teams: {
         Row: {
           created_at: string | null
@@ -928,6 +969,7 @@ export type Database = {
       frequency_type: "pontual" | "intermitente" | "continuo"
       lock_status: "locked" | "unlocked"
       machine_type: "servidor" | "vm" | "desktop" | "cloud"
+      sla_alert_type: "warning" | "overdue"
       ticket_priority: "P1" | "P2" | "P3" | "P4"
       ticket_segment: "DB" | "APP"
       ticket_status:
@@ -1073,6 +1115,7 @@ export const Constants = {
       frequency_type: ["pontual", "intermitente", "continuo"],
       lock_status: ["locked", "unlocked"],
       machine_type: ["servidor", "vm", "desktop", "cloud"],
+      sla_alert_type: ["warning", "overdue"],
       ticket_priority: ["P1", "P2", "P3", "P4"],
       ticket_segment: ["DB", "APP"],
       ticket_status: [
