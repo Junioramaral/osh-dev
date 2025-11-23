@@ -959,6 +959,10 @@ export type Database = {
       }
       is_otimizzo_user: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      validate_ticket_upload_path: {
+        Args: { _path: string; _user_id: string }
+        Returns: boolean
+      }
     }
     Enums: {
       app_role: "super_admin" | "user"

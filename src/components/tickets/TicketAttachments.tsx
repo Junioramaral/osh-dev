@@ -15,6 +15,23 @@ function AttachmentCard({ attachment }: AttachmentCardProps) {
     if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
     return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
   };
+
+  const handleDownload = async (url: string, fileName: string) => {
+    try {
+      const response = await fetch(url);
+      const blob = await response.blob();
+      const downloadUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = fileName;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      window.URL.revokeObjectURL(downloadUrl);
+    } catch (error) {
+      console.error("Erro ao baixar arquivo:", error);
+    }
+  };
   
   return (
     <Card className="hover:shadow-lg transition-shadow cursor-pointer">
@@ -29,7 +46,12 @@ function AttachmentCard({ attachment }: AttachmentCardProps) {
         <p className="mt-2 text-sm font-medium truncate">{attachment.name}</p>
         <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size || 0)}</p>
         <div className="flex gap-2 mt-2">
-          <Button size="sm" variant="outline" className="flex-1">
+          <Button 
+            size="sm" 
+            variant="outline" 
+            className="flex-1"
+            onClick={() => handleDownload(attachment.url, attachment.name)}
+          >
             <Download className="h-3 w-3 mr-1" />
             Download
           </Button>
