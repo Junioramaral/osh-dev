@@ -81,9 +81,9 @@ interface NewTicketDialogProps {
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
   const { profile, tenantId, hasRole } = useAuth();
   const queryClient = useQueryClient();
-  const [segment, setSegment] = useState<"DB" | "APP">("DB");
+  const [segment, setSegment] = useState<"DB" | "APP" | null>(null);
 
-  const { register, handleSubmit, watch, setValue, formState: { errors, isSubmitting } } = useForm<TicketFormData>({
+  const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       segment: "DB",
@@ -94,6 +94,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       priority: "P3",
     },
   });
+
+  const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = form;
 
   const selectedClientId = watch("client_id");
   const selectedDbEngine = watch("db_engine");
@@ -122,14 +124,23 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const hasOnlyOneSegment = availableSegments.length === 1;
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
 
-  // Auto-set segment if tenant has only one
+  // Initialize segment when tenant loads
   useEffect(() => {
-    if (currentTenant && availableSegments.length > 0) {
+    if (currentTenant && availableSegments.length > 0 && segment === null) {
       const initialSegment = availableSegments[0] as "DB" | "APP";
       setSegment(initialSegment);
-      setValue("segment", initialSegment);
+      
+      // Reset form with correct initial values
+      reset({
+        segment: initialSegment,
+        client_id: tenantId || "",
+        frequency: "pontual",
+        business_impact: "medio",
+        ticket_type: "incidente",
+        priority: "P3",
+      });
     }
-  }, [currentTenant, setValue]);
+  }, [currentTenant, availableSegments, segment, reset, tenantId]);
 
   // Fetch clients
   const { data: clients } = useQuery({
@@ -162,7 +173,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const { data: appProducts } = useQuery({
     queryKey: ["app-products", selectedClientId],
     queryFn: async () => {
-      if (!selectedClientId || segment !== "APP") return [];
+      if (!selectedClientId) return [];
+      if (segment === null) return []; // Aguardando tenant carregar
+      if (segment !== "APP") return [];
       
       // Buscar os product_ids do cliente
       const { data: clientData, error: clientError } = await supabase
