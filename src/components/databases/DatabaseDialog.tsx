@@ -35,17 +35,17 @@ import { useCreateDatabase, type CreateDatabaseData } from "@/hooks/useDatabaseM
 const databaseSchema = z.object({
   client_id: z.string().uuid("Selecione um cliente"),
   machine_id: z.string().optional(),
-  engine: z.enum(["oracle", "postgresql", "mysql", "mongodb", "sqlserver"], {
+  engine: z.enum(["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"], {
     required_error: "Selecione um engine",
   }),
   version: z.string().min(1, "Versão é obrigatória"),
   instance_name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   endpoint: z.string().optional(),
   port: z.coerce.number().int().min(1).max(65535).optional().or(z.literal("")),
-  environment: z.enum(["producao", "homologacao", "desenvolvimento"], {
+  environment: z.enum(["prod", "hom", "qa", "dev"], {
     required_error: "Selecione um ambiente",
   }),
-  criticality: z.enum(["baixa", "media", "alta"]).default("media"),
+  criticality: z.enum(["baixa", "media", "alta", "critica"]).default("media"),
 });
 
 type DatabaseFormData = z.infer<typeof databaseSchema>;
@@ -81,12 +81,12 @@ export default function DatabaseDialog({
     defaultValues: {
       client_id: profile?.client_id || "",
       machine_id: "",
-      engine: "postgresql",
+      engine: "PostgreSQL",
       version: "",
       instance_name: "",
       endpoint: "",
       port: "" as any,
-      environment: "producao",
+      environment: "prod",
       criticality: "media",
     },
   });
@@ -182,13 +182,13 @@ export default function DatabaseDialog({
                           <SelectValue />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
-                        <SelectItem value="postgresql">PostgreSQL</SelectItem>
-                        <SelectItem value="mysql">MySQL</SelectItem>
-                        <SelectItem value="oracle">Oracle</SelectItem>
-                        <SelectItem value="mongodb">MongoDB</SelectItem>
-                        <SelectItem value="sqlserver">SQL Server</SelectItem>
-                      </SelectContent>
+                    <SelectContent>
+                      <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
+                      <SelectItem value="MySQL">MySQL</SelectItem>
+                      <SelectItem value="Oracle">Oracle</SelectItem>
+                      <SelectItem value="MongoDB">MongoDB</SelectItem>
+                      <SelectItem value="SQL Server">SQL Server</SelectItem>
+                    </SelectContent>
                     </Select>
                     <FormMessage />
                   </FormItem>
@@ -238,9 +238,10 @@ export default function DatabaseDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="producao">Produção</SelectItem>
-                        <SelectItem value="homologacao">Homologação</SelectItem>
-                        <SelectItem value="desenvolvimento">Desenvolvimento</SelectItem>
+                        <SelectItem value="prod">Produção</SelectItem>
+                        <SelectItem value="hom">Homologação</SelectItem>
+                        <SelectItem value="qa">QA</SelectItem>
+                        <SelectItem value="dev">Desenvolvimento</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
@@ -264,6 +265,7 @@ export default function DatabaseDialog({
                         <SelectItem value="baixa">Baixa</SelectItem>
                         <SelectItem value="media">Média</SelectItem>
                         <SelectItem value="alta">Alta</SelectItem>
+                        <SelectItem value="critica">Crítica</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormMessage />
