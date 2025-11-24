@@ -10,9 +10,32 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Database, AlertCircle } from "lucide-react";
+import { Plus, Database, AlertCircle, Search, Trash2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
+import { cn } from "@/lib/utils";
 import DatabaseDialog from "@/components/databases/DatabaseDialog";
+import { useDeleteDatabase } from "@/hooks/useDatabaseMutations";
 import type { Tables } from "@/integrations/supabase/types";
+
+const ITEMS_PER_PAGE = 10;
 
 export default function Databases() {
   const { profile, isSuperAdmin, hasRole } = useAuth();
@@ -20,6 +43,12 @@ export default function Databases() {
   const [environmentFilter, setEnvironmentFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedDatabase, setSelectedDatabase] = useState<Tables<"database_instances"> | null>(null);
+  const [searchQuery, setSearchQuery] = useState<string>("");
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [databaseToDelete, setDatabaseToDelete] = useState<Tables<"database_instances"> | null>(null);
+  const [clientPages, setClientPages] = useState<Record<string, number>>({});
+  
+  const deleteDatabase = useDeleteDatabase();
 
   const { data: databases, isLoading } = useQuery({
     queryKey: ["databases"],
@@ -40,7 +69,9 @@ export default function Databases() {
   const filteredDatabases = databases?.filter((db) => {
     const matchesEngine = engineFilter === "all" || db.engine === engineFilter;
     const matchesEnvironment = environmentFilter === "all" || db.environment === environmentFilter;
-    return matchesEngine && matchesEnvironment;
+    const matchesSearch = searchQuery === "" || 
+      db.instance_name.toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesEngine && matchesEnvironment && matchesSearch;
   });
 
   const groupDatabasesByClient = () => {
@@ -75,6 +106,38 @@ export default function Databases() {
     }
   };
 
+  const handleDeleteClick = (db: Tables<"database_instances">, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setDatabaseToDelete(db);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (databaseToDelete) {
+      deleteDatabase.mutate(databaseToDelete.id);
+      setDeleteDialogOpen(false);
+      setDatabaseToDelete(null);
+    }
+  };
+
+  const getPaginatedDatabases = (clientName: string, databases: typeof filteredDatabases) => {
+    const currentPage = clientPages[clientName] || 1;
+    const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
+    const endIndex = startIndex + ITEMS_PER_PAGE;
+    return databases.slice(startIndex, endIndex);
+  };
+
+  const getTotalPages = (totalItems: number) => {
+    return Math.ceil(totalItems / ITEMS_PER_PAGE);
+  };
+
+  const handlePageChange = (clientName: string, page: number) => {
+    setClientPages(prev => ({
+      ...prev,
+      [clientName]: page
+    }));
+  };
+
   const getCriticalityColor = (criticality: string) => {
     const colors = {
       baixa: "bg-success text-success-foreground",
@@ -100,7 +163,17 @@ export default function Databases() {
           )}
         </div>
 
-        <div className="flex gap-4">
+        <div className="flex gap-4 flex-wrap">
+          <div className="relative flex-1 min-w-[300px] max-w-md">
+            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por nome da instância..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+
           <Select value={engineFilter} onValueChange={setEngineFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Engine" />
@@ -162,10 +235,11 @@ export default function Databases() {
                         <TableHead>Versão</TableHead>
                         <TableHead>Ambiente</TableHead>
                         <TableHead>Criticidade</TableHead>
+                        <TableHead className="w-[80px]">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {clientDatabases.map((db) => (
+                      {getPaginatedDatabases(clientName, clientDatabases).map((db) => (
                         <TableRow 
                           key={db.id}
                           className="cursor-pointer hover:bg-accent"
@@ -190,10 +264,77 @@ export default function Databases() {
                               </Badge>
                             )}
                           </TableCell>
+                          <TableCell>
+                            {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={(e) => handleDeleteClick(db, e)}
+                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
+
+                  {clientDatabases.length > ITEMS_PER_PAGE && (
+                    <div className="mt-4">
+                      <Pagination>
+                        <PaginationContent>
+                          <PaginationItem>
+                            <PaginationPrevious
+                              onClick={() => {
+                                const currentPage = clientPages[clientName] || 1;
+                                if (currentPage > 1) {
+                                  handlePageChange(clientName, currentPage - 1);
+                                }
+                              }}
+                              className={cn(
+                                "cursor-pointer",
+                                (clientPages[clientName] || 1) === 1 && "pointer-events-none opacity-50"
+                              )}
+                            />
+                          </PaginationItem>
+
+                          {Array.from({ length: getTotalPages(clientDatabases.length) }, (_, i) => i + 1).map((page) => {
+                            const currentPage = clientPages[clientName] || 1;
+                            return (
+                              <PaginationItem key={page}>
+                                <PaginationLink
+                                  onClick={() => handlePageChange(clientName, page)}
+                                  isActive={currentPage === page}
+                                  className="cursor-pointer"
+                                >
+                                  {page}
+                                </PaginationLink>
+                              </PaginationItem>
+                            );
+                          })}
+
+                          <PaginationItem>
+                            <PaginationNext
+                              onClick={() => {
+                                const currentPage = clientPages[clientName] || 1;
+                                const totalPages = getTotalPages(clientDatabases.length);
+                                if (currentPage < totalPages) {
+                                  handlePageChange(clientName, currentPage + 1);
+                                }
+                              }}
+                              className={cn(
+                                "cursor-pointer",
+                                (clientPages[clientName] || 1) === getTotalPages(clientDatabases.length) && 
+                                "pointer-events-none opacity-50"
+                              )}
+                            />
+                          </PaginationItem>
+                        </PaginationContent>
+                      </Pagination>
+                    </div>
+                  )}
                 </AccordionContent>
               </AccordionItem>
             ))}
@@ -218,6 +359,30 @@ export default function Databases() {
         onOpenChange={handleDialogClose}
         database={selectedDatabase}
       />
+
+      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Confirmar Exclusão</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja excluir a instância{" "}
+              <strong>{databaseToDelete?.instance_name}</strong>?
+              <br />
+              <br />
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={handleConfirmDelete}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </AppLayout>
   );
 }

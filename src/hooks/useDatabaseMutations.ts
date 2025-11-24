@@ -106,3 +106,28 @@ export const useUpdateDatabase = () => {
     },
   });
 };
+
+export const useDeleteDatabase = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("database_instances")
+        .delete()
+        .eq("id", id);
+
+      if (error) throw error;
+      return id;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["databases"] });
+      toast.success("Instância DB excluída com sucesso!");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao excluir instância", {
+        description: error.message,
+      });
+    },
+  });
+};
