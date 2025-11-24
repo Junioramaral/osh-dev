@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Database, AlertCircle, Search, Trash2 } from "lucide-react";
+import { Plus, Database, AlertCircle, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -35,6 +35,14 @@ import DatabaseDialog from "@/components/databases/DatabaseDialog";
 import { useDeleteDatabase } from "@/hooks/useDatabaseMutations";
 import type { Tables } from "@/integrations/supabase/types";
 
+type SortField = "instance_name" | "engine" | "version" | "environment" | "criticality";
+type SortDirection = "asc" | "desc" | null;
+
+interface SortConfig {
+  field: SortField | null;
+  direction: SortDirection;
+}
+
 const ITEMS_PER_PAGE = 10;
 
 export default function Databases() {
@@ -47,6 +55,7 @@ export default function Databases() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [databaseToDelete, setDatabaseToDelete] = useState<Tables<"database_instances"> | null>(null);
   const [clientPages, setClientPages] = useState<Record<string, number>>({});
+  const [clientSorts, setClientSorts] = useState<Record<string, SortConfig>>({});
   
   const deleteDatabase = useDeleteDatabase();
 
@@ -120,11 +129,58 @@ export default function Databases() {
     }
   };
 
+  // Função para obter valor de ordenação customizado
+  const getSortValue = (db: Tables<"database_instances">, field: SortField) => {
+    switch (field) {
+      case "instance_name":
+        return db.instance_name.toLowerCase();
+      case "engine":
+        return db.engine.toLowerCase();
+      case "version":
+        return db.version.toLowerCase();
+      case "environment":
+        // Ordem lógica: dev -> qa -> hom -> prod
+        const envOrder: Record<string, number> = { dev: 1, qa: 2, hom: 3, prod: 4 };
+        return envOrder[db.environment] || 0;
+      case "criticality":
+        // Ordem lógica: baixa -> media -> alta
+        const critOrder: Record<string, number> = { baixa: 1, media: 2, alta: 3 };
+        return critOrder[db.criticality || "media"] || 0;
+      default:
+        return "";
+    }
+  };
+
+  // Função para ordenar instâncias de um cliente
+  const getSortedDatabases = (clientName: string, databases: typeof filteredDatabases) => {
+    if (!databases) return [];
+    
+    const sortConfig = clientSorts[clientName];
+    
+    if (!sortConfig || !sortConfig.field || !sortConfig.direction) {
+      return databases; // Sem ordenação, retorna original
+    }
+
+    return [...databases].sort((a, b) => {
+      const aValue = getSortValue(a, sortConfig.field!);
+      const bValue = getSortValue(b, sortConfig.field!);
+      
+      if (aValue < bValue) {
+        return sortConfig.direction === "asc" ? -1 : 1;
+      }
+      if (aValue > bValue) {
+        return sortConfig.direction === "asc" ? 1 : -1;
+      }
+      return 0;
+    });
+  };
+
   const getPaginatedDatabases = (clientName: string, databases: typeof filteredDatabases) => {
+    const sortedDatabases = getSortedDatabases(clientName, databases);
     const currentPage = clientPages[clientName] || 1;
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
-    return databases.slice(startIndex, endIndex);
+    return sortedDatabases.slice(startIndex, endIndex);
   };
 
   const getTotalPages = (totalItems: number) => {
@@ -136,6 +192,51 @@ export default function Databases() {
       ...prev,
       [clientName]: page
     }));
+  };
+
+  // Handler para mudança de ordenação
+  const handleSort = (clientName: string, field: SortField) => {
+    setClientSorts(prev => {
+      const currentSort = prev[clientName];
+      
+      let newDirection: SortDirection = "asc";
+      
+      // Se já está ordenando por este campo, alternar direção
+      if (currentSort?.field === field) {
+        if (currentSort.direction === "asc") {
+          newDirection = "desc";
+        } else if (currentSort.direction === "desc") {
+          newDirection = null; // Remove ordenação
+        }
+      }
+      
+      return {
+        ...prev,
+        [clientName]: {
+          field: newDirection ? field : null,
+          direction: newDirection,
+        },
+      };
+    });
+  };
+
+  // Componente de ícone de ordenação
+  const SortIcon = ({ clientName, field }: { clientName: string; field: SortField }) => {
+    const sortConfig = clientSorts[clientName];
+    
+    if (!sortConfig || sortConfig.field !== field) {
+      return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
+    }
+    
+    if (sortConfig.direction === "asc") {
+      return <ArrowUp className="ml-2 h-4 w-4 text-primary" />;
+    }
+    
+    if (sortConfig.direction === "desc") {
+      return <ArrowDown className="ml-2 h-4 w-4 text-primary" />;
+    }
+    
+    return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
   };
 
   const getCriticalityColor = (criticality: string) => {
@@ -228,16 +329,66 @@ export default function Databases() {
                 </AccordionTrigger>
                 <AccordionContent className="px-6 pb-4">
                   <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Nome da Instância</TableHead>
-                        <TableHead>Engine</TableHead>
-                        <TableHead>Versão</TableHead>
-                        <TableHead>Ambiente</TableHead>
-                        <TableHead>Criticidade</TableHead>
-                        <TableHead className="w-[80px]">Ações</TableHead>
-                      </TableRow>
-                    </TableHeader>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 hover:bg-accent font-semibold"
+                        onClick={() => handleSort(clientName, "instance_name")}
+                      >
+                        Nome da Instância
+                        <SortIcon clientName={clientName} field="instance_name" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 hover:bg-accent font-semibold"
+                        onClick={() => handleSort(clientName, "engine")}
+                      >
+                        Engine
+                        <SortIcon clientName={clientName} field="engine" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 hover:bg-accent font-semibold"
+                        onClick={() => handleSort(clientName, "version")}
+                      >
+                        Versão
+                        <SortIcon clientName={clientName} field="version" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 hover:bg-accent font-semibold"
+                        onClick={() => handleSort(clientName, "environment")}
+                      >
+                        Ambiente
+                        <SortIcon clientName={clientName} field="environment" />
+                      </Button>
+                    </TableHead>
+                    <TableHead>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 hover:bg-accent font-semibold"
+                        onClick={() => handleSort(clientName, "criticality")}
+                      >
+                        Criticidade
+                        <SortIcon clientName={clientName} field="criticality" />
+                      </Button>
+                    </TableHead>
+                    <TableHead className="w-[80px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
                     <TableBody>
                       {getPaginatedDatabases(clientName, clientDatabases).map((db) => (
                         <TableRow 
