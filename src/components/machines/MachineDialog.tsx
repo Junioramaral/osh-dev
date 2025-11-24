@@ -31,7 +31,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2, Plus, Trash2, Eye, EyeOff } from "lucide-react";
-import { useCreateMachine } from "@/hooks/useMachineMutations";
+import { useCreateMachine, useUpdateMachine } from "@/hooks/useMachineMutations";
+import { Tables } from "@/integrations/supabase/types";
 
 const machineSchema = z.object({
   client_id: z.string().uuid("Selecione um cliente"),
@@ -66,14 +67,17 @@ interface AdditionalUser {
 interface MachineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  machine?: Tables<"machines"> | null;
 }
 
 export default function MachineDialog({
   open,
   onOpenChange,
+  machine,
 }: MachineDialogProps) {
   const { isSuperAdmin, profile } = useAuth();
   const createMachine = useCreateMachine();
+  const updateMachine = useUpdateMachine();
   const [additionalUsers, setAdditionalUsers] = useState<AdditionalUser[]>([]);
   const [showRootPassword, setShowRootPassword] = useState(false);
 
@@ -113,6 +117,39 @@ export default function MachineDialog({
     }
   }, [isSuperAdmin, profile, form]);
 
+  useEffect(() => {
+    if (machine && open) {
+      form.setValue("client_id", machine.client_id);
+      form.setValue("environment", machine.environment as any);
+      form.setValue("operating_system", machine.operating_system as any);
+      form.setValue("hostname", machine.hostname);
+      form.setValue("ip_address", machine.ip_address || "");
+      form.setValue("root_username", machine.root_username || "");
+      form.setValue("root_password", "");
+      form.setValue("machine_type", machine.machine_type as any);
+      form.setValue("criticality", (machine.criticality || "media") as any);
+      form.setValue("description", machine.description || "");
+      
+      if (machine.additional_users) {
+        const users = Array.isArray(machine.additional_users) 
+          ? machine.additional_users 
+          : [];
+        setAdditionalUsers(
+          users.map((user: any) => ({
+            id: crypto.randomUUID(),
+            username: user.username || "",
+            password: user.password || "",
+            description: user.description || "",
+            showPassword: false,
+          }))
+        );
+      }
+    } else if (!open) {
+      form.reset();
+      setAdditionalUsers([]);
+    }
+  }, [machine, open, form]);
+
   const handleAddUser = () => {
     setAdditionalUsers([
       ...additionalUsers,
@@ -147,38 +184,54 @@ export default function MachineDialog({
       (user) => user.username.trim() && user.password.trim()
     );
 
-    createMachine.mutate(
-      {
-        client_id: data.client_id,
-        environment: data.environment,
-        operating_system: data.operating_system,
-        hostname: data.hostname,
-        ip_address: data.ip_address,
-        root_username: data.root_username,
-        root_password: data.root_password,
-        machine_type: data.machine_type,
-        criticality: data.criticality,
-        description: data.description,
-        additional_users: validUsers.map(({ id, showPassword, ...user }) => user),
-      },
-      {
-        onSuccess: () => {
-          onOpenChange(false);
-          form.reset();
-          setAdditionalUsers([]);
-        },
-      }
-    );
+    const machineData = {
+      client_id: data.client_id,
+      environment: data.environment,
+      operating_system: data.operating_system,
+      hostname: data.hostname,
+      ip_address: data.ip_address,
+      root_username: data.root_username,
+      root_password: data.root_password,
+      machine_type: data.machine_type,
+      criticality: data.criticality,
+      description: data.description,
+      additional_users: validUsers.map(({ id, showPassword, ...user }) => user),
+    };
+
+    if (machine) {
+      updateMachine.mutate(
+        { id: machine.id, data: machineData },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            form.reset();
+            setAdditionalUsers([]);
+          },
+        }
+      );
+    } else {
+      createMachine.mutate(
+        machineData,
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            form.reset();
+            setAdditionalUsers([]);
+          },
+        }
+      );
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova Máquina</DialogTitle>
+          <DialogTitle>{machine ? "Editar Máquina" : "Nova Máquina"}</DialogTitle>
           <DialogDescription>
-            Cadastre uma nova máquina no catálogo de infraestrutura. Todas as
-            informações são protegidas por controle de acesso.
+            {machine 
+              ? "Atualize as informações da máquina no catálogo de infraestrutura."
+              : "Cadastre uma nova máquina no catálogo de infraestrutura. Todas as informações são protegidas por controle de acesso."}
           </DialogDescription>
         </DialogHeader>
 
@@ -518,15 +571,15 @@ export default function MachineDialog({
                 type="button"
                 variant="outline"
                 onClick={() => onOpenChange(false)}
-                disabled={createMachine.isPending}
+                disabled={createMachine.isPending || updateMachine.isPending}
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createMachine.isPending}>
-                {createMachine.isPending && (
+              <Button type="submit" disabled={createMachine.isPending || updateMachine.isPending}>
+                {(createMachine.isPending || updateMachine.isPending) && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Criar Máquina
+                {machine ? "Atualizar" : "Criar Máquina"}
               </Button>
             </div>
           </form>
