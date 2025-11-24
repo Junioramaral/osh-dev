@@ -25,7 +25,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-react";
+import { Loader2, AlertCircle, Database, Package } from "lucide-react";
 import { format } from "date-fns";
 
 const ticketSchema = z.object({
@@ -538,6 +538,31 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           {/* DB Specific Fields */}
           {segment === "DB" && (
             <>
+              {/* Aviso se não houver instâncias */}
+              {dbInstances?.length === 0 && selectedDbEngine && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900 mb-1">
+                      Nenhuma instância DB cadastrada
+                    </p>
+                    <p className="text-sm text-amber-700 mb-2">
+                      Para criar tickets do segmento DB, você precisa cadastrar pelo menos uma instância de banco de dados primeiro.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open('/databases', '_blank')}
+                      className="text-amber-900 border-amber-300 hover:bg-amber-100"
+                    >
+                      <Database className="mr-2 h-4 w-4" />
+                      Cadastrar Instância DB
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="db_engine">Engine *</Label>
@@ -612,6 +637,31 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           {/* APP Specific Fields */}
           {segment === "APP" && (
             <>
+              {/* Aviso se não houver instâncias */}
+              {appInstances?.length === 0 && selectedAppProductId && (
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                  <div className="flex-1">
+                    <p className="text-sm font-medium text-amber-900 mb-1">
+                      Nenhuma instância APP cadastrada
+                    </p>
+                    <p className="text-sm text-amber-700 mb-2">
+                      Para criar tickets do segmento APP, você precisa cadastrar pelo menos uma instância de aplicação primeiro.
+                    </p>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open('/applications', '_blank')}
+                      className="text-amber-900 border-amber-300 hover:bg-amber-100"
+                    >
+                      <Package className="mr-2 h-4 w-4" />
+                      Cadastrar Instância APP
+                    </Button>
+                  </div>
+                </div>
+              )}
+
               <div className="grid grid-cols-2 gap-4">
                 {/* Produto: esconder se houver apenas 1 */}
                 {appProducts && appProducts.length === 1 ? (
@@ -815,8 +865,16 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
               Cancelar
             </Button>
-            <Button type="submit" disabled={isSubmitting}>
-              {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            <Button 
+              type="submit" 
+              disabled={
+                isSubmitting || 
+                isUploading ||
+                (segment === "DB" && dbInstances?.length === 0 && !!selectedDbEngine) ||
+                (segment === "APP" && appInstances?.length === 0 && !!selectedAppProductId)
+              }
+            >
+              {(isSubmitting || isUploading) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
               Criar Ticket
             </Button>
           </div>
