@@ -319,11 +319,10 @@ export default function DatabaseDialog({
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger>
-                        <SelectValue placeholder="Selecione uma máquina" />
+                        <SelectValue placeholder="Nenhuma máquina" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Nenhuma</SelectItem>
                       {machines?.map((machine) => (
                         <SelectItem key={machine.id} value={machine.id}>
                           {machine.hostname}
