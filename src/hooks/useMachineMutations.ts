@@ -38,7 +38,7 @@ export const useCreateMachine = () => {
         environment: data.environment || null,
         ip_address: data.ip_address || null,
         root_username: data.root_username || null,
-        root_password_secret_id: data.root_password || null,
+        root_password_secret_id: null, // Temporariamente null - implementar vault futuramente
         additional_users: data.additional_users.length > 0 ? data.additional_users : [],
         description: data.description || null,
       };
