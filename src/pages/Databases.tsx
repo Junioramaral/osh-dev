@@ -9,11 +9,13 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Plus, Database, AlertCircle } from "lucide-react";
+import DatabaseDialog from "@/components/databases/DatabaseDialog";
 
 export default function Databases() {
   const { profile, isSuperAdmin, hasRole } = useAuth();
   const [engineFilter, setEngineFilter] = useState<string>("all");
   const [environmentFilter, setEnvironmentFilter] = useState<string>("all");
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
 
   const { data: databases, isLoading } = useQuery({
     queryKey: ["databases"],
@@ -55,7 +57,7 @@ export default function Databases() {
             <p className="text-muted-foreground">Catálogo de instâncias de banco de dados</p>
           </div>
           {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
-            <Button>
+            <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Instância
             </Button>
@@ -148,6 +150,11 @@ export default function Databases() {
           </Card>
         )}
       </div>
+      
+      <DatabaseDialog 
+        open={isDialogOpen} 
+        onOpenChange={setIsDialogOpen} 
+      />
     </AppLayout>
   );
 }
