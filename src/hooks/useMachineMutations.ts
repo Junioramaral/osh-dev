@@ -27,6 +27,50 @@ export const useCreateMachine = () => {
 
   return useMutation({
     mutationFn: async (data: CreateMachineData) => {
+      let rootPasswordSecretId = null;
+
+      // Se tem senha root, criar secret no Vault
+      if (data.root_password) {
+        const { data: secretData, error: secretError } = await supabase.functions.invoke(
+          'machine-secrets',
+          {
+            body: {
+              action: 'create',
+              password: data.root_password,
+              name: `machine_root_${data.hostname}`
+            }
+          }
+        );
+
+        if (secretError) throw new Error(`Erro ao criar secret root: ${secretError.message}`);
+        rootPasswordSecretId = secretData.secretId;
+      }
+
+      // Processar additional_users (também criptografar senhas)
+      const encryptedAdditionalUsers = [];
+      for (const user of data.additional_users) {
+        if (user.password) {
+          const { data: userSecretData, error: userSecretError } = await supabase.functions.invoke(
+            'machine-secrets',
+            {
+              body: {
+                action: 'create',
+                password: user.password,
+                name: `machine_user_${data.hostname}_${user.username}`
+              }
+            }
+          );
+
+          if (userSecretError) throw new Error(`Erro ao criar secret do usuário ${user.username}: ${userSecretError.message}`);
+          
+          encryptedAdditionalUsers.push({
+            username: user.username,
+            password_secret_id: userSecretData.secretId,
+            description: user.description || null
+          });
+        }
+      }
+
       // Prepare the insert data with proper typing
       const insertData: any = {
         client_id: data.client_id,
@@ -38,8 +82,8 @@ export const useCreateMachine = () => {
         environment: data.environment || null,
         ip_address: data.ip_address || null,
         root_username: data.root_username || null,
-        root_password_secret_id: null, // Temporariamente null - implementar vault futuramente
-        additional_users: data.additional_users.length > 0 ? data.additional_users : [],
+        root_password_secret_id: rootPasswordSecretId,
+        additional_users: encryptedAdditionalUsers,
         description: data.description || null,
       };
 
@@ -68,7 +112,81 @@ export const useUpdateMachine = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: CreateMachineData }) => {
+    mutationFn: async ({ id, data, originalMachine }: { id: string; data: CreateMachineData; originalMachine?: any }) => {
+      let rootPasswordSecretId = originalMachine?.root_password_secret_id || null;
+
+      // Se tem senha root nova ou alterada
+      if (data.root_password) {
+        if (rootPasswordSecretId) {
+          // Atualizar secret existente
+          const { error: updateError } = await supabase.functions.invoke(
+            'machine-secrets',
+            {
+              body: {
+                action: 'update',
+                secretId: rootPasswordSecretId,
+                password: data.root_password
+              }
+            }
+          );
+
+          if (updateError) throw new Error(`Erro ao atualizar secret root: ${updateError.message}`);
+        } else {
+          // Criar novo secret
+          const { data: secretData, error: secretError } = await supabase.functions.invoke(
+            'machine-secrets',
+            {
+              body: {
+                action: 'create',
+                password: data.root_password,
+                name: `machine_root_${data.hostname}`
+              }
+            }
+          );
+
+          if (secretError) throw new Error(`Erro ao criar secret root: ${secretError.message}`);
+          rootPasswordSecretId = secretData.secretId;
+        }
+      }
+
+      // Processar additional_users (criptografar senhas novas/alteradas)
+      const encryptedAdditionalUsers = [];
+      for (const user of data.additional_users) {
+        if (user.password) {
+          // Verificar se é uma senha existente que não foi alterada (começa com uuid pattern)
+          const isExistingSecret = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.password);
+          
+          if (isExistingSecret) {
+            // Manter secret_id existente
+            encryptedAdditionalUsers.push({
+              username: user.username,
+              password_secret_id: user.password,
+              description: user.description || null
+            });
+          } else {
+            // Criar novo secret para senha em texto plano
+            const { data: userSecretData, error: userSecretError } = await supabase.functions.invoke(
+              'machine-secrets',
+              {
+                body: {
+                  action: 'create',
+                  password: user.password,
+                  name: `machine_user_${data.hostname}_${user.username}`
+                }
+              }
+            );
+
+            if (userSecretError) throw new Error(`Erro ao criar secret do usuário ${user.username}: ${userSecretError.message}`);
+            
+            encryptedAdditionalUsers.push({
+              username: user.username,
+              password_secret_id: userSecretData.secretId,
+              description: user.description || null
+            });
+          }
+        }
+      }
+
       const updateData: any = {
         client_id: data.client_id,
         hostname: data.hostname,
@@ -78,7 +196,8 @@ export const useUpdateMachine = () => {
         environment: data.environment || null,
         ip_address: data.ip_address || null,
         root_username: data.root_username || null,
-        additional_users: data.additional_users.length > 0 ? data.additional_users : [],
+        root_password_secret_id: rootPasswordSecretId,
+        additional_users: encryptedAdditionalUsers,
         description: data.description || null,
       };
 
