@@ -947,6 +947,11 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_machine_secret: {
+        Args: { secret_name: string; secret_value: string }
+        Returns: string
+      }
+      decrypt_machine_secret: { Args: { secret_id: string }; Returns: string }
       extract_domain_from_email: { Args: { _email: string }; Returns: string }
       get_tenant_by_domain: { Args: { _email: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
@@ -959,6 +964,10 @@ export type Database = {
       }
       is_otimizzo_user: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      update_machine_secret: {
+        Args: { new_value: string; secret_id: string }
+        Returns: undefined
+      }
       validate_ticket_upload_path: {
         Args: { _path: string; _user_id: string }
         Returns: boolean
