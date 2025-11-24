@@ -45,6 +45,37 @@ interface SortConfig {
 
 const ITEMS_PER_PAGE = 10;
 
+const ENVIRONMENT_CONFIG = {
+  prod: {
+    label: "Produção",
+    icon: "🏢",
+    color: "text-red-600",
+    bgColor: "bg-red-50",
+    order: 1
+  },
+  hom: {
+    label: "Homologação",
+    icon: "🧪",
+    color: "text-yellow-600",
+    bgColor: "bg-yellow-50",
+    order: 2
+  },
+  qa: {
+    label: "QA",
+    icon: "🔬",
+    color: "text-blue-600",
+    bgColor: "bg-blue-50",
+    order: 3
+  },
+  dev: {
+    label: "Desenvolvimento",
+    icon: "💻",
+    color: "text-green-600",
+    bgColor: "bg-green-50",
+    order: 4
+  }
+};
+
 export default function Databases() {
   const { profile, isSuperAdmin, hasRole } = useAuth();
   const [engineFilter, setEngineFilter] = useState<string>("all");
@@ -54,8 +85,9 @@ export default function Databases() {
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [databaseToDelete, setDatabaseToDelete] = useState<Tables<"database_instances"> | null>(null);
-  const [clientPages, setClientPages] = useState<Record<string, number>>({});
-  const [clientSorts, setClientSorts] = useState<Record<string, SortConfig>>({});
+  // Chave composta: "ClientName::Environment"
+  const [environmentPages, setEnvironmentPages] = useState<Record<string, number>>({});
+  const [environmentSorts, setEnvironmentSorts] = useState<Record<string, SortConfig>>({});
   
   const deleteDatabase = useDeleteDatabase();
 
@@ -83,20 +115,35 @@ export default function Databases() {
     return matchesEngine && matchesEnvironment && matchesSearch;
   });
 
-  const groupDatabasesByClient = () => {
-    if (!filteredDatabases) return {};
-    
-    return filteredDatabases.reduce((acc, db) => {
-      const clientName = db.clients?.name || "Sem Cliente";
-      if (!acc[clientName]) {
-        acc[clientName] = [];
-      }
-      acc[clientName].push(db);
-      return acc;
-    }, {} as Record<string, typeof filteredDatabases>);
+  // Função auxiliar para criar chave única por cliente+ambiente
+  const getEnvironmentKey = (clientName: string, environment: string) => {
+    return `${clientName}::${environment}`;
   };
 
-  const groupedDatabases = groupDatabasesByClient();
+  const groupDatabasesByClientAndEnvironment = () => {
+    if (!filteredDatabases) return {};
+    
+    const grouped: Record<string, Record<string, Tables<"database_instances">[]>> = {};
+    
+    filteredDatabases.forEach((db) => {
+      const clientName = db.clients?.name || "Sem Cliente";
+      const environment = db.environment;
+      
+      if (!grouped[clientName]) {
+        grouped[clientName] = {};
+      }
+      
+      if (!grouped[clientName][environment]) {
+        grouped[clientName][environment] = [];
+      }
+      
+      grouped[clientName][environment].push(db);
+    });
+    
+    return grouped;
+  };
+
+  const groupedDatabases = groupDatabasesByClientAndEnvironment();
 
   const handleEditDatabase = (db: Tables<"database_instances">) => {
     setSelectedDatabase(db);
@@ -151,11 +198,11 @@ export default function Databases() {
     }
   };
 
-  // Função para ordenar instâncias de um cliente
-  const getSortedDatabases = (clientName: string, databases: typeof filteredDatabases) => {
+  // Função para ordenar instâncias de um ambiente
+  const getSortedDatabases = (envKey: string, databases: any[]) => {
     if (!databases) return [];
     
-    const sortConfig = clientSorts[clientName];
+    const sortConfig = environmentSorts[envKey];
     
     if (!sortConfig || !sortConfig.field || !sortConfig.direction) {
       return databases; // Sem ordenação, retorna original
@@ -175,9 +222,14 @@ export default function Databases() {
     });
   };
 
-  const getPaginatedDatabases = (clientName: string, databases: typeof filteredDatabases) => {
-    const sortedDatabases = getSortedDatabases(clientName, databases);
-    const currentPage = clientPages[clientName] || 1;
+  const getPaginatedDatabases = (
+    clientName: string,
+    environment: string,
+    databases: any[]
+  ) => {
+    const envKey = getEnvironmentKey(clientName, environment);
+    const sortedDatabases = getSortedDatabases(envKey, databases);
+    const currentPage = environmentPages[envKey] || 1;
     const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
     const endIndex = startIndex + ITEMS_PER_PAGE;
     return sortedDatabases.slice(startIndex, endIndex);
@@ -187,17 +239,19 @@ export default function Databases() {
     return Math.ceil(totalItems / ITEMS_PER_PAGE);
   };
 
-  const handlePageChange = (clientName: string, page: number) => {
-    setClientPages(prev => ({
+  const handlePageChange = (clientName: string, environment: string, page: number) => {
+    const envKey = getEnvironmentKey(clientName, environment);
+    setEnvironmentPages(prev => ({
       ...prev,
-      [clientName]: page
+      [envKey]: page
     }));
   };
 
   // Handler para mudança de ordenação
-  const handleSort = (clientName: string, field: SortField) => {
-    setClientSorts(prev => {
-      const currentSort = prev[clientName];
+  const handleSort = (clientName: string, environment: string, field: SortField) => {
+    const envKey = getEnvironmentKey(clientName, environment);
+    setEnvironmentSorts(prev => {
+      const currentSort = prev[envKey];
       
       let newDirection: SortDirection = "asc";
       
@@ -212,7 +266,7 @@ export default function Databases() {
       
       return {
         ...prev,
-        [clientName]: {
+        [envKey]: {
           field: newDirection ? field : null,
           direction: newDirection,
         },
@@ -221,8 +275,17 @@ export default function Databases() {
   };
 
   // Componente de ícone de ordenação
-  const SortIcon = ({ clientName, field }: { clientName: string; field: SortField }) => {
-    const sortConfig = clientSorts[clientName];
+  const SortIcon = ({ 
+    clientName, 
+    environment,
+    field 
+  }: { 
+    clientName: string;
+    environment: string;
+    field: SortField;
+  }) => {
+    const envKey = getEnvironmentKey(clientName, environment);
+    const sortConfig = environmentSorts[envKey];
     
     if (!sortConfig || sortConfig.field !== field) {
       return <ArrowUpDown className="ml-2 h-4 w-4 text-muted-foreground/50" />;
@@ -314,181 +377,233 @@ export default function Databases() {
           </div>
         ) : filteredDatabases && filteredDatabases.length > 0 ? (
           <Accordion type="multiple" className="space-y-4">
-            {Object.entries(groupedDatabases).map(([clientName, clientDatabases]) => (
-              <AccordionItem 
-                key={clientName} 
-                value={clientName}
-                className="border rounded-lg bg-card"
-              >
-                <AccordionTrigger className="px-6 hover:no-underline hover:bg-accent/50 rounded-t-lg">
-                  <div className="flex items-center gap-3">
-                    <Database className="h-5 w-5 text-primary" />
-                    <span className="text-lg font-semibold">{clientName}</span>
-                    <Badge variant="secondary">{clientDatabases.length}</Badge>
-                  </div>
-                </AccordionTrigger>
-                <AccordionContent className="px-6 pb-4">
-                  <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 hover:bg-accent font-semibold"
-                        onClick={() => handleSort(clientName, "instance_name")}
-                      >
-                        Nome da Instância
-                        <SortIcon clientName={clientName} field="instance_name" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 hover:bg-accent font-semibold"
-                        onClick={() => handleSort(clientName, "engine")}
-                      >
-                        Engine
-                        <SortIcon clientName={clientName} field="engine" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 hover:bg-accent font-semibold"
-                        onClick={() => handleSort(clientName, "version")}
-                      >
-                        Versão
-                        <SortIcon clientName={clientName} field="version" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 hover:bg-accent font-semibold"
-                        onClick={() => handleSort(clientName, "environment")}
-                      >
-                        Ambiente
-                        <SortIcon clientName={clientName} field="environment" />
-                      </Button>
-                    </TableHead>
-                    <TableHead>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className="h-8 px-2 hover:bg-accent font-semibold"
-                        onClick={() => handleSort(clientName, "criticality")}
-                      >
-                        Criticidade
-                        <SortIcon clientName={clientName} field="criticality" />
-                      </Button>
-                    </TableHead>
-                    <TableHead className="w-[80px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                    <TableBody>
-                      {getPaginatedDatabases(clientName, clientDatabases).map((db) => (
-                        <TableRow 
-                          key={db.id}
-                          className="cursor-pointer hover:bg-accent"
-                          onClick={() => handleEditDatabase(db)}
-                        >
-                          <TableCell className="font-medium">{db.instance_name}</TableCell>
-                          <TableCell>
-                            <Badge variant="outline">{db.engine}</Badge>
-                          </TableCell>
-                          <TableCell className="text-muted-foreground">{db.version}</TableCell>
-                          <TableCell>
-                            <Badge variant="secondary">
-                              {db.environment === "prod" ? "Produção" :
-                               db.environment === "hom" ? "Homologação" :
-                               db.environment === "qa" ? "QA" : "Desenvolvimento"}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            {db.criticality && (
-                              <Badge className={getCriticalityColor(db.criticality)}>
-                                {db.criticality.charAt(0).toUpperCase() + db.criticality.slice(1)}
-                              </Badge>
-                            )}
-                          </TableCell>
-                          <TableCell>
-                            {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
-                              <Button
-                                variant="ghost"
-                                size="icon"
-                                onClick={(e) => handleDeleteClick(db, e)}
-                                className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-
-                  {clientDatabases.length > ITEMS_PER_PAGE && (
-                    <div className="mt-4">
-                      <Pagination>
-                        <PaginationContent>
-                          <PaginationItem>
-                            <PaginationPrevious
-                              onClick={() => {
-                                const currentPage = clientPages[clientName] || 1;
-                                if (currentPage > 1) {
-                                  handlePageChange(clientName, currentPage - 1);
-                                }
-                              }}
-                              className={cn(
-                                "cursor-pointer",
-                                (clientPages[clientName] || 1) === 1 && "pointer-events-none opacity-50"
-                              )}
-                            />
-                          </PaginationItem>
-
-                          {Array.from({ length: getTotalPages(clientDatabases.length) }, (_, i) => i + 1).map((page) => {
-                            const currentPage = clientPages[clientName] || 1;
-                            return (
-                              <PaginationItem key={page}>
-                                <PaginationLink
-                                  onClick={() => handlePageChange(clientName, page)}
-                                  isActive={currentPage === page}
-                                  className="cursor-pointer"
-                                >
-                                  {page}
-                                </PaginationLink>
-                              </PaginationItem>
-                            );
-                          })}
-
-                          <PaginationItem>
-                            <PaginationNext
-                              onClick={() => {
-                                const currentPage = clientPages[clientName] || 1;
-                                const totalPages = getTotalPages(clientDatabases.length);
-                                if (currentPage < totalPages) {
-                                  handlePageChange(clientName, currentPage + 1);
-                                }
-                              }}
-                              className={cn(
-                                "cursor-pointer",
-                                (clientPages[clientName] || 1) === getTotalPages(clientDatabases.length) && 
-                                "pointer-events-none opacity-50"
-                              )}
-                            />
-                          </PaginationItem>
-                        </PaginationContent>
-                      </Pagination>
+            {Object.entries(groupedDatabases).map(([clientName, environmentGroups]) => {
+              const totalClientInstances = Object.values(environmentGroups).reduce(
+                (sum, envDbs) => sum + envDbs.length, 
+                0
+              );
+              
+              return (
+                <AccordionItem 
+                  key={clientName} 
+                  value={clientName}
+                  className="border rounded-lg bg-card"
+                >
+                  <AccordionTrigger className="px-6 hover:no-underline hover:bg-accent/50 rounded-t-lg">
+                    <div className="flex items-center gap-3">
+                      <Database className="h-5 w-5 text-primary" />
+                      <span className="text-lg font-semibold">{clientName}</span>
+                      <Badge variant="secondary">{totalClientInstances}</Badge>
                     </div>
-                  )}
-                </AccordionContent>
-              </AccordionItem>
-            ))}
+                  </AccordionTrigger>
+                  
+                  <AccordionContent className="px-6 pb-4">
+                    <Accordion type="multiple" className="space-y-2 mt-2">
+                      {Object.entries(environmentGroups)
+                        .sort(([envA], [envB]) => {
+                          const configA = ENVIRONMENT_CONFIG[envA as keyof typeof ENVIRONMENT_CONFIG];
+                          const configB = ENVIRONMENT_CONFIG[envB as keyof typeof ENVIRONMENT_CONFIG];
+                          return (configA?.order || 99) - (configB?.order || 99);
+                        })
+                        .map(([environment, envDatabases]) => {
+                          const envConfig = ENVIRONMENT_CONFIG[environment as keyof typeof ENVIRONMENT_CONFIG];
+                          const envKey = getEnvironmentKey(clientName, environment);
+                          
+                          return (
+                            <AccordionItem 
+                              key={envKey} 
+                              value={envKey}
+                              className="border rounded-md"
+                            >
+                              <AccordionTrigger 
+                                className={cn(
+                                  "px-4 py-3 hover:no-underline hover:bg-accent/30 rounded-t-md",
+                                  envConfig?.bgColor
+                                )}
+                              >
+                                <div className="flex items-center gap-2">
+                                  <span className="text-xl">{envConfig?.icon || "📁"}</span>
+                                  <span className={cn("font-medium", envConfig?.color)}>
+                                    {envConfig?.label || environment.toUpperCase()}
+                                  </span>
+                                  <Badge variant="outline" className="ml-2">
+                                    {envDatabases.length}
+                                  </Badge>
+                                </div>
+                              </AccordionTrigger>
+                              
+                              <AccordionContent className="px-4 pb-4 pt-2">
+                                <Table>
+                                  <TableHeader>
+                                    <TableRow>
+                                      <TableHead>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 hover:bg-accent font-semibold"
+                                          onClick={() => handleSort(clientName, environment, "instance_name")}
+                                        >
+                                          Nome da Instância
+                                          <SortIcon 
+                                            clientName={clientName}
+                                            environment={environment}
+                                            field="instance_name" 
+                                          />
+                                        </Button>
+                                      </TableHead>
+                                      <TableHead>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 hover:bg-accent font-semibold"
+                                          onClick={() => handleSort(clientName, environment, "engine")}
+                                        >
+                                          Engine
+                                          <SortIcon 
+                                            clientName={clientName}
+                                            environment={environment}
+                                            field="engine" 
+                                          />
+                                        </Button>
+                                      </TableHead>
+                                      <TableHead>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 hover:bg-accent font-semibold"
+                                          onClick={() => handleSort(clientName, environment, "version")}
+                                        >
+                                          Versão
+                                          <SortIcon 
+                                            clientName={clientName}
+                                            environment={environment}
+                                            field="version" 
+                                          />
+                                        </Button>
+                                      </TableHead>
+                                      <TableHead>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 hover:bg-accent font-semibold"
+                                          onClick={() => handleSort(clientName, environment, "criticality")}
+                                        >
+                                          Criticidade
+                                          <SortIcon 
+                                            clientName={clientName}
+                                            environment={environment}
+                                            field="criticality" 
+                                          />
+                                        </Button>
+                                      </TableHead>
+                                      <TableHead className="w-[80px]">Ações</TableHead>
+                                    </TableRow>
+                                  </TableHeader>
+                                  
+                                  <TableBody>
+                                    {getPaginatedDatabases(clientName, environment, envDatabases).map((db) => (
+                                      <TableRow 
+                                        key={db.id}
+                                        className="cursor-pointer hover:bg-accent"
+                                        onClick={() => handleEditDatabase(db)}
+                                      >
+                                        <TableCell className="font-medium">{db.instance_name}</TableCell>
+                                        <TableCell>
+                                          <Badge variant="outline">{db.engine}</Badge>
+                                        </TableCell>
+                                        <TableCell className="text-muted-foreground">{db.version}</TableCell>
+                                        <TableCell>
+                                          {db.criticality && (
+                                            <Badge className={getCriticalityColor(db.criticality)}>
+                                              {db.criticality.charAt(0).toUpperCase() + db.criticality.slice(1)}
+                                            </Badge>
+                                          )}
+                                        </TableCell>
+                                        <TableCell>
+                                          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
+                                            <Button
+                                              variant="ghost"
+                                              size="icon"
+                                              onClick={(e) => handleDeleteClick(db, e)}
+                                              className="h-8 w-8 text-destructive hover:text-destructive hover:bg-destructive/10"
+                                            >
+                                              <Trash2 className="h-4 w-4" />
+                                            </Button>
+                                          )}
+                                        </TableCell>
+                                      </TableRow>
+                                    ))}
+                                  </TableBody>
+                                </Table>
+
+                                {envDatabases.length > ITEMS_PER_PAGE && (
+                                  <div className="mt-4">
+                                    <Pagination>
+                                      <PaginationContent>
+                                        <PaginationItem>
+                                          <PaginationPrevious
+                                            onClick={() => {
+                                              const currentPage = environmentPages[envKey] || 1;
+                                              if (currentPage > 1) {
+                                                handlePageChange(clientName, environment, currentPage - 1);
+                                              }
+                                            }}
+                                            className={cn(
+                                              "cursor-pointer",
+                                              (environmentPages[envKey] || 1) === 1 && 
+                                              "pointer-events-none opacity-50"
+                                            )}
+                                          />
+                                        </PaginationItem>
+
+                                        {Array.from(
+                                          { length: getTotalPages(envDatabases.length) }, 
+                                          (_, i) => i + 1
+                                        ).map((page) => {
+                                          const currentPage = environmentPages[envKey] || 1;
+                                          return (
+                                            <PaginationItem key={page}>
+                                              <PaginationLink
+                                                onClick={() => handlePageChange(clientName, environment, page)}
+                                                isActive={currentPage === page}
+                                                className="cursor-pointer"
+                                              >
+                                                {page}
+                                              </PaginationLink>
+                                            </PaginationItem>
+                                          );
+                                        })}
+
+                                        <PaginationItem>
+                                          <PaginationNext
+                                            onClick={() => {
+                                              const currentPage = environmentPages[envKey] || 1;
+                                              const totalPages = getTotalPages(envDatabases.length);
+                                              if (currentPage < totalPages) {
+                                                handlePageChange(clientName, environment, currentPage + 1);
+                                              }
+                                            }}
+                                            className={cn(
+                                              "cursor-pointer",
+                                              (environmentPages[envKey] || 1) === 
+                                              getTotalPages(envDatabases.length) && 
+                                              "pointer-events-none opacity-50"
+                                            )}
+                                          />
+                                        </PaginationItem>
+                                      </PaginationContent>
+                                    </Pagination>
+                                  </div>
+                                )}
+                              </AccordionContent>
+                            </AccordionItem>
+                          );
+                        })}
+                    </Accordion>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
           </Accordion>
         ) : (
           <Card>
