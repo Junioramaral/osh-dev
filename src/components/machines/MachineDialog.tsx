@@ -125,24 +125,75 @@ export default function MachineDialog({
       form.setValue("hostname", machine.hostname);
       form.setValue("ip_address", machine.ip_address || "");
       form.setValue("root_username", machine.root_username || "");
-      form.setValue("root_password", "");
       form.setValue("machine_type", machine.machine_type as any);
       form.setValue("criticality", (machine.criticality || "media") as any);
       form.setValue("description", machine.description || "");
       
+      // Descriptografar senha root se existir
+      if (machine.root_password_secret_id) {
+        supabase.functions.invoke('machine-secrets', {
+          body: {
+            action: 'decrypt',
+            secretId: machine.root_password_secret_id
+          }
+        }).then(({ data, error }) => {
+          if (error) {
+            console.error('Erro ao descriptografar senha root:', error);
+            form.setValue("root_password", "");
+          } else if (data?.password) {
+            form.setValue("root_password", data.password);
+          }
+        });
+      } else {
+        form.setValue("root_password", "");
+      }
+      
+      // Descriptografar senhas de additional_users
       if (machine.additional_users) {
         const users = Array.isArray(machine.additional_users) 
           ? machine.additional_users 
           : [];
-        setAdditionalUsers(
-          users.map((user: any) => ({
+        
+        const decryptPromises = users.map(async (user: any) => {
+          if (user.password_secret_id) {
+            const { data, error } = await supabase.functions.invoke('machine-secrets', {
+              body: {
+                action: 'decrypt',
+                secretId: user.password_secret_id
+              }
+            });
+            
+            if (error) {
+              console.error(`Erro ao descriptografar senha do usuário ${user.username}:`, error);
+              return {
+                id: crypto.randomUUID(),
+                username: user.username || "",
+                password: "",
+                description: user.description || "",
+                showPassword: false,
+              };
+            }
+            
+            return {
+              id: crypto.randomUUID(),
+              username: user.username || "",
+              password: data?.password || "",
+              description: user.description || "",
+              showPassword: false,
+            };
+          }
+          return {
             id: crypto.randomUUID(),
             username: user.username || "",
             password: user.password || "",
             description: user.description || "",
             showPassword: false,
-          }))
-        );
+          };
+        });
+
+        Promise.all(decryptPromises).then(decryptedUsers => {
+          setAdditionalUsers(decryptedUsers);
+        });
       }
     } else if (!open) {
       form.reset();
@@ -200,7 +251,7 @@ export default function MachineDialog({
 
     if (machine) {
       updateMachine.mutate(
-        { id: machine.id, data: machineData },
+        { id: machine.id, data: machineData, originalMachine: machine },
         {
           onSuccess: () => {
             onOpenChange(false);

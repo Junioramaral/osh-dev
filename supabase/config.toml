@@ -5,3 +5,6 @@ verify_jwt = false
 
 [functions.sla-monitor]
 verify_jwt = false
+
+[functions.machine-secrets]
+verify_jwt = true
