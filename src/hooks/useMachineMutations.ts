@@ -63,3 +63,43 @@ export const useCreateMachine = () => {
     },
   });
 };
+
+export const useUpdateMachine = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: CreateMachineData }) => {
+      const updateData: any = {
+        client_id: data.client_id,
+        hostname: data.hostname,
+        machine_type: data.machine_type,
+        operating_system: data.operating_system,
+        criticality: data.criticality || "media",
+        environment: data.environment || null,
+        ip_address: data.ip_address || null,
+        root_username: data.root_username || null,
+        additional_users: data.additional_users.length > 0 ? data.additional_users : [],
+        description: data.description || null,
+      };
+
+      const { data: machine, error } = await supabase
+        .from("machines")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return machine;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["machines"] });
+      toast.success("Máquina atualizada com sucesso!");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao atualizar máquina", {
+        description: error.message,
+      });
+    },
+  });
+};
