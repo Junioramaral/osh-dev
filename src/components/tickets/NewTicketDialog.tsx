@@ -32,7 +32,7 @@ const ticketSchema = z.object({
   segment: z.enum(["DB", "APP"]),
   client_id: z.string().uuid("Selecione um cliente"),
   title: z.string().min(1, "Título é obrigatório").max(100, "Máximo 100 caracteres"),
-  description: z.string().optional(),
+  
   ticket_type: z.enum(["incidente", "duvida", "solicitacao"]),
   priority: z.enum(["P1", "P2", "P3", "P4"]),
   category: z.string().min(1, "Categoria é obrigatória"),
@@ -81,7 +81,7 @@ interface NewTicketDialogProps {
 }
 
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
-  const { profile, tenantId, hasRole } = useAuth();
+  const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
   const queryClient = useQueryClient();
   const [segment, setSegment] = useState<"DB" | "APP" | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
@@ -270,7 +270,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         contact_name: profile?.full_name || user.email || "Usuário",
         contact_email: user.email || "",
         title: data.title,
-        description: data.description,
         ticket_type: data.ticket_type,
         priority: data.priority,
         category: data.category,
@@ -493,10 +492,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
           </div>
 
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea {...register("description")} placeholder="Detalhes adicionais (opcional)" />
-          </div>
 
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
@@ -540,27 +535,41 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             <>
               {/* Aviso se não houver instâncias */}
               {dbInstances?.length === 0 && selectedDbEngine && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-amber-900 mb-1">
-                      Nenhuma instância DB cadastrada
-                    </p>
-                    <p className="text-sm text-amber-700 mb-2">
-                      Para criar tickets do segmento DB, você precisa cadastrar pelo menos uma instância de banco de dados primeiro.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open('/databases', '_blank')}
-                      className="text-amber-900 border-amber-300 hover:bg-amber-100"
-                    >
-                      <Database className="mr-2 h-4 w-4" />
-                      Cadastrar Instância DB
-                    </Button>
+                isOtimizzoUser ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-900 mb-1">
+                        Nenhuma instância DB cadastrada
+                      </p>
+                      <p className="text-sm text-amber-700 mb-2">
+                        Cadastre uma instância de banco de dados para este cliente antes de criar o ticket.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/databases', '_blank')}
+                        className="text-amber-900 border-amber-300 hover:bg-amber-100"
+                      >
+                        <Database className="mr-2 h-4 w-4" />
+                        Cadastrar Instância DB
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-1">
+                        Nenhuma instância DB disponível
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Entre em contato com o suporte Otimizzo para que possamos cadastrar as instâncias de banco de dados necessárias para seu ambiente.
+                      </p>
+                    </div>
+                  </div>
+                )
               )}
 
               <div className="grid grid-cols-2 gap-4">
@@ -639,27 +648,41 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             <>
               {/* Aviso se não houver instâncias */}
               {appInstances?.length === 0 && selectedAppProductId && (
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
-                  <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-amber-900 mb-1">
-                      Nenhuma instância APP cadastrada
-                    </p>
-                    <p className="text-sm text-amber-700 mb-2">
-                      Para criar tickets do segmento APP, você precisa cadastrar pelo menos uma instância de aplicação primeiro.
-                    </p>
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={() => window.open('/applications', '_blank')}
-                      className="text-amber-900 border-amber-300 hover:bg-amber-100"
-                    >
-                      <Package className="mr-2 h-4 w-4" />
-                      Cadastrar Instância APP
-                    </Button>
+                isOtimizzoUser ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-900 mb-1">
+                        Nenhuma instância APP cadastrada
+                      </p>
+                      <p className="text-sm text-amber-700 mb-2">
+                        Cadastre uma instância de aplicação para este cliente antes de criar o ticket.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/applications', '_blank')}
+                        className="text-amber-900 border-amber-300 hover:bg-amber-100"
+                      >
+                        <Package className="mr-2 h-4 w-4" />
+                        Cadastrar Instância APP
+                      </Button>
+                    </div>
                   </div>
-                </div>
+                ) : (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-1">
+                        Nenhuma instância APP disponível
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Entre em contato com o suporte Otimizzo para que possamos cadastrar as instâncias de aplicação necessárias para seu ambiente.
+                      </p>
+                    </div>
+                  </div>
+                )
               )}
 
               <div className="grid grid-cols-2 gap-4">
