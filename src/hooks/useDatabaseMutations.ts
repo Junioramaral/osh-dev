@@ -15,6 +15,19 @@ export interface CreateDatabaseData {
   tags?: string[];
 }
 
+export interface UpdateDatabaseData {
+  client_id?: string;
+  machine_id?: string;
+  engine?: string;
+  version?: string;
+  instance_name?: string;
+  endpoint?: string;
+  port?: number;
+  environment?: string;
+  criticality?: string;
+  tags?: string[];
+}
+
 export const useCreateDatabase = () => {
   const queryClient = useQueryClient();
 
@@ -48,6 +61,46 @@ export const useCreateDatabase = () => {
     },
     onError: (error: Error) => {
       toast.error("Erro ao criar instância", {
+        description: error.message,
+      });
+    },
+  });
+};
+
+export const useUpdateDatabase = () => {
+  const queryClient = useQueryClient();
+
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: UpdateDatabaseData }) => {
+      const updateData: any = {
+        client_id: data.client_id,
+        machine_id: data.machine_id || null,
+        engine: data.engine,
+        version: data.version,
+        instance_name: data.instance_name,
+        endpoint: data.endpoint || null,
+        port: data.port || null,
+        environment: data.environment,
+        criticality: data.criticality || "media",
+        tags: data.tags || [],
+      };
+
+      const { data: database, error } = await supabase
+        .from("database_instances")
+        .update(updateData)
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) throw error;
+      return database;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["databases"] });
+      toast.success("Instância DB atualizada com sucesso!");
+    },
+    onError: (error: Error) => {
+      toast.error("Erro ao atualizar instância", {
         description: error.message,
       });
     },

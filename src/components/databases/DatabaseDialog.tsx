@@ -30,7 +30,8 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Loader2 } from "lucide-react";
-import { useCreateDatabase, type CreateDatabaseData } from "@/hooks/useDatabaseMutations";
+import { useCreateDatabase, useUpdateDatabase, type CreateDatabaseData, type UpdateDatabaseData } from "@/hooks/useDatabaseMutations";
+import type { Tables } from "@/integrations/supabase/types";
 
 const databaseSchema = z.object({
   client_id: z.string().uuid("Selecione um cliente"),
@@ -53,14 +54,19 @@ type DatabaseFormData = z.infer<typeof databaseSchema>;
 interface DatabaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  database?: Tables<"database_instances"> | null;
 }
 
 export default function DatabaseDialog({
   open,
   onOpenChange,
+  database,
 }: DatabaseDialogProps) {
   const { isSuperAdmin, profile } = useAuth();
   const createDatabase = useCreateDatabase();
+  const updateDatabase = useUpdateDatabase();
+  
+  const isEditMode = !!database;
 
   const { data: clients } = useQuery({
     queryKey: ["clients"],
@@ -115,26 +121,73 @@ export default function DatabaseDialog({
     }
   }, [isSuperAdmin, profile, form]);
 
+  useEffect(() => {
+    if (database && open) {
+      form.reset({
+        client_id: database.client_id,
+        machine_id: database.machine_id || "",
+        engine: database.engine as any,
+        version: database.version,
+        instance_name: database.instance_name,
+        endpoint: database.endpoint || "",
+        port: database.port || ("" as any),
+        environment: database.environment as any,
+        criticality: database.criticality || "media",
+      });
+    } else if (!database && open) {
+      form.reset({
+        client_id: profile?.client_id || "",
+        machine_id: "",
+        engine: "PostgreSQL",
+        version: "",
+        instance_name: "",
+        endpoint: "",
+        port: "" as any,
+        environment: "prod",
+        criticality: "media",
+      });
+    }
+  }, [database, open, profile, form]);
+
   const onSubmit = (data: DatabaseFormData) => {
     const submitData = {
       ...data,
       port: data.port === "" ? undefined : data.port,
     };
-    createDatabase.mutate(submitData as CreateDatabaseData, {
-      onSuccess: () => {
-        onOpenChange(false);
-        form.reset();
-      },
-    });
+    
+    if (isEditMode && database) {
+      updateDatabase.mutate(
+        { id: database.id, data: submitData as UpdateDatabaseData },
+        {
+          onSuccess: () => {
+            onOpenChange(false);
+            form.reset();
+          },
+        }
+      );
+    } else {
+      createDatabase.mutate(submitData as CreateDatabaseData, {
+        onSuccess: () => {
+          onOpenChange(false);
+          form.reset();
+        },
+      });
+    }
   };
+  
+  const isPending = createDatabase.isPending || updateDatabase.isPending;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Nova Instância de Banco de Dados</DialogTitle>
+          <DialogTitle>
+            {isEditMode ? "Editar Instância de Banco de Dados" : "Nova Instância de Banco de Dados"}
+          </DialogTitle>
           <DialogDescription>
-            Cadastre uma nova instância de banco de dados no catálogo.
+            {isEditMode 
+              ? "Atualize as informações da instância de banco de dados."
+              : "Cadastre uma nova instância de banco de dados no catálogo."}
           </DialogDescription>
         </DialogHeader>
 
@@ -345,11 +398,11 @@ export default function DatabaseDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={createDatabase.isPending}>
-                {createDatabase.isPending && (
+              <Button type="submit" disabled={isPending}>
+                {isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
-                Criar Instância
+                {isEditMode ? "Atualizar Instância" : "Criar Instância"}
               </Button>
             </div>
           </form>

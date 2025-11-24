@@ -3,19 +3,23 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Card, CardContent } from "@/components/ui/card";
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Plus, Database, AlertCircle } from "lucide-react";
 import DatabaseDialog from "@/components/databases/DatabaseDialog";
+import type { Tables } from "@/integrations/supabase/types";
 
 export default function Databases() {
   const { profile, isSuperAdmin, hasRole } = useAuth();
   const [engineFilter, setEngineFilter] = useState<string>("all");
   const [environmentFilter, setEnvironmentFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [selectedDatabase, setSelectedDatabase] = useState<Tables<"database_instances"> | null>(null);
 
   const { data: databases, isLoading } = useQuery({
     queryKey: ["databases"],
@@ -39,6 +43,38 @@ export default function Databases() {
     return matchesEngine && matchesEnvironment;
   });
 
+  const groupDatabasesByClient = () => {
+    if (!filteredDatabases) return {};
+    
+    return filteredDatabases.reduce((acc, db) => {
+      const clientName = db.clients?.name || "Sem Cliente";
+      if (!acc[clientName]) {
+        acc[clientName] = [];
+      }
+      acc[clientName].push(db);
+      return acc;
+    }, {} as Record<string, typeof filteredDatabases>);
+  };
+
+  const groupedDatabases = groupDatabasesByClient();
+
+  const handleEditDatabase = (db: Tables<"database_instances">) => {
+    setSelectedDatabase(db);
+    setIsDialogOpen(true);
+  };
+
+  const handleNewDatabase = () => {
+    setSelectedDatabase(null);
+    setIsDialogOpen(true);
+  };
+
+  const handleDialogClose = (open: boolean) => {
+    setIsDialogOpen(open);
+    if (!open) {
+      setSelectedDatabase(null);
+    }
+  };
+
   const getCriticalityColor = (criticality: string) => {
     const colors = {
       baixa: "bg-success text-success-foreground",
@@ -57,7 +93,7 @@ export default function Databases() {
             <p className="text-muted-foreground">Catálogo de instâncias de banco de dados</p>
           </div>
           {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
-            <Button onClick={() => setIsDialogOpen(true)}>
+            <Button onClick={handleNewDatabase}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Instância
             </Button>
@@ -71,11 +107,11 @@ export default function Databases() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos Engines</SelectItem>
-              <SelectItem value="oracle">Oracle</SelectItem>
-              <SelectItem value="postgresql">PostgreSQL</SelectItem>
-              <SelectItem value="mysql">MySQL</SelectItem>
-              <SelectItem value="mongodb">MongoDB</SelectItem>
-              <SelectItem value="sqlserver">SQL Server</SelectItem>
+              <SelectItem value="Oracle">Oracle</SelectItem>
+              <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
+              <SelectItem value="MySQL">MySQL</SelectItem>
+              <SelectItem value="MongoDB">MongoDB</SelectItem>
+              <SelectItem value="SQL Server">SQL Server</SelectItem>
             </SelectContent>
           </Select>
           <Select value={environmentFilter} onValueChange={setEnvironmentFilter}>
@@ -84,58 +120,84 @@ export default function Databases() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos Ambientes</SelectItem>
-              <SelectItem value="producao">Produção</SelectItem>
-              <SelectItem value="homologacao">Homologação</SelectItem>
-              <SelectItem value="desenvolvimento">Desenvolvimento</SelectItem>
+              <SelectItem value="prod">Produção</SelectItem>
+              <SelectItem value="hom">Homologação</SelectItem>
+              <SelectItem value="qa">QA</SelectItem>
+              <SelectItem value="dev">Desenvolvimento</SelectItem>
             </SelectContent>
           </Select>
         </div>
 
         {isLoading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          <div className="space-y-4">
             {[1, 2, 3].map((i) => (
               <Card key={i}>
-                <CardHeader>
-                  <Skeleton className="h-4 w-[200px]" />
-                </CardHeader>
-                <CardContent>
-                  <Skeleton className="h-20 w-full" />
+                <CardContent className="pt-6">
+                  <Skeleton className="h-12 w-full" />
                 </CardContent>
               </Card>
             ))}
           </div>
         ) : filteredDatabases && filteredDatabases.length > 0 ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-            {filteredDatabases.map((db) => (
-              <Card key={db.id} className="hover:shadow-lg transition-shadow cursor-pointer">
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
+          <Accordion type="multiple" className="space-y-4">
+            {Object.entries(groupedDatabases).map(([clientName, clientDatabases]) => (
+              <AccordionItem 
+                key={clientName} 
+                value={clientName}
+                className="border rounded-lg bg-card"
+              >
+                <AccordionTrigger className="px-6 hover:no-underline hover:bg-accent/50 rounded-t-lg">
+                  <div className="flex items-center gap-3">
                     <Database className="h-5 w-5 text-primary" />
-                    {db.instance_name}
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <div className="flex items-center gap-2">
-                    <Badge variant="outline">{db.engine.toUpperCase()}</Badge>
-                    <Badge variant="secondary">{db.environment}</Badge>
+                    <span className="text-lg font-semibold">{clientName}</span>
+                    <Badge variant="secondary">{clientDatabases.length}</Badge>
                   </div>
-                  <div className="text-sm space-y-1">
-                    <p className="text-muted-foreground">
-                      Versão: <span className="text-foreground">{db.version}</span>
-                    </p>
-                    <p className="text-muted-foreground">
-                      Cliente: <span className="text-foreground">{db.clients?.name}</span>
-                    </p>
-                  </div>
-                  {db.criticality && (
-                    <Badge className={getCriticalityColor(db.criticality)}>
-                      Criticidade: {db.criticality}
-                    </Badge>
-                  )}
-                </CardContent>
-              </Card>
+                </AccordionTrigger>
+                <AccordionContent className="px-6 pb-4">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome da Instância</TableHead>
+                        <TableHead>Engine</TableHead>
+                        <TableHead>Versão</TableHead>
+                        <TableHead>Ambiente</TableHead>
+                        <TableHead>Criticidade</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {clientDatabases.map((db) => (
+                        <TableRow 
+                          key={db.id}
+                          className="cursor-pointer hover:bg-accent"
+                          onClick={() => handleEditDatabase(db)}
+                        >
+                          <TableCell className="font-medium">{db.instance_name}</TableCell>
+                          <TableCell>
+                            <Badge variant="outline">{db.engine}</Badge>
+                          </TableCell>
+                          <TableCell className="text-muted-foreground">{db.version}</TableCell>
+                          <TableCell>
+                            <Badge variant="secondary">
+                              {db.environment === "prod" ? "Produção" :
+                               db.environment === "hom" ? "Homologação" :
+                               db.environment === "qa" ? "QA" : "Desenvolvimento"}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            {db.criticality && (
+                              <Badge className={getCriticalityColor(db.criticality)}>
+                                {db.criticality.charAt(0).toUpperCase() + db.criticality.slice(1)}
+                              </Badge>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </AccordionContent>
+              </AccordionItem>
             ))}
-          </div>
+          </Accordion>
         ) : (
           <Card>
             <CardContent className="flex flex-col items-center justify-center py-16">
@@ -153,7 +215,8 @@ export default function Databases() {
       
       <DatabaseDialog 
         open={isDialogOpen} 
-        onOpenChange={setIsDialogOpen} 
+        onOpenChange={handleDialogClose}
+        database={selectedDatabase}
       />
     </AppLayout>
   );
