@@ -1,11 +1,12 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { toast } from "sonner";
-import { Lock } from "lucide-react";
+import { Lock, ShieldAlert, Check, X } from "lucide-react";
 
 interface ForcePasswordChangeProps {
   onPasswordChanged: () => void;
@@ -15,6 +16,30 @@ const ForcePasswordChange = ({ onPasswordChanged }: ForcePasswordChangeProps) =>
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [isLoading, setIsLoading] = useState(false);
+
+  // Validação em tempo real com status de cada requisito
+  const passwordRequirements = useMemo(() => ({
+    length: {
+      label: "No mínimo 8 caracteres",
+      met: newPassword.length >= 8,
+    },
+    uppercase: {
+      label: "Letra maiúscula",
+      met: /[A-Z]/.test(newPassword),
+    },
+    lowercase: {
+      label: "Letra minúscula",
+      met: /[a-z]/.test(newPassword),
+    },
+    number: {
+      label: "Pelo menos um número",
+      met: /[0-9]/.test(newPassword),
+    },
+    special: {
+      label: "Caractere especial",
+      met: /[^A-Za-z0-9]/.test(newPassword),
+    },
+  }), [newPassword]);
 
   const validatePassword = (password: string): string | null => {
     if (password.length < 8) {
@@ -81,18 +106,27 @@ const ForcePasswordChange = ({ onPasswordChanged }: ForcePasswordChangeProps) =>
   };
 
   return (
-    <Dialog open={true} modal>
-      <DialogContent className="sm:max-w-md [&>button]:hidden">
-        <DialogHeader>
-          <div className="flex items-center justify-center w-12 h-12 mx-auto mb-4 bg-primary/10 rounded-full">
-            <Lock className="w-6 h-6 text-primary" />
-          </div>
-          <DialogTitle className="text-center">Trocar Senha Obrigatória</DialogTitle>
-          <DialogDescription className="text-center">
-            Por motivos de segurança, você precisa trocar sua senha temporária antes de continuar.
-          </DialogDescription>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4 mt-4">
+    <Card className="shadow-lg">
+      <CardHeader className="text-center">
+        <div className="flex items-center justify-center w-16 h-16 mx-auto mb-4 bg-primary/10 rounded-full">
+          <Lock className="w-8 h-8 text-primary" />
+        </div>
+        <CardTitle>Trocar Senha Obrigatória</CardTitle>
+        <CardDescription>
+          Por motivos de segurança, você precisa trocar sua senha temporária antes de continuar.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {/* Banner informativo de primeiro acesso */}
+        <Alert className="mb-4 border-amber-500/50 bg-amber-50 dark:bg-amber-950/20">
+          <ShieldAlert className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+          <AlertTitle className="text-amber-800 dark:text-amber-400">Primeiro Acesso</AlertTitle>
+          <AlertDescription className="text-amber-700 dark:text-amber-300">
+            Você está usando uma senha temporária. Crie uma senha pessoal para continuar.
+          </AlertDescription>
+        </Alert>
+
+        <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="new-password">Nova Senha</Label>
             <Input
@@ -117,21 +151,32 @@ const ForcePasswordChange = ({ onPasswordChanged }: ForcePasswordChangeProps) =>
               disabled={isLoading}
             />
           </div>
-          <div className="bg-muted p-3 rounded-md text-sm space-y-1">
-            <p className="font-medium">A senha deve conter:</p>
-            <ul className="list-disc list-inside space-y-1 text-muted-foreground">
-              <li>No mínimo 8 caracteres</li>
-              <li>Letras maiúsculas e minúsculas</li>
-              <li>Pelo menos um número</li>
-              <li>Pelo menos um caractere especial</li>
+
+          {/* Checklist dinâmico de requisitos */}
+          <div className="bg-muted/50 p-4 rounded-md space-y-2">
+            <p className="font-medium text-sm mb-3">A senha deve conter:</p>
+            <ul className="space-y-2">
+              {Object.entries(passwordRequirements).map(([key, req]) => (
+                <li key={key} className="flex items-center gap-2 text-sm">
+                  {req.met ? (
+                    <Check className="h-4 w-4 text-green-600 dark:text-green-500 flex-shrink-0" />
+                  ) : (
+                    <X className="h-4 w-4 text-muted-foreground flex-shrink-0" />
+                  )}
+                  <span className={req.met ? "text-foreground" : "text-muted-foreground"}>
+                    {req.label}
+                  </span>
+                </li>
+              ))}
             </ul>
           </div>
+
           <Button type="submit" className="w-full" disabled={isLoading}>
-            {isLoading ? "Alterando..." : "Alterar Senha"}
+            {isLoading ? "Criando Senha..." : "Criar Minha Senha"}
           </Button>
         </form>
-      </DialogContent>
-    </Dialog>
+      </CardContent>
+    </Card>
   );
 };
 
