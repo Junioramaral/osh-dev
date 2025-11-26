@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,12 +25,21 @@ const Auth = () => {
     
     if (error) {
       toast.error(error.message);
-    } else {
-      toast.success("Login realizado com sucesso!");
     }
+    // Não mostrar toast de sucesso aqui - será mostrado no useEffect se precisar trocar senha
     
     setIsLoading(false);
   };
+
+  // Toast contextual quando precisa trocar senha
+  useEffect(() => {
+    if (mustChangePassword) {
+      toast.info("Primeiro acesso detectado", {
+        description: "Por segurança, você precisa criar uma nova senha.",
+        duration: 5000,
+      });
+    }
+  }, [mustChangePassword]);
 
   const handleForgotPassword = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -55,7 +64,25 @@ const Auth = () => {
 
 
   if (mustChangePassword) {
-    return <ForcePasswordChange onPasswordChanged={clearMustChangePassword} />;
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4">
+        <div className="w-full max-w-md">
+          {/* Header consistente com a tela de login */}
+          <div className="text-center mb-8">
+            <div className="flex items-center justify-center gap-2 mb-4">
+              <div className="flex items-center justify-center w-12 h-12 bg-primary rounded-lg">
+                <Server className="w-6 h-6 text-primary-foreground" />
+              </div>
+              <Database className="w-8 h-8 text-accent" />
+            </div>
+            <h1 className="text-3xl font-bold text-foreground">Otimizzo Service Hub</h1>
+            <p className="text-muted-foreground mt-2">Primeiro Acesso</p>
+          </div>
+          
+          <ForcePasswordChange onPasswordChanged={clearMustChangePassword} />
+        </div>
+      </div>
+    );
   }
 
   return (
