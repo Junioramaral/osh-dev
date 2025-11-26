@@ -116,7 +116,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name, segments, tenant_type")
+        .select("id, name, segments, tenant_type, db_engines, app_product_ids")
         .eq("id", tenantId)
         .single();
       
@@ -130,6 +130,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const availableSegments = currentTenant?.segments || [];
   const hasOnlyOneSegment = availableSegments.length === 1;
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
+  const availableDbEngines = currentTenant?.db_engines || [];
 
   // Initialize segment when tenant loads
   useEffect(() => {
@@ -254,6 +255,13 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       setValue("app_instance_id", appInstances[0].id);
     }
   }, [appInstances, segment, setValue]);
+
+  // Auto-selecionar engine quando houver apenas 1
+  useEffect(() => {
+    if (availableDbEngines.length === 1 && segment === "DB") {
+      setValue("db_engine", availableDbEngines[0] as any);
+    }
+  }, [availableDbEngines, segment, setValue]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: TicketFormData) => {
@@ -533,6 +541,45 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           {/* DB Specific Fields */}
           {segment === "DB" && (
             <>
+              {/* Aviso se não houver engines cadastradas */}
+              {availableDbEngines.length === 0 && (
+                isOtimizzoUser ? (
+                  <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-amber-900 mb-1">
+                        Nenhuma engine de banco de dados cadastrada
+                      </p>
+                      <p className="text-sm text-amber-700 mb-2">
+                        Cadastre as engines de banco de dados para este cliente antes de criar o ticket.
+                      </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={() => window.open('/clients', '_blank')}
+                        className="text-amber-900 border-amber-300 hover:bg-amber-100"
+                      >
+                        <Database className="mr-2 h-4 w-4" />
+                        Cadastrar Engines
+                      </Button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg flex items-start gap-3">
+                    <AlertCircle className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+                    <div className="flex-1">
+                      <p className="text-sm font-medium text-blue-900 mb-1">
+                        Nenhuma engine de banco de dados disponível
+                      </p>
+                      <p className="text-sm text-blue-700">
+                        Entre em contato com o suporte Otimizzo para que possamos cadastrar as engines de banco de dados necessárias para seu ambiente.
+                      </p>
+                    </div>
+                  </div>
+                )
+              )}
+
               {/* Aviso se não houver instâncias */}
               {dbInstances?.length === 0 && selectedDbEngine && (
                 isOtimizzoUser ? (
@@ -573,22 +620,39 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="db_engine">Engine *</Label>
-                  <Select value={watch("db_engine")} onValueChange={(value: any) => setValue("db_engine", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o engine" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="Oracle">Oracle</SelectItem>
-                      <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
-                      <SelectItem value="MySQL">MySQL</SelectItem>
-                      <SelectItem value="MongoDB">MongoDB</SelectItem>
-                      <SelectItem value="SQL Server">SQL Server</SelectItem>
-                    </SelectContent>
-                  </Select>
-                  {errors.db_engine && <p className="text-sm text-destructive">{errors.db_engine.message}</p>}
-                </div>
+                {/* Engine: esconder se houver apenas 1 */}
+                {availableDbEngines.length === 1 ? (
+                  <div className="space-y-2">
+                    <Label>Engine *</Label>
+                    <div className="flex items-center gap-2">
+                      <Input 
+                        value={availableDbEngines[0]}
+                        disabled
+                        className="bg-muted cursor-not-allowed"
+                      />
+                      <p className="text-xs text-muted-foreground whitespace-nowrap">
+                        (Engine única)
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <Label htmlFor="db_engine">Engine *</Label>
+                    <Select value={watch("db_engine")} onValueChange={(value: any) => setValue("db_engine", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione a engine" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableDbEngines.map((engine) => (
+                          <SelectItem key={engine} value={engine}>
+                            {engine}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {errors.db_engine && <p className="text-sm text-destructive">{errors.db_engine.message}</p>}
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <Label htmlFor="db_instance_id">Instância DB *</Label>
