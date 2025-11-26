@@ -144,6 +144,7 @@ export default function Tickets() {
         .select(`
           *,
           clients(name),
+          profiles!tickets_analyst_id_fkey(full_name),
           sla_first_response_deadline,
           sla_resolution_deadline,
           sla_first_response_met,
@@ -277,6 +278,7 @@ export default function Tickets() {
                   <TableHead>Tempo de Vida</TableHead>
                   <TableHead>Título</TableHead>
                   <TableHead>Cliente</TableHead>
+                  <TableHead>Analista</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>SLA</TableHead>
