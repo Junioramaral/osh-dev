@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail, Edit, Loader2 } from "lucide-react";
-import { useTenantUsers } from "@/hooks/useTenantUsers";
+import { useTenantUsers, TenantUser } from "@/hooks/useTenantUsers";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -17,6 +17,7 @@ import {
   DialogHeader,
   DialogTitle,
   DialogTrigger,
+  DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
@@ -33,6 +34,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -46,6 +53,8 @@ const TenantDetail = () => {
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [isOpeningEditDialog, setIsOpeningEditDialog] = useState(false);
   const [userToDelete, setUserToDelete] = useState<string | null>(null);
+  const [userToEdit, setUserToEdit] = useState<TenantUser | null>(null);
+  const [isEditUserDialogOpen, setIsEditUserDialogOpen] = useState(false);
 
   type TenantAdmin = {
     id: string;
@@ -58,6 +67,13 @@ const TenantDetail = () => {
     full_name: "",
     phone: "",
     role: "user",
+  });
+
+  const [editUserForm, setEditUserForm] = useState({
+    full_name: "",
+    email: "",
+    phone: "",
+    role: "",
   });
 
   const [editForm, setEditForm] = useState({
@@ -82,6 +98,8 @@ const TenantDetail = () => {
     isLoading: usersLoading,
     inviteUser,
     isInviting,
+    updateUser,
+    isUpdating,
     deactivateUser,
     reactivateUser,
     removeUser,
@@ -264,6 +282,51 @@ const TenantDetail = () => {
         setInviteForm({ email: "", full_name: "", phone: "", role: "user" });
       },
     });
+  };
+
+  const handleEditUserSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!userToEdit || !editUserForm.full_name || !editUserForm.email) {
+      toast.error("Preencha todos os campos obrigatórios");
+      return;
+    }
+
+    // Validate email domain
+    const emailDomain = editUserForm.email.split("@")[1]?.toLowerCase();
+    const tenantDomain = tenant?.domain?.toLowerCase();
+
+    if (emailDomain !== tenantDomain) {
+      toast.error(`O email deve pertencer ao domínio ${tenantDomain}`, {
+        description: `Email fornecido: ${editUserForm.email}`,
+      });
+      return;
+    }
+
+    // Validate phone if provided
+    if (editUserForm.phone && !isValidPhone(editUserForm.phone)) {
+      toast.error("Telefone inválido", {
+        description: "O telefone deve ter 10 ou 11 dígitos",
+      });
+      return;
+    }
+
+    updateUser(
+      {
+        userId: userToEdit.id,
+        full_name: editUserForm.full_name,
+        email: editUserForm.email,
+        phone: editUserForm.phone ? cleanPhone(editUserForm.phone) : "",
+        role: editUserForm.role,
+      },
+      {
+        onSuccess: () => {
+          setIsEditUserDialogOpen(false);
+          setUserToEdit(null);
+          setEditUserForm({ full_name: "", email: "", phone: "", role: "" });
+        },
+      }
+    );
   };
 
   const handleEditTenantSubmit = (e: React.FormEvent) => {
@@ -677,11 +740,12 @@ const TenantDetail = () => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead>Nome</TableHead>
-                        <TableHead>Email</TableHead>
-                        <TableHead>Função</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead className="text-right">Ações</TableHead>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>Email</TableHead>
+                      <TableHead>Telefone</TableHead>
+                      <TableHead>Função</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -689,9 +753,10 @@ const TenantDetail = () => {
                         const status = getUserStatus(user);
                         const StatusIcon = status.icon;
                         return (
-                          <TableRow key={user.id}>
+                           <TableRow key={user.id}>
                             <TableCell className="font-medium">{user.full_name}</TableCell>
                             <TableCell>{user.email}</TableCell>
+                            <TableCell>{user.phone || "-"}</TableCell>
                             <TableCell>{getRoleLabel(user.role)}</TableCell>
                             <TableCell>
                               <Badge variant={status.variant}>
@@ -700,30 +765,86 @@ const TenantDetail = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <div className="flex justify-end gap-2">
-                                {!user.email_confirmed_at && user.is_active && (
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => resendInvite(user.id)}
-                                    disabled={isResending}
-                                  >
-                                    <Mail className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                {user.is_active ? (
-                                  <Button variant="ghost" size="sm" onClick={() => deactivateUser(user.id)}>
-                                    <ShieldOff className="h-4 w-4" />
-                                  </Button>
-                                ) : (
-                                  <Button variant="ghost" size="sm" onClick={() => reactivateUser(user.id)}>
-                                    <ShieldCheck className="h-4 w-4" />
-                                  </Button>
-                                )}
-                                <Button variant="ghost" size="sm" onClick={() => setUserToDelete(user.id)}>
-                                  <Trash2 className="h-4 w-4 text-destructive" />
-                                </Button>
-                              </div>
+                              <TooltipProvider>
+                                <div className="flex justify-end gap-2">
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => {
+                                          setUserToEdit(user);
+                                          setEditUserForm({
+                                            full_name: user.full_name,
+                                            email: user.email,
+                                            phone: user.phone || "",
+                                            role: user.role,
+                                          });
+                                          setIsEditUserDialogOpen(true);
+                                        }}
+                                      >
+                                        <Edit className="h-4 w-4" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Editar usuário</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+
+                                  {!user.email_confirmed_at && user.is_active && (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          onClick={() => resendInvite(user.id)}
+                                          disabled={isResending}
+                                        >
+                                          <Mail className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Reenviar convite</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+
+                                  {user.is_active ? (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="sm" onClick={() => deactivateUser(user.id)}>
+                                          <ShieldOff className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Desativar usuário</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  ) : (
+                                    <Tooltip>
+                                      <TooltipTrigger asChild>
+                                        <Button variant="ghost" size="sm" onClick={() => reactivateUser(user.id)}>
+                                          <ShieldCheck className="h-4 w-4" />
+                                        </Button>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p>Reativar usuário</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  )}
+
+                                  <Tooltip>
+                                    <TooltipTrigger asChild>
+                                      <Button variant="ghost" size="sm" onClick={() => setUserToDelete(user.id)}>
+                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                      </Button>
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p>Remover permanentemente</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </div>
+                              </TooltipProvider>
                             </TableCell>
                           </TableRow>
                         );
@@ -742,6 +863,93 @@ const TenantDetail = () => {
           </TabsContent>
         </Tabs>
       </div>
+
+      {/* Edit User Dialog */}
+      <Dialog open={isEditUserDialogOpen} onOpenChange={setIsEditUserDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar Usuário</DialogTitle>
+            <DialogDescription>
+              Atualize as informações do usuário abaixo
+            </DialogDescription>
+          </DialogHeader>
+
+          <form onSubmit={handleEditUserSubmit} className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="edit-full-name">Nome Completo *</Label>
+              <Input
+                id="edit-full-name"
+                value={editUserForm.full_name}
+                onChange={(e) =>
+                  setEditUserForm({ ...editUserForm, full_name: e.target.value })
+                }
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-email">Email *</Label>
+              <Input
+                id="edit-email"
+                type="email"
+                value={editUserForm.email}
+                onChange={(e) =>
+                  setEditUserForm({ ...editUserForm, email: e.target.value })
+                }
+                required
+              />
+              {tenant?.domain && (
+                <p className="text-xs text-muted-foreground">
+                  Email deve ser do domínio: @{tenant.domain}
+                </p>
+              )}
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-phone">Telefone</Label>
+              <PhoneInput
+                id="edit-phone"
+                value={editUserForm.phone}
+                onChange={(e) =>
+                  setEditUserForm({ ...editUserForm, phone: e.target.value })
+                }
+                placeholder="(00) 00000-0000"
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="edit-role">Função *</Label>
+              <Select
+                value={editUserForm.role}
+                onValueChange={(value) =>
+                  setEditUserForm({ ...editUserForm, role: value })
+                }
+              >
+                <SelectTrigger id="edit-role">
+                  <SelectValue placeholder="Selecione a função" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="user">Usuário</SelectItem>
+                  <SelectItem value="super_admin">Super Admin</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <DialogFooter>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsEditUserDialogOpen(false)}
+              >
+                Cancelar
+              </Button>
+              <Button type="submit" disabled={isUpdating}>
+                {isUpdating ? "Salvando..." : "Salvar"}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       <AlertDialog open={!!userToDelete} onOpenChange={() => setUserToDelete(null)}>
         <AlertDialogContent>

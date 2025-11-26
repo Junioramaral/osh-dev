@@ -6,6 +6,7 @@ export interface TenantUser {
   id: string;
   email: string;
   full_name: string;
+  phone: string | null;
   role: string;
   is_active: boolean;
   email_confirmed_at: string | null;
@@ -29,6 +30,7 @@ export const useTenantUsers = (tenantId: string | undefined) => {
         .select(`
           id,
           full_name,
+          phone,
           is_active,
           created_at,
           user_roles!inner (
@@ -67,6 +69,7 @@ export const useTenantUsers = (tenantId: string | undefined) => {
           id: profile.id,
           email: authUser?.email || "N/A",
           full_name: profile.full_name,
+          phone: profile.phone || null,
           role: userRole?.role || "user",
           is_active: profile.is_active,
           email_confirmed_at: authUser?.email_confirmed_at || null,
@@ -178,6 +181,58 @@ export const useTenantUsers = (tenantId: string | undefined) => {
     },
   });
 
+  // Update user mutation
+  const updateUserMutation = useMutation({
+    mutationFn: async (params: {
+      userId: string;
+      full_name?: string;
+      email?: string;
+      phone?: string;
+      role?: string;
+    }) => {
+      // Update profile (full_name, phone)
+      if (params.full_name !== undefined || params.phone !== undefined) {
+        const { error: profileError } = await supabase
+          .from("profiles")
+          .update({
+            ...(params.full_name !== undefined && { full_name: params.full_name }),
+            ...(params.phone !== undefined && { phone: params.phone || null }),
+          })
+          .eq("id", params.userId);
+
+        if (profileError) throw profileError;
+      }
+
+      // Update email via auth admin
+      if (params.email) {
+        const { error: authError } = await supabase.auth.admin.updateUserById(
+          params.userId,
+          { email: params.email }
+        );
+        if (authError) throw authError;
+      }
+
+      // Update role
+      if (params.role) {
+        const { error: roleError } = await supabase
+          .from("user_roles")
+          .update({ role: params.role as any })
+          .eq("user_id", params.userId)
+          .eq("tenant_id", tenantId);
+
+        if (roleError) throw roleError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
+      toast.success("Usuário atualizado com sucesso");
+    },
+    onError: (error: any) => {
+      console.error("Error updating user:", error);
+      toast.error("Erro ao atualizar usuário");
+    },
+  });
+
   // Resend invite mutation
   const resendInviteMutation = useMutation({
     mutationFn: async (userId: string) => {
@@ -202,6 +257,8 @@ export const useTenantUsers = (tenantId: string | undefined) => {
     error,
     inviteUser: inviteUserMutation.mutate,
     isInviting: inviteUserMutation.isPending,
+    updateUser: updateUserMutation.mutate,
+    isUpdating: updateUserMutation.isPending,
     deactivateUser: deactivateUserMutation.mutate,
     isDeactivating: deactivateUserMutation.isPending,
     reactivateUser: reactivateUserMutation.mutate,
