@@ -5,6 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useTicketAge } from "@/hooks/useTicketAge";
 import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
 import { cn } from "@/lib/utils";
+import { User } from "lucide-react";
 
 interface TicketRowProps {
   ticket: any;
@@ -48,6 +49,16 @@ export function TicketRow({ ticket, isSelected, onToggleSelect }: TicketRowProps
       </TableCell>
       <TableCell>
         {ticket.clients?.name}
+      </TableCell>
+      <TableCell className="text-muted-foreground">
+        {ticket.profiles?.full_name ? (
+          <span className="flex items-center gap-1">
+            <User className="h-3 w-3" />
+            {ticket.profiles.full_name}
+          </span>
+        ) : (
+          <span className="text-yellow-600 italic text-sm">Não atribuído</span>
+        )}
       </TableCell>
       <TableCell>
         <Badge variant="outline" className={getPriorityColor(ticket.priority)}>
