@@ -14,7 +14,7 @@ interface InviteUserRequest {
   full_name: string;
   phone?: string;
   tenant_id: string;
-  role: 'super_admin' | 'user';
+  role: string; // Accept any role string from frontend
 }
 
 serve(async (req) => {
@@ -154,6 +154,11 @@ serve(async (req) => {
     // Create user with default password
     const DEFAULT_PASSWORD = "osh@123456";
 
+    // Map role to app_role enum (only super_admin or user are valid)
+    const appRole: 'super_admin' | 'user' = role === 'super_admin' ? 'super_admin' : 'user';
+    
+    console.log(`📝 Mapping role "${role}" to app_role "${appRole}"`);
+
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password: DEFAULT_PASSWORD,
@@ -161,7 +166,7 @@ serve(async (req) => {
       user_metadata: {
         full_name,
         tenant_id,
-        role,
+        original_role: role, // Store original role in metadata
         must_change_password: true, // Flag to force password change on first login
       },
     });
@@ -189,10 +194,10 @@ serve(async (req) => {
       console.error("❌ Error creating profile:", profileError);
     }
 
-    // Create user_roles entry
+    // Create user_roles entry with mapped app_role
     const { error: roleError } = await adminClient.from("user_roles").insert({
       user_id: newUser.user!.id,
-      role,
+      role: appRole, // Use mapped app_role enum value
       tenant_id,
     });
 
