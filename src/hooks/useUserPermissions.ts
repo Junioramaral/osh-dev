@@ -8,7 +8,7 @@ export interface UserPermission {
   email: string;
   client_id: string | null;
   client_name: string | null;
-  role: "super_admin" | "user";
+  role: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
   is_active: boolean;
 }
 
@@ -55,13 +55,20 @@ export const useUserPermissions = (filters?: {
         .from("user_roles")
         .select("user_id, role");
 
-      // Buscar emails do auth
-      const { data: authData } = await supabase.auth.admin.listUsers();
+      // Buscar emails via Edge Function
+      const { data: authData, error: authError } = await supabase.functions.invoke("manage-user", {
+        body: { action: "list_users" }
+      });
+
+      if (authError) {
+        console.error("Error fetching users from Edge Function:", authError);
+        throw authError;
+      }
 
       // Mapear dados
       const usersWithPermissions: UserPermission[] = profiles.map((profile: any) => {
         const userRole = roles?.find((r: any) => r.user_id === profile.id);
-        const authUser = authData?.users.find((u: any) => u.id === profile.id);
+        const authUser = authData?.users?.find((u: any) => u.id === profile.id);
         const client = clients?.find((c: any) => c.id === profile.client_id);
 
         return {
@@ -70,17 +77,15 @@ export const useUserPermissions = (filters?: {
           email: authUser?.email || "",
           client_id: profile.client_id,
           client_name: client?.name || "Otimizzo",
-          role: (userRole?.role as "super_admin" | "user") || "user",
+          role: (userRole?.role as "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user") || "user",
           is_active: profile.is_active || false,
         };
       });
 
       // Aplicar filtro de role
       let filteredUsers = usersWithPermissions;
-      if (filters?.role === "super_admin") {
-        filteredUsers = filteredUsers.filter(u => u.role === "super_admin");
-      } else if (filters?.role === "user") {
-        filteredUsers = filteredUsers.filter(u => u.role === "user");
+      if (filters?.role && filters.role !== "all") {
+        filteredUsers = filteredUsers.filter(u => u.role === filters.role);
       }
 
       // Aplicar busca por nome ou email
@@ -109,7 +114,7 @@ export const useUserPermissions = (filters?: {
       newRole,
     }: {
       userId: string;
-      newRole: "user" | "super_admin";
+      newRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
     }) => {
       const { error } = await supabase
         .from("user_roles")
@@ -120,11 +125,16 @@ export const useUserPermissions = (filters?: {
     },
     onSuccess: (_, variables) => {
       const user = users.find(u => u.id === variables.userId);
+      const roleLabels = {
+        super_admin: "Super Admin",
+        tenant_admin: "Tenant Admin",
+        analyst_db: "Analista DB",
+        analyst_app: "Analista APP",
+        user: "Usuário"
+      };
       toast({
         title: "Permissão alterada com sucesso",
-        description: `${user?.full_name} agora é ${
-          variables.newRole === "super_admin" ? "Super Admin" : "Usuário"
-        }`,
+        description: `${user?.full_name} agora é ${roleLabels[variables.newRole]}`,
       });
       queryClient.invalidateQueries({ queryKey: ["user-permissions"] });
     },

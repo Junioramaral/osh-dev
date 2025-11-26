@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
-import { useUserPermissions } from "@/hooks/useUserPermissions";
+import { useUserPermissions, UserPermission } from "@/hooks/useUserPermissions";
 import AppLayout from "@/components/layout/AppLayout";
 import {
   Table,
@@ -32,7 +32,47 @@ import {
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Shield, Search } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Shield, Search, Info } from "lucide-react";
+
+// Helper para obter labels das roles
+const getRoleLabel = (role: string): string => {
+  const labels: Record<string, string> = {
+    super_admin: "Super Admin",
+    tenant_admin: "Tenant Admin",
+    analyst_db: "Analista DB",
+    analyst_app: "Analista APP",
+    user: "Usuário"
+  };
+  return labels[role] || role;
+};
+
+// Helper para obter variant do badge
+const getRoleBadgeVariant = (role: string): "destructive" | "default" | "secondary" | "outline" => {
+  switch (role) {
+    case "super_admin":
+      return "destructive";
+    case "tenant_admin":
+      return "default";
+    case "analyst_db":
+    case "analyst_app":
+      return "outline";
+    default:
+      return "secondary";
+  }
+};
+
+// Helper para obter descrição da role
+const getRoleDescription = (role: string): string => {
+  const descriptions: Record<string, string> = {
+    super_admin: "Acesso completo ao sistema, gerencia todos os tenants e usuários",
+    tenant_admin: "Administra seu tenant, gerencia usuários e configurações",
+    analyst_db: "Analista de banco de dados, atende tickets de DB",
+    analyst_app: "Analista de aplicação, atende tickets de APP",
+    user: "Usuário padrão do tenant, pode criar e visualizar tickets"
+  };
+  return descriptions[role] || "";
+};
 
 const UserPermissions = () => {
   const { user: currentUser } = useAuth();
@@ -47,8 +87,8 @@ const UserPermissions = () => {
     userId: string;
     userName: string;
     userEmail: string;
-    currentRole: "user" | "super_admin";
-    newRole: "user" | "super_admin";
+    currentRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
+    newRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
   } | null>(null);
 
   const { users, isLoading, updateRole, isUpdating } = useUserPermissions(filters);
@@ -70,8 +110,8 @@ const UserPermissions = () => {
     userId: string,
     userName: string,
     userEmail: string,
-    currentRole: "user" | "super_admin",
-    newRole: "user" | "super_admin"
+    currentRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user",
+    newRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user"
   ) => {
     setConfirmDialog({
       open: true,
@@ -146,6 +186,9 @@ const UserPermissions = () => {
             <SelectContent>
               <SelectItem value="all">Todas as roles</SelectItem>
               <SelectItem value="super_admin">Super Admin</SelectItem>
+              <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
+              <SelectItem value="analyst_db">Analista DB</SelectItem>
+              <SelectItem value="analyst_app">Analista APP</SelectItem>
               <SelectItem value="user">Usuário</SelectItem>
             </SelectContent>
           </Select>
@@ -173,7 +216,21 @@ const UserPermissions = () => {
                 <TableHead>Nome</TableHead>
                 <TableHead>Email</TableHead>
                 <TableHead>Tenant</TableHead>
-                <TableHead>Role Atual</TableHead>
+                <TableHead>
+                  <div className="flex items-center gap-2">
+                    Role Atual
+                    <TooltipProvider>
+                      <Tooltip>
+                        <TooltipTrigger>
+                          <Info className="h-4 w-4 text-muted-foreground" />
+                        </TooltipTrigger>
+                        <TooltipContent>
+                          <p className="max-w-xs">Níveis de permissão do sistema</p>
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </div>
+                </TableHead>
                 <TableHead>Status</TableHead>
                 <TableHead className="text-right">Ações</TableHead>
               </TableRow>
@@ -217,13 +274,18 @@ const UserPermissions = () => {
                       <TableCell>{user.email}</TableCell>
                       <TableCell>{user.client_name}</TableCell>
                       <TableCell>
-                        <Badge
-                          variant={
-                            user.role === "super_admin" ? "destructive" : "secondary"
-                          }
-                        >
-                          {user.role === "super_admin" ? "Super Admin" : "Usuário"}
-                        </Badge>
+                        <TooltipProvider>
+                          <Tooltip>
+                            <TooltipTrigger>
+                              <Badge variant={getRoleBadgeVariant(user.role)}>
+                                {getRoleLabel(user.role)}
+                              </Badge>
+                            </TooltipTrigger>
+                            <TooltipContent>
+                              <p className="max-w-xs">{getRoleDescription(user.role)}</p>
+                            </TooltipContent>
+                          </Tooltip>
+                        </TooltipProvider>
                       </TableCell>
                       <TableCell>
                         <Badge variant={user.is_active ? "default" : "outline"}>
@@ -233,7 +295,7 @@ const UserPermissions = () => {
                       <TableCell className="text-right">
                         <Select
                           value={user.role}
-                          onValueChange={(value: "user" | "super_admin") =>
+                          onValueChange={(value: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user") =>
                             handleRoleChange(
                               user.id,
                               user.full_name,
@@ -244,12 +306,15 @@ const UserPermissions = () => {
                           }
                           disabled={isCurrentUser || isUpdating}
                         >
-                          <SelectTrigger className="w-[140px]">
+                          <SelectTrigger className="w-[150px]">
                             <SelectValue />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="user">Usuário</SelectItem>
                             <SelectItem value="super_admin">Super Admin</SelectItem>
+                            <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
+                            <SelectItem value="analyst_db">Analista DB</SelectItem>
+                            <SelectItem value="analyst_app">Analista APP</SelectItem>
+                            <SelectItem value="user">Usuário</SelectItem>
                           </SelectContent>
                         </Select>
                         {isCurrentUser && (
@@ -283,17 +348,20 @@ const UserPermissions = () => {
               <div className="bg-muted p-3 rounded-md">
                 <p className="text-sm">
                   <span className="font-semibold">Role atual:</span>{" "}
-                  {confirmDialog?.currentRole === "super_admin"
-                    ? "Super Admin"
-                    : "Usuário"}
+                  {confirmDialog?.currentRole && getRoleLabel(confirmDialog.currentRole)}
                 </p>
                 <p className="text-sm">
                   <span className="font-semibold">Nova role:</span>{" "}
-                  {confirmDialog?.newRole === "super_admin"
-                    ? "Super Admin"
-                    : "Usuário"}
+                  {confirmDialog?.newRole && getRoleLabel(confirmDialog.newRole)}
                 </p>
               </div>
+              {confirmDialog?.newRole && (
+                <div className="bg-muted/50 p-3 rounded-md">
+                  <p className="text-sm text-muted-foreground">
+                    {getRoleDescription(confirmDialog.newRole)}
+                  </p>
+                </div>
+              )}
               {confirmDialog?.newRole === "super_admin" && (
                 <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-md">
                   <p className="text-sm text-destructive font-semibold">
