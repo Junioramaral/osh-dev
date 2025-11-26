@@ -154,10 +154,11 @@ serve(async (req) => {
     // Create user with default password
     const DEFAULT_PASSWORD = "osh@123456";
 
-    // Map role to app_role enum (only super_admin or user are valid)
-    const appRole: 'super_admin' | 'user' = role === 'super_admin' ? 'super_admin' : 'user';
+    // Validate and use the role directly from the enum
+    const validRoles = ['super_admin', 'tenant_admin', 'analyst_db', 'analyst_app', 'user'];
+    const appRole = validRoles.includes(role) ? role : 'user';
     
-    console.log(`📝 Mapping role "${role}" to app_role "${appRole}"`);
+    console.log(`📝 Using role "${role}" -> app_role "${appRole}"`);
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
@@ -166,7 +167,7 @@ serve(async (req) => {
       user_metadata: {
         full_name,
         tenant_id,
-        original_role: role, // Store original role in metadata
+        role: appRole, // Store role in metadata
         must_change_password: true, // Flag to force password change on first login
       },
     });
@@ -194,10 +195,10 @@ serve(async (req) => {
       console.error("❌ Error creating profile:", profileError);
     }
 
-    // Create user_roles entry with mapped app_role
+    // Create user_roles entry with granular role
     const { error: roleError } = await adminClient.from("user_roles").insert({
       user_id: newUser.user!.id,
-      role: appRole, // Use mapped app_role enum value
+      role: appRole, // Use validated app_role from enum
       tenant_id,
     });
 

@@ -974,7 +974,12 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "super_admin" | "user"
+      app_role:
+        | "super_admin"
+        | "user"
+        | "tenant_admin"
+        | "analyst_db"
+        | "analyst_app"
       business_impact: "nenhum" | "baixo" | "medio" | "alto" | "critico"
       criticality_level: "baixa" | "media" | "alta" | "critica"
       db_engine: "Oracle" | "PostgreSQL" | "MySQL" | "MongoDB" | "SQL Server"
@@ -1120,7 +1125,13 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["super_admin", "user"],
+      app_role: [
+        "super_admin",
+        "user",
+        "tenant_admin",
+        "analyst_db",
+        "analyst_app",
+      ],
       business_impact: ["nenhum", "baixo", "medio", "alto", "critico"],
       criticality_level: ["baixa", "media", "alta", "critica"],
       db_engine: ["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"],
