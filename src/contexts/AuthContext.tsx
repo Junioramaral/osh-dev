@@ -10,7 +10,7 @@ interface Profile {
   team_id: string | null;
 }
 
-export type UserRoleType = 'super_admin' | 'user';
+export type UserRoleType = 'super_admin' | 'tenant_admin' | 'analyst_db' | 'analyst_app' | 'user';
 
 interface UserRole {
   role: UserRoleType;
