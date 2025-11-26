@@ -46,12 +46,14 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       const userIds = profiles?.map(p => p.id) || [];
       if (userIds.length === 0) return [];
 
-      // Try to get auth users data - but don't fail if it errors
+      // Get auth users data via edge function
       let authUsers: any[] = [];
       try {
-        const { data, error: authError } = await supabase.auth.admin.listUsers();
-        if (!authError && data.users) {
-          authUsers = data.users;
+        const { data, error: authError } = await supabase.functions.invoke("manage-user", {
+          body: { action: "list_users" }
+        });
+        if (!authError && data?.data?.users) {
+          authUsers = data.data.users;
         }
       } catch (err) {
         console.error("Error fetching auth users:", err);
@@ -164,10 +166,13 @@ export const useTenantUsers = (tenantId: string | undefined) => {
 
       if (profileError) throw profileError;
 
-      // Then delete from auth.users using admin API
-      const { error: authError } = await supabase.auth.admin.deleteUser(userId);
-      if (authError) {
-        console.error("Error deleting auth user:", authError);
+      // Then delete from auth.users using edge function
+      const { data, error: authError } = await supabase.functions.invoke("manage-user", {
+        body: { action: "delete", userId }
+      });
+      
+      if (authError || data?.error) {
+        console.error("Error deleting auth user:", authError || data?.error);
         // Note: Profile is already deleted, log but don't throw
       }
     },
@@ -203,13 +208,19 @@ export const useTenantUsers = (tenantId: string | undefined) => {
         if (profileError) throw profileError;
       }
 
-      // Update email via auth admin
+      // Update email via edge function
       if (params.email) {
-        const { error: authError } = await supabase.auth.admin.updateUserById(
-          params.userId,
-          { email: params.email }
-        );
-        if (authError) throw authError;
+        const { data, error: authError } = await supabase.functions.invoke("manage-user", {
+          body: { 
+            action: "update_email", 
+            userId: params.userId, 
+            data: { email: params.email } 
+          }
+        });
+        
+        if (authError || data?.error) {
+          throw new Error(authError?.message || data?.error || "Erro ao atualizar email");
+        }
       }
 
       // Update role
@@ -239,8 +250,16 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       const user = users?.find(u => u.id === userId);
       if (!user) throw new Error("Usuário não encontrado");
 
-      const { error } = await supabase.auth.admin.inviteUserByEmail(user.email);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke("manage-user", {
+        body: { 
+          action: "resend_invite", 
+          data: { email: user.email } 
+        }
+      });
+      
+      if (error || data?.error) {
+        throw new Error(error?.message || data?.error || "Erro ao reenviar convite");
+      }
     },
     onSuccess: () => {
       toast.success("Convite reenviado com sucesso");
