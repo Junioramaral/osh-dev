@@ -1,5 +1,6 @@
 import { ReactNode } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import {
   LayoutDashboard,
@@ -23,8 +24,14 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, isSuperAdmin, isOtimizzoUser, signOut, loading } = useAuth();
+  const { user, profile, isSuperAdmin, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
+
+  // Camada adicional de segurança: redirecionar para /auth se precisar trocar senha
+  if (mustChangePassword) {
+    console.log('[AppLayout] User must change password, redirecting to /auth');
+    return <Navigate to="/auth" replace />;
+  }
 
   if (loading) {
     return (

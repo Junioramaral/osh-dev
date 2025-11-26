@@ -138,13 +138,22 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const tenantId = roles.find(r => r.tenant_id)?.tenant_id || null;
 
   const signIn = async (email: string, password: string) => {
-    const { error } = await supabase.auth.signInWithPassword({
+    const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
-    if (!error) {
-      navigate('/dashboard');
+    if (!error && data?.user) {
+      // Verificar ANTES de navegar se precisa trocar senha
+      const mustChange = data.user.user_metadata?.must_change_password === true;
+      console.log('[AuthContext] Login successful, must_change_password:', mustChange);
+      setMustChangePassword(mustChange);
+      
+      // Só navega se NÃO precisar trocar senha
+      if (!mustChange) {
+        navigate('/dashboard');
+      }
+      // Se mustChange = true, permanece em /auth e ForcePasswordChange será exibido
     }
     
     return { error };
