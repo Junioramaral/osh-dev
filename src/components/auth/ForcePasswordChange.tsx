@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
@@ -127,23 +128,21 @@ const ForcePasswordChange = ({ onPasswordChanged }: ForcePasswordChangeProps) =>
         </Alert>
 
         <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="new-password">Nova Senha</Label>
-            <Input
-              id="new-password"
-              type="password"
-              value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
-              placeholder="Digite sua nova senha"
-              required
-              disabled={isLoading}
-            />
-          </div>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">Nova Senha</Label>
+                <PasswordInput
+                  id="new-password"
+                  value={newPassword}
+                  onChange={(e) => setNewPassword(e.target.value)}
+                  placeholder="Digite sua nova senha"
+                  required
+                  disabled={isLoading}
+                />
+              </div>
           <div className="space-y-2">
             <Label htmlFor="confirm-password">Confirmar Nova Senha</Label>
-            <Input
+            <PasswordInput
               id="confirm-password"
-              type="password"
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               placeholder="Confirme sua nova senha"
