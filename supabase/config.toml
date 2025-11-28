@@ -11,3 +11,6 @@ verify_jwt = true
 
 [functions.manage-user]
 verify_jwt = true
+
+[functions.send-comment-notification]
+verify_jwt = false

@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Send, Paperclip, Info, Lock } from "lucide-react";
+import { Send, Paperclip, Info, Lock, Mail } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -37,10 +37,15 @@ function CommentCard({ comment }: CommentCardProps) {
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {comment.is_internal && (
-              <Badge variant="outline" className="bg-yellow-100 border-yellow-300">
+            {comment.is_internal ? (
+              <Badge variant="outline" className="bg-yellow-100 border-yellow-300 text-yellow-800">
                 <Lock className="h-3 w-3 mr-1" />
                 Interno
+              </Badge>
+            ) : (
+              <Badge variant="outline" className="bg-blue-100 border-blue-300 text-blue-800">
+                <Mail className="h-3 w-3 mr-1" />
+                Enviado ao cliente
               </Badge>
             )}
           </div>
@@ -67,7 +72,17 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
   
   const addCommentMutation = useMutation({
     mutationFn: async ({ content, is_internal }: { content: string; is_internal: boolean }) => {
-      const { data, error } = await supabase
+      // Fetch ticket details first
+      const { data: ticket, error: ticketError } = await supabase
+        .from('tickets')
+        .select('contact_email, contact_name, ticket_number, title, first_response_at')
+        .eq('id', ticketId)
+        .single();
+      
+      if (ticketError) throw ticketError;
+      
+      // Insert comment
+      const { data: commentData, error: commentError } = await supabase
         .from('ticket_comments')
         .insert({
           ticket_id: ticketId,
@@ -75,17 +90,12 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
           content,
           is_internal
         })
-        .select()
+        .select('*, profiles(full_name)')
         .single();
-      if (error) throw error;
+      
+      if (commentError) throw commentError;
       
       // Check and mark first response
-      const { data: ticket } = await supabase
-        .from('tickets')
-        .select('first_response_at')
-        .eq('id', ticketId)
-        .single();
-      
       if (!ticket?.first_response_at) {
         await supabase
           .from('tickets')
@@ -93,14 +103,48 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
           .eq('id', ticketId);
       }
       
-      return data;
+      // Send email notification if comment is external
+      if (!is_internal) {
+        try {
+          const { error: emailError } = await supabase.functions.invoke('send-comment-notification', {
+            body: {
+              ticketId,
+              commentContent: content,
+              authorName: commentData.profiles?.full_name || 'Equipe de Suporte',
+              contactEmail: ticket.contact_email,
+              contactName: ticket.contact_name,
+              ticketNumber: ticket.ticket_number,
+              ticketTitle: ticket.title,
+            }
+          });
+          
+          if (emailError) {
+            console.error('Error sending email notification:', emailError);
+            // Don't throw error - comment was saved successfully
+          }
+        } catch (error) {
+          console.error('Error calling email notification function:', error);
+          // Don't throw error - comment was saved successfully
+        }
+      }
+      
+      return { commentData, isExternal: !is_internal };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       setNewComment('');
+      setIsInternal(false);
       queryClient.invalidateQueries({ queryKey: ['ticket-comments', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
-      toast({ title: 'Comentário adicionado com sucesso' });
+      
+      if (data.isExternal) {
+        toast({ 
+          title: 'Comentário enviado e cliente notificado por email',
+          description: 'O cliente receberá uma notificação sobre esta atualização'
+        });
+      } else {
+        toast({ title: 'Comentário interno adicionado com sucesso' });
+      }
     },
     onError: (error: any) => {
       toast({ 
@@ -163,20 +207,32 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
                     <Info className="h-4 w-4 text-muted-foreground" />
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p className="max-w-xs text-xs">Comentários internos são visíveis apenas para a equipe</p>
+                    <p className="max-w-xs text-xs">
+                      {isInternal 
+                        ? "🔒 O cliente NÃO receberá este comentário" 
+                        : "📧 O cliente receberá este comentário por email"}
+                    </p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
             </div>
           </div>
           
-          <Button 
-            onClick={handleSubmit} 
-            disabled={!newComment.trim() || addCommentMutation.isPending}
-          >
-            <Send className="h-4 w-4 mr-2" />
-            Enviar
-          </Button>
+          <div className="flex items-center gap-2">
+            {!isInternal && (
+              <span className="text-xs text-muted-foreground flex items-center gap-1">
+                <Mail className="h-3 w-3" />
+                Cliente será notificado
+              </span>
+            )}
+            <Button 
+              onClick={handleSubmit} 
+              disabled={!newComment.trim() || addCommentMutation.isPending}
+            >
+              <Send className="h-4 w-4 mr-2" />
+              Enviar
+            </Button>
+          </div>
         </div>
       </Card>
     </div>
