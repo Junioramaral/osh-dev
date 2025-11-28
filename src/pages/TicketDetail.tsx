@@ -9,6 +9,7 @@ import TicketTimeline from "@/components/tickets/TicketTimeline";
 import TicketComments from "@/components/tickets/TicketComments";
 import TicketAttachments from "@/components/tickets/TicketAttachments";
 import TicketSidebar from "@/components/tickets/TicketSidebar";
+import TicketSLATab from "@/components/tickets/TicketSLATab";
 import { AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 
@@ -76,8 +77,9 @@ export default function TicketDetail() {
         <div className="flex flex-col lg:flex-row gap-6">
           <main className="flex-1">
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className="grid w-full grid-cols-5">
                 <TabsTrigger value="details">Detalhes</TabsTrigger>
+                <TabsTrigger value="sla">SLA</TabsTrigger>
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="comments">
                   Comentários {comments && comments.length > 0 ? `(${comments.length})` : ''}
@@ -86,6 +88,9 @@ export default function TicketDetail() {
               </TabsList>
               <TabsContent value="details" className="mt-6">
                 <TicketDetails ticket={ticket} />
+              </TabsContent>
+              <TabsContent value="sla" className="mt-6">
+                <TicketSLATab ticket={ticket} />
               </TabsContent>
               <TabsContent value="timeline" className="mt-6">
                 <TicketTimeline ticketId={ticket.id} />
