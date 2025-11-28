@@ -44,8 +44,8 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     const emailResponse = await resend.emails.send({
-      from: "Otimizzo Suporte <onboarding@resend.dev>",
-      replyTo: `ticket-${ticketNumber}@resend.dev`,
+      from: "Otimizzo Suporte <noreply@otimizzo.com>",
+      replyTo: "suporte@otimizzo.com",
       to: [contactEmail],
       subject: `[Ticket #${ticketNumber}] Nova atualização - ${ticketTitle}`,
       headers: {
