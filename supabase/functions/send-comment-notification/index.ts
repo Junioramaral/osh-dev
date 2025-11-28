@@ -45,8 +45,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     const emailResponse = await resend.emails.send({
       from: "Otimizzo Suporte <onboarding@resend.dev>",
+      replyTo: `ticket-${ticketNumber}@resend.dev`,
       to: [contactEmail],
       subject: `[Ticket #${ticketNumber}] Nova atualização - ${ticketTitle}`,
+      headers: {
+        'X-Ticket-Number': ticketNumber,
+        'In-Reply-To': `<ticket-${ticketNumber}@otimizzo.com>`,
+        'References': `<ticket-${ticketNumber}@otimizzo.com>`,
+      },
       html: `
         <!DOCTYPE html>
         <html>
@@ -84,11 +90,17 @@ const handler = async (req: Request): Promise<Response> => {
                 <p style="white-space: pre-wrap;">${commentContent}</p>
               </div>
               
-              <p style="color: #6c757d; font-size: 14px;">Caso tenha dúvidas, responda diretamente este email ou acesse o portal de suporte.</p>
+              <p style="color: #6c757d; font-size: 14px;">
+                💡 <strong>Você pode responder diretamente este email!</strong><br>
+                Sua resposta será automaticamente adicionada ao ticket.
+              </p>
             </div>
             
             <div class="footer">
-              <p style="margin: 0;">Atenciosamente,<br><strong>Equipe Otimizzo</strong></p>
+              <p style="margin: 5px 0;">Atenciosamente,<br><strong>Equipe Otimizzo</strong></p>
+              <p style="margin: 5px 0; font-size: 11px; color: #999;">
+                Este email foi enviado em resposta ao Ticket #${ticketNumber}
+              </p>
             </div>
           </div>
         </body>

@@ -38,7 +38,10 @@ export function useTicketComments(ticketId: string | undefined) {
       
       const { data, error } = await supabase
         .from('ticket_comments')
-        .select('*, profiles!ticket_comments_author_id_fkey(full_name)')
+        .select(`
+          *,
+          profiles!ticket_comments_author_id_fkey(full_name)
+        `)
         .eq('ticket_id', ticketId)
         .order('created_at', { ascending: true });
       

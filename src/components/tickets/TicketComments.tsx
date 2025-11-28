@@ -12,7 +12,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Send, Paperclip, Info, Lock, Mail } from "lucide-react";
+import { Send, Paperclip, Info, Lock, Mail, Reply } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -21,26 +21,48 @@ interface CommentCardProps {
 }
 
 function CommentCard({ comment }: CommentCardProps) {
+  // Determinar a origem do comentário
+  const isEmailReply = comment.source === 'email';
+  const isInternal = comment.is_internal;
+  
+  // Nome do autor
+  const authorName = isEmailReply 
+    ? `${comment.author_name || comment.author_email}${comment.author_name ? ' (via email)' : ''}`
+    : comment.profiles?.full_name || 'Usuário';
+  
+  // Iniciais do avatar
+  const avatarInitial = isEmailReply
+    ? (comment.author_name?.[0] || comment.author_email?.[0] || 'C')
+    : (comment.profiles?.full_name?.[0] || 'U');
+  
   return (
-    <Card className={`mb-4 ${comment.is_internal ? 'border-yellow-200 bg-yellow-50/50' : ''}`}>
+    <Card className={`mb-4 ${
+      isInternal ? 'border-yellow-200 bg-yellow-50/50' : 
+      isEmailReply ? 'border-green-200 bg-green-50/50' : ''
+    }`}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Avatar className="h-8 w-8">
               <AvatarFallback className="text-xs">
-                {comment.profiles?.full_name?.[0] || 'U'}
+                {avatarInitial}
               </AvatarFallback>
             </Avatar>
             <div>
-              <p className="font-medium text-sm">{comment.profiles?.full_name || 'Usuário'}</p>
+              <p className="font-medium text-sm">{authorName}</p>
               <p className="text-xs text-muted-foreground">{format(new Date(comment.created_at), 'dd/MM/yyyy HH:mm')}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            {comment.is_internal ? (
+            {isInternal ? (
               <Badge variant="outline" className="bg-yellow-100 border-yellow-300 text-yellow-800">
                 <Lock className="h-3 w-3 mr-1" />
                 Interno
+              </Badge>
+            ) : isEmailReply ? (
+              <Badge variant="outline" className="bg-green-100 border-green-300 text-green-800">
+                <Reply className="h-3 w-3 mr-1" />
+                Resposta do cliente
               </Badge>
             ) : (
               <Badge variant="outline" className="bg-blue-100 border-blue-300 text-blue-800">

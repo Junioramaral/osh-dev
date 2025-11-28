@@ -548,29 +548,41 @@ export type Database = {
       ticket_comments: {
         Row: {
           attachments: Json | null
-          author_id: string
+          author_email: string | null
+          author_id: string | null
+          author_name: string | null
           content: string
           created_at: string | null
+          email_message_id: string | null
           id: string
           is_internal: boolean | null
+          source: Database["public"]["Enums"]["comment_source"] | null
           ticket_id: string
         }
         Insert: {
           attachments?: Json | null
-          author_id: string
+          author_email?: string | null
+          author_id?: string | null
+          author_name?: string | null
           content: string
           created_at?: string | null
+          email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
+          source?: Database["public"]["Enums"]["comment_source"] | null
           ticket_id: string
         }
         Update: {
           attachments?: Json | null
-          author_id?: string
+          author_email?: string | null
+          author_id?: string | null
+          author_name?: string | null
           content?: string
           created_at?: string | null
+          email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
+          source?: Database["public"]["Enums"]["comment_source"] | null
           ticket_id?: string
         }
         Relationships: [
@@ -981,6 +993,7 @@ export type Database = {
         | "analyst_db"
         | "analyst_app"
       business_impact: "nenhum" | "baixo" | "medio" | "alto" | "critico"
+      comment_source: "portal" | "email"
       criticality_level: "baixa" | "media" | "alta" | "critica"
       db_engine: "Oracle" | "PostgreSQL" | "MySQL" | "MongoDB" | "SQL Server"
       environment_type: "prod" | "hom" | "qa" | "dev"
@@ -1133,6 +1146,7 @@ export const Constants = {
         "analyst_app",
       ],
       business_impact: ["nenhum", "baixo", "medio", "alto", "critico"],
+      comment_source: ["portal", "email"],
       criticality_level: ["baixa", "media", "alta", "critica"],
       db_engine: ["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"],
       environment_type: ["prod", "hom", "qa", "dev"],
