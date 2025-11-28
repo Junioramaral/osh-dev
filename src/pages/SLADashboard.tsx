@@ -576,7 +576,14 @@ const SLADashboard = () => {
             </CardHeader>
             <CardContent>
               {metrics.slaByStatus.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+                <ChartContainer
+                  config={{
+                    value: {
+                      label: "Quantidade",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
                   <PieChart>
                     <Pie
                       data={metrics.slaByStatus}
@@ -593,7 +600,7 @@ const SLADashboard = () => {
                     </Pie>
                     <ChartTooltip content={<ChartTooltipContent />} />
                   </PieChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   Sem dados disponíveis
@@ -610,7 +617,27 @@ const SLADashboard = () => {
             </CardHeader>
             <CardContent>
               {metrics.slaByPriority.length > 0 ? (
-                <ResponsiveContainer width="100%" height={300}>
+                <ChartContainer
+                  config={{
+                    atendido: {
+                      label: "Atendido",
+                      color: "hsl(var(--success))",
+                    },
+                    noPrazo: {
+                      label: "No Prazo",
+                      color: "hsl(var(--primary))",
+                    },
+                    emRisco: {
+                      label: "Em Risco",
+                      color: "hsl(var(--warning))",
+                    },
+                    vencido: {
+                      label: "Vencido",
+                      color: "hsl(var(--destructive))",
+                    },
+                  }}
+                  className="h-[300px]"
+                >
                   <BarChart data={metrics.slaByPriority}>
                     <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                     <XAxis dataKey="priority" stroke="hsl(var(--foreground))" />
@@ -622,7 +649,7 @@ const SLADashboard = () => {
                     <Bar dataKey="emRisco" name="Em Risco" stackId="a" fill="hsl(var(--warning))" />
                     <Bar dataKey="vencido" name="Vencido" stackId="a" fill="hsl(var(--destructive))" />
                   </BarChart>
-                </ResponsiveContainer>
+                </ChartContainer>
               ) : (
                 <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                   Sem dados disponíveis
@@ -640,7 +667,18 @@ const SLADashboard = () => {
           </CardHeader>
           <CardContent>
             {metrics.slaEvolution.length > 0 ? (
-              <ResponsiveContainer width="100%" height={300}>
+              <ChartContainer
+                config={{
+                  taxa: {
+                    label: "Taxa de SLA (%)",
+                    color: "hsl(var(--primary))",
+                  },
+                  tickets: {
+                    label: "Tickets",
+                  },
+                }}
+                className="h-[300px]"
+              >
                 <LineChart data={metrics.slaEvolution}>
                   <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
                   <XAxis dataKey="date" stroke="hsl(var(--foreground))" />
@@ -657,7 +695,7 @@ const SLADashboard = () => {
                     dot={{ fill: 'hsl(var(--primary))' }}
                   />
                 </LineChart>
-              </ResponsiveContainer>
+              </ChartContainer>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
                 Sem dados disponíveis
