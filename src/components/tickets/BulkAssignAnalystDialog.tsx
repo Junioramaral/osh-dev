@@ -33,19 +33,13 @@ export function BulkAssignAnalystDialog({
   const { data: analysts, isLoading } = useQuery({
     queryKey: ["otimizzo-analysts"],
     queryFn: async () => {
-      // Buscar perfis do tenant Otimizzo
-      const { data: otimizzoTenant } = await supabase
-        .from("clients")
-        .select("id")
-        .eq("tenant_type", "otimizzo")
-        .single();
-
-      if (!otimizzoTenant) return [];
+      // ID fixo do tenant Otimizzo para evitar problemas com RLS
+      const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, team_id, teams(name, segment)")
-        .eq("client_id", otimizzoTenant.id)
+        .eq("client_id", OTIMIZZO_TENANT_ID)
         .eq("is_active", true)
         .order("full_name");
 
