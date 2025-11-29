@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -32,6 +32,12 @@ export default function TicketHeader({ ticket }: TicketHeaderProps) {
           {slaStatus.type !== 'not-applicable' && (
             <Badge className={slaStatus.color}>
               {slaStatus.icon} {slaStatus.label}
+            </Badge>
+          )}
+          {ticket.lock_status === 'locked' && ticket.lock_owner_id && (
+            <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/20">
+              <Lock className="h-3 w-3 mr-1" />
+              Assumido
             </Badge>
           )}
         </div>
