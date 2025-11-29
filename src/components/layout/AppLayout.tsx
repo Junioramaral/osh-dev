@@ -44,17 +44,20 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     );
   }
 
-  const navigation = [
+  const operationalNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
     { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
+  ].filter(item => item.show);
+
+  const adminNav = [
+    { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin },
     { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Permissões", href: "/admin/permissions", icon: Shield, show: isSuperAdmin },
     { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || isOtimizzoUser },
     { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || isOtimizzoUser },
     { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser },
-    { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
-    { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin },
-    { name: "Permissões", href: "/admin/permissions", icon: Shield, show: isSuperAdmin },
   ].filter(item => item.show);
 
   const SidebarContent = () => (
@@ -69,22 +72,52 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-1">
-        {navigation.map((item) => {
-          const Icon = item.icon;
-          return (
-            <NavLink
-              key={item.name}
-              to={item.href}
-              className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-sidebar-accent"
-              activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
-              onClick={() => setOpen(false)}
-            >
-              <Icon className="w-4 h-4" />
-              {item.name}
-            </NavLink>
-          );
-        })}
+      <nav className="flex-1 p-4 space-y-4">
+        {/* Seção Operacional */}
+        <div className="space-y-1">
+          <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
+            Operacional
+          </p>
+          {operationalNav.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.name}
+                to={item.href}
+                className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-sidebar-accent"
+                activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                onClick={() => setOpen(false)}
+              >
+                <Icon className="w-4 h-4" />
+                {item.name}
+              </NavLink>
+            );
+          })}
+        </div>
+
+        {/* Seção Administrativa */}
+        {adminNav.length > 0 && (
+          <div className="space-y-1">
+            <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
+              Administrativo
+            </p>
+            {adminNav.map((item) => {
+              const Icon = item.icon;
+              return (
+                <NavLink
+                  key={item.name}
+                  to={item.href}
+                  className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-sidebar-accent"
+                  activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+                  onClick={() => setOpen(false)}
+                >
+                  <Icon className="w-4 h-4" />
+                  {item.name}
+                </NavLink>
+              );
+            })}
+          </div>
+        )}
       </nav>
 
       <div className="p-4 border-t border-sidebar-border">
