@@ -38,18 +38,17 @@ export function BulkAssignAnalystDialog({
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, team_id, teams(name, segment)")
+        .select("id, full_name, team_id")
         .eq("client_id", OTIMIZZO_TENANT_ID)
         .eq("is_active", true)
         .order("full_name");
 
-      if (error) throw error;
-      return data?.map(analyst => ({
-        ...analyst,
-        teams: analyst.teams && Array.isArray(analyst.teams) && analyst.teams.length > 0 
-          ? analyst.teams[0] 
-          : null
-      })) || [];
+      if (error) {
+        console.error("Erro ao buscar analistas:", error);
+        throw error;
+      }
+      
+      return data || [];
     },
     enabled: open,
   });
@@ -97,11 +96,6 @@ export function BulkAssignAnalystDialog({
                     >
                       {analyst.full_name}
                     </Label>
-                    {analyst.teams && (
-                      <p className="text-sm text-muted-foreground">
-                        {analyst.teams.name} - {analyst.teams.segment}
-                      </p>
-                    )}
                   </div>
                 </div>
               ))}
