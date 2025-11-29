@@ -116,10 +116,41 @@ export function useBulkTicketActions() {
     },
   });
 
+  const bulkLockTickets = useMutation({
+    mutationFn: async ({
+      ticketIds,
+      userId,
+    }: {
+      ticketIds: string[];
+      userId: string;
+    }) => {
+      const { error } = await supabase
+        .from("tickets")
+        .update({
+          lock_status: "locked",
+          lock_owner_id: userId,
+          lock_at: new Date().toISOString(),
+        })
+        .in("id", ticketIds);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${variables.ticketIds.length} ticket(s) assumido(s) com sucesso!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao assumir tickets: " + error.message);
+    },
+  });
+
   return {
     bulkAssignAnalyst,
     bulkAssignTeam,
     bulkChangeStatus,
     bulkChangePriority,
+    bulkLockTickets,
   };
 }

@@ -12,7 +12,8 @@ import {
   UserCircle, 
   ListChecks, 
   AlertCircle, 
-  X 
+  X,
+  Lock
 } from "lucide-react";
 
 interface BulkActionsBarProps {
@@ -22,6 +23,7 @@ interface BulkActionsBarProps {
   onAssignTeam: () => void;
   onChangeStatus: (status: string) => void;
   onChangePriority: (priority: string) => void;
+  onLockTickets: () => void;
 }
 
 export function BulkActionsBar({ 
@@ -30,7 +32,8 @@ export function BulkActionsBar({
   onAssignAnalyst,
   onAssignTeam,
   onChangeStatus,
-  onChangePriority
+  onChangePriority,
+  onLockTickets
 }: BulkActionsBarProps) {
   return (
     <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 animate-in slide-in-from-bottom">
@@ -43,6 +46,15 @@ export function BulkActionsBar({
         <div className="h-6 w-px bg-primary-foreground/20" />
         
         <div className="flex items-center gap-2">
+          <Button
+            variant="secondary"
+            size="sm"
+            onClick={onLockTickets}
+          >
+            <Lock className="h-4 w-4 mr-2" />
+            Assumir Ticket
+          </Button>
+
           <Button
             variant="secondary"
             size="sm"

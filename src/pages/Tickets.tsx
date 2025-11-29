@@ -34,6 +34,7 @@ export default function Tickets() {
     bulkAssignTeam,
     bulkChangeStatus,
     bulkChangePriority,
+    bulkLockTickets,
   } = useBulkTicketActions();
 
   const toggleTicketSelection = (ticketId: string) => {
@@ -84,6 +85,15 @@ export default function Tickets() {
     bulkChangePriority.mutate({
       ticketIds: Array.from(selectedTickets),
       priority,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  const handleBulkLockTickets = () => {
+    if (!profile?.id) return;
+    bulkLockTickets.mutate({
+      ticketIds: Array.from(selectedTickets),
+      userId: profile.id,
     });
     setSelectedTickets(new Set());
   };
@@ -145,6 +155,7 @@ export default function Tickets() {
           *,
           clients(name),
           profiles!tickets_analyst_id_fkey(full_name),
+          lock_owner:profiles!tickets_lock_owner_id_fkey(full_name),
           sla_first_response_deadline,
           sla_resolution_deadline,
           sla_first_response_met,
@@ -321,6 +332,7 @@ export default function Tickets() {
           onAssignTeam={() => setShowAssignTeamDialog(true)}
           onChangeStatus={handleBulkChangeStatus}
           onChangePriority={handleBulkChangePriority}
+          onLockTickets={handleBulkLockTickets}
         />
       )}
 

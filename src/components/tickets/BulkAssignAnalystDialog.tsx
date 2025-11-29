@@ -44,7 +44,7 @@ export function BulkAssignAnalystDialog({
 
       const { data, error } = await supabase
         .from("profiles")
-        .select("id, full_name, team_id, teams!inner(name, segment)")
+        .select("id, full_name, team_id, teams(name, segment)")
         .eq("client_id", otimizzoTenant.id)
         .eq("is_active", true)
         .order("full_name");
