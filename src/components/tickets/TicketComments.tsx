@@ -131,6 +131,7 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
           const { error: emailError } = await supabase.functions.invoke('send-comment-notification', {
             body: {
               ticketId,
+              commentId: commentData.id,
               commentContent: content,
               authorName: commentData.profiles?.full_name || 'Equipe de Suporte',
               contactEmail: ticket.contact_email,
