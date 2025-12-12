@@ -5,7 +5,14 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail, Edit, Loader2 } from "lucide-react";
+import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail, Edit, Loader2, MoreHorizontal } from "lucide-react";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { useTenantUsers, TenantUser } from "@/hooks/useTenantUsers";
 import { useState, useEffect } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
@@ -753,7 +760,20 @@ const TenantDetail = () => {
                         const status = getUserStatus(user);
                         const StatusIcon = status.icon;
                         return (
-                           <TableRow key={user.id}>
+                           <TableRow 
+                            key={user.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setUserToEdit(user);
+                              setEditUserForm({
+                                full_name: user.full_name,
+                                email: user.email,
+                                phone: user.phone || "",
+                                role: user.role,
+                              });
+                              setIsEditUserDialogOpen(true);
+                            }}
+                          >
                             <TableCell className="font-medium">{user.full_name}</TableCell>
                             <TableCell>{user.email}</TableCell>
                             <TableCell>{user.phone || "-"}</TableCell>
@@ -765,86 +785,64 @@ const TenantDetail = () => {
                               </Badge>
                             </TableCell>
                             <TableCell className="text-right">
-                              <TooltipProvider>
-                                <div className="flex justify-end gap-2">
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => {
-                                          setUserToEdit(user);
-                                          setEditUserForm({
-                                            full_name: user.full_name,
-                                            email: user.email,
-                                            phone: user.phone || "",
-                                            role: user.role,
-                                          });
-                                          setIsEditUserDialogOpen(true);
-                                        }}
-                                      >
-                                        <Edit className="h-4 w-4" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Editar usuário</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                    <span className="sr-only">Abrir menu</span>
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-background">
                                   {!user.email_confirmed_at && user.is_active && (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button
-                                          variant="ghost"
-                                          size="sm"
-                                          onClick={() => resendInvite(user.id)}
-                                          disabled={isResending}
-                                        >
-                                          <Mail className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Reenviar convite</p>
-                                      </TooltipContent>
-                                    </Tooltip>
+                                    <>
+                                      <DropdownMenuItem
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          resendInvite(user.id);
+                                        }}
+                                        disabled={isResending}
+                                      >
+                                        <Mail className="mr-2 h-4 w-4" />
+                                        Reenviar convite
+                                      </DropdownMenuItem>
+                                      <DropdownMenuSeparator />
+                                    </>
                                   )}
-
+                                  
                                   {user.is_active ? (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="sm" onClick={() => deactivateUser(user.id)}>
-                                          <ShieldOff className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Desativar usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        deactivateUser(user.id);
+                                      }}
+                                    >
+                                      <ShieldOff className="mr-2 h-4 w-4" />
+                                      Desativar
+                                    </DropdownMenuItem>
                                   ) : (
-                                    <Tooltip>
-                                      <TooltipTrigger asChild>
-                                        <Button variant="ghost" size="sm" onClick={() => reactivateUser(user.id)}>
-                                          <ShieldCheck className="h-4 w-4" />
-                                        </Button>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p>Reativar usuário</p>
-                                      </TooltipContent>
-                                    </Tooltip>
+                                    <DropdownMenuItem
+                                      onClick={(e) => {
+                                        e.stopPropagation();
+                                        reactivateUser(user.id);
+                                      }}
+                                    >
+                                      <ShieldCheck className="mr-2 h-4 w-4" />
+                                      Ativar
+                                    </DropdownMenuItem>
                                   )}
-
-                                  <Tooltip>
-                                    <TooltipTrigger asChild>
-                                      <Button variant="ghost" size="sm" onClick={() => setUserToDelete(user.id)}>
-                                        <Trash2 className="h-4 w-4 text-destructive" />
-                                      </Button>
-                                    </TooltipTrigger>
-                                    <TooltipContent>
-                                      <p>Remover permanentemente</p>
-                                    </TooltipContent>
-                                  </Tooltip>
-                                </div>
-                              </TooltipProvider>
+                                  
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setUserToDelete(user.id);
+                                    }}
+                                  >
+                                    <Trash2 className="mr-2 h-4 w-4" />
+                                    Remover
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
                             </TableCell>
                           </TableRow>
                         );
