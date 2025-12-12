@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2 } from "lucide-react";
+import { Loader2, Database, Package } from "lucide-react";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClientMutations";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -275,145 +275,151 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                       </FormItem>
                     )}
                   />
+                </div>
 
-                  <div className="space-y-6">
-                    {/* Seção de Segmentos */}
-                    <FormField
-                      control={form.control}
-                      name="segments"
-                      render={({ field }) => (
-                        <FormItem>
-                          <FormLabel>Segmentos</FormLabel>
-                          <div className="flex gap-6">
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="segment-db"
-                                checked={field.value.includes("DB")}
-                                onCheckedChange={(checked) => {
-                                  const newSegments = checked
-                                    ? [...field.value, "DB"]
-                                    : field.value.filter((s) => s !== "DB");
-                                  field.onChange(newSegments);
-                                  setSelectedSegments(newSegments);
-                                  if (!checked) {
-                                    form.setValue("db_engines", []);
-                                  }
-                                }}
-                              />
-                              <label htmlFor="segment-db" className="text-sm font-medium cursor-pointer">
-                                Banco de Dados (DB)
-                              </label>
-                            </div>
-                            <div className="flex items-center space-x-2">
-                              <Checkbox
-                                id="segment-app"
-                                checked={field.value.includes("APP")}
-                                onCheckedChange={(checked) => {
-                                  const newSegments = checked
-                                    ? [...field.value, "APP"]
-                                    : field.value.filter((s) => s !== "APP");
-                                  field.onChange(newSegments);
-                                  setSelectedSegments(newSegments);
-                                  if (!checked) {
-                                    form.setValue("app_product_ids", []);
-                                  }
-                                }}
-                              />
-                              <label htmlFor="segment-app" className="text-sm font-medium cursor-pointer">
-                                Aplicação (APP)
-                              </label>
-                            </div>
-                          </div>
-                          <FormMessage />
-                        </FormItem>
+                {/* Seção de Segmentos */}
+                <FormField
+                  control={form.control}
+                  name="segments"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Segmentos</FormLabel>
+                      <div className="flex gap-6">
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="segment-db"
+                            checked={field.value.includes("DB")}
+                            onCheckedChange={(checked) => {
+                              const newSegments = checked
+                                ? [...field.value, "DB"]
+                                : field.value.filter((s) => s !== "DB");
+                              field.onChange(newSegments);
+                              setSelectedSegments(newSegments);
+                              if (!checked) {
+                                form.setValue("db_engines", []);
+                              }
+                            }}
+                          />
+                          <label htmlFor="segment-db" className="text-sm font-medium cursor-pointer">
+                            Banco de Dados (DB)
+                          </label>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <Checkbox
+                            id="segment-app"
+                            checked={field.value.includes("APP")}
+                            onCheckedChange={(checked) => {
+                              const newSegments = checked
+                                ? [...field.value, "APP"]
+                                : field.value.filter((s) => s !== "APP");
+                              field.onChange(newSegments);
+                              setSelectedSegments(newSegments);
+                              if (!checked) {
+                                form.setValue("app_product_ids", []);
+                              }
+                            }}
+                          />
+                          <label htmlFor="segment-app" className="text-sm font-medium cursor-pointer">
+                            Aplicação (APP)
+                          </label>
+                        </div>
+                      </div>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                {/* Grid lado a lado para Engines e Produtos */}
+                {(selectedSegments.includes("DB") || selectedSegments.includes("APP")) && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Coluna Esquerda: Engines de Banco */}
+                    <div className="space-y-2">
+                      {selectedSegments.includes("DB") ? (
+                        <FormField
+                          control={form.control}
+                          name="db_engines"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <Database className="h-4 w-4 text-blue-500" />
+                                Engines de Banco ({field.value.length})
+                              </FormLabel>
+                              <div className="space-y-3 border rounded-md p-4 bg-muted/20">
+                                {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
+                                  <div key={engine} className="flex items-center space-x-2">
+                                    <Checkbox
+                                      id={`engine-${engine}`}
+                                      checked={field.value.includes(engine)}
+                                      onCheckedChange={(checked) => {
+                                        const newEngines = checked
+                                          ? [...field.value, engine]
+                                          : field.value.filter((e) => e !== engine);
+                                        field.onChange(newEngines);
+                                      }}
+                                    />
+                                    <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
+                                      {engine}
+                                    </label>
+                                  </div>
+                                ))}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <div className="h-full" />
                       )}
-                    />
+                    </div>
 
-                    {/* Grid horizontal para Engines (esquerda) e Produtos (direita) */}
-                    <div className="grid grid-cols-1 lg:grid-cols-[40%_90%] gap-8 lg:gap-10">
-                      {/* Coluna da esquerda: Engines de Banco */}
-                      <div className="space-y-2 min-w-0">
-                        {selectedSegments.includes("DB") && (
-                          <FormField
-                            control={form.control}
-                            name="db_engines"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="whitespace-nowrap">
-                                  Engines de Banco ({field.value.length})
-                                </FormLabel>
-                                <div className="space-y-3 border rounded-md p-4 bg-muted/20">
-                                  {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
-                                    <div key={engine} className="flex items-center space-x-2">
-                                      <Checkbox
-                                        id={`engine-${engine}`}
-                                        checked={field.value.includes(engine)}
-                                        onCheckedChange={(checked) => {
-                                          const newEngines = checked
-                                            ? [...field.value, engine]
-                                            : field.value.filter((e) => e !== engine);
-                                          field.onChange(newEngines);
-                                        }}
-                                      />
-                                      <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
-                                        {engine}
+                    {/* Coluna Direita: Produtos de Aplicação */}
+                    <div className="space-y-2">
+                      {selectedSegments.includes("APP") ? (
+                        <FormField
+                          control={form.control}
+                          name="app_product_ids"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="flex items-center gap-2">
+                                <Package className="h-4 w-4 text-green-500" />
+                                Produtos de Aplicação ({field.value.length})
+                              </FormLabel>
+                              <div className="space-y-3 border rounded-md p-4 bg-muted/20 max-h-64 overflow-y-auto">
+                                {appProducts?.map((product) => (
+                                  <div key={product.id} className="flex items-start space-x-3">
+                                    <Checkbox
+                                      id={`app-${product.id}`}
+                                      checked={field.value.includes(product.id)}
+                                      onCheckedChange={(checked) => {
+                                        const newProducts = checked
+                                          ? [...field.value, product.id]
+                                          : field.value.filter((id) => id !== product.id);
+                                        field.onChange(newProducts);
+                                      }}
+                                    />
+                                    <div className="flex flex-col min-w-0">
+                                      <label htmlFor={`app-${product.id}`} className="text-sm font-medium cursor-pointer">
+                                        {product.name}
                                       </label>
+                                      {product.description && (
+                                        <span className="text-xs text-muted-foreground line-clamp-2">
+                                          {product.description}
+                                        </span>
+                                      )}
                                     </div>
-                                  ))}
-                                </div>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                      </div>
-
-                      {/* Coluna da direita: Produtos de Aplicação */}
-                      <div className="space-y-2 min-w-0">
-                        {selectedSegments.includes("APP") && (
-                          <FormField
-                            control={form.control}
-                            name="app_product_ids"
-                            render={({ field }) => (
-                              <FormItem>
-                                <FormLabel className="whitespace-nowrap">
-                                  Produtos de Aplicação ({field.value.length})
-                                </FormLabel>
-                                <div className="space-y-3 border rounded-md p-4 bg-muted/20 max-h-96 overflow-y-auto">
-                                  {appProducts?.map((product) => (
-                                    <div key={product.id} className="flex items-start space-x-3 min-w-0">
-                                      <Checkbox
-                                        id={`app-${product.id}`}
-                                        checked={field.value.includes(product.id)}
-                                        onCheckedChange={(checked) => {
-                                          const newProducts = checked
-                                            ? [...field.value, product.id]
-                                            : field.value.filter((id) => id !== product.id);
-                                          field.onChange(newProducts);
-                                        }}
-                                        className="mt-1"
-                                      />
-                                      <label
-                                        htmlFor={`app-${product.id}`}
-                                        className="text-sm cursor-pointer flex-1 min-w-0 leading-relaxed"
-                                      >
-                                        <div className="font-medium">{product.name}</div>
-                                        {product.description && (
-                                          <div className="text-xs text-muted-foreground">{product.description}</div>
-                                        )}
-                                      </label>
-                                    </div>
-                                  ))}
-                                </div>
-                                <FormMessage />
-                              </FormItem>
-                            )}
-                          />
-                        )}
-                      </div>
+                                  </div>
+                                ))}
+                              </div>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                      ) : (
+                        <div className="h-full" />
+                      )}
                     </div>
                   </div>
-                </div>
+                )}
               </TabsContent>
 
               <TabsContent value="contract" className="space-y-4">
