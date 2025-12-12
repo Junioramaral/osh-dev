@@ -19,12 +19,14 @@ type FAQArticle = Database["public"]["Tables"]["faq_articles"]["Row"] & {
 
 interface FAQArticleRowProps {
   article: FAQArticle;
+  onView: (article: FAQArticle) => void;
   onEdit: (article: FAQArticle) => void;
   onDelete: (article: FAQArticle) => void;
 }
 
 export default function FAQArticleRow({
   article,
+  onView,
   onEdit,
   onDelete,
 }: FAQArticleRowProps) {
@@ -74,7 +76,7 @@ export default function FAQArticleRow({
   };
 
   return (
-    <TableRow className="hover:bg-muted/50">
+    <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onView(article)}>
       {/* Visibility */}
       <TableCell>
         {getVisibilityBadge()}
@@ -145,7 +147,7 @@ export default function FAQArticleRow({
       </TableCell>
 
       {/* Actions */}
-      <TableCell>
+      <TableCell onClick={(e) => e.stopPropagation()}>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button variant="ghost" size="icon" className="h-8 w-8">
