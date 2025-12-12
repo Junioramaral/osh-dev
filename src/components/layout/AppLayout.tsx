@@ -8,6 +8,7 @@ import {
   LayoutDashboard,
   Users,
   Ticket,
+  UserCheck,
   Database,
   AppWindow,
   Server,
@@ -51,6 +52,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const operationalNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
+    { name: "Meus Tickets", href: "/my-tickets", icon: UserCheck, show: isOtimizzoUser || isSuperAdmin },
     { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
   ].filter(item => item.show);
