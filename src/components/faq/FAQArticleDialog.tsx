@@ -31,9 +31,103 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Building2, Globe, Loader2, Paperclip, X, AlertTriangle, HelpCircle, CheckCircle } from "lucide-react";
-import { Database, Json } from "@/integrations/supabase/types";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Lock, Building2, Globe, Loader2, Paperclip, X, AlertTriangle, HelpCircle, CheckCircle, Database, Package } from "lucide-react";
+import { Database as DatabaseType, Json } from "@/integrations/supabase/types";
 import { FileUploadZone, FileWithPreview } from "@/components/tickets/FileUploadZone";
+
+// Ícones SVG específicos para cada engine de banco de dados
+const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
+  const iconProps = { className: "h-4 w-4 flex-shrink-0" };
+  
+  switch (engine) {
+    case "PostgreSQL":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#336791"/>
+          <path d="M17.5 14.5c0 2-1.5 3.5-3.5 3.5s-3.5-1.5-3.5-3.5c0-1.5.5-2.5 1-3l2.5-3 2.5 3c.5.5 1 1.5 1 3z" fill="#fff"/>
+          <circle cx="12" cy="9" r="2" fill="#fff"/>
+        </svg>
+      );
+    case "MySQL":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#00758F"/>
+          <path d="M8 8c1 0 2 .5 2.5 1.5s.5 2 1.5 2.5c1 .5 2 1 2 2s-.5 2-1.5 2.5-2 .5-2.5 1.5" stroke="#F29111" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+          <circle cx="15" cy="10" r="1.5" fill="#F29111"/>
+        </svg>
+      );
+    case "SQL Server":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#CC2927"/>
+          <path d="M7 8h10M7 12h10M7 16h6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      );
+    case "Oracle":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#F80000"/>
+          <ellipse cx="12" cy="12" rx="6" ry="3" stroke="#fff" strokeWidth="1.5" fill="none"/>
+          <path d="M6 12v2c0 1.657 2.686 3 6 3s6-1.343 6-3v-2" stroke="#fff" strokeWidth="1.5" fill="none"/>
+        </svg>
+      );
+    case "MongoDB":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#47A248"/>
+          <path d="M12 6v12M9 9c1.5-1 4.5-1 6 0M9 15c1.5 1 4.5 1 6 0" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      );
+    default:
+      return <Database className="h-4 w-4 text-muted-foreground" />;
+  }
+};
+
+// Ícones SVG específicos para cada produto de aplicação
+const ApplicationProductIcon = ({ productName }: { productName: string }) => {
+  const iconProps = { className: "h-4 w-4 flex-shrink-0" };
+  
+  switch (productName) {
+    case "ContaDia":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="2" width="16" height="20" rx="2" fill="#2563EB"/>
+          <rect x="6" y="4" width="12" height="4" rx="1" fill="#fff"/>
+          <circle cx="8" cy="11" r="1" fill="#fff"/>
+          <circle cx="12" cy="11" r="1" fill="#fff"/>
+          <circle cx="16" cy="11" r="1" fill="#fff"/>
+          <circle cx="8" cy="15" r="1" fill="#fff"/>
+          <circle cx="12" cy="15" r="1" fill="#fff"/>
+          <circle cx="16" cy="15" r="1" fill="#fff"/>
+          <circle cx="8" cy="19" r="1" fill="#fff"/>
+          <circle cx="12" cy="19" r="1" fill="#fff"/>
+          <circle cx="16" cy="19" r="1" fill="#fff"/>
+        </svg>
+      );
+    case "LexisFlow":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#7C3AED"/>
+          <path d="M12 6v10M8 8l4-2 4 2" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M6 12l2-4 2 4H6zM14 12l2-4 2 4h-4z" fill="#fff"/>
+          <path d="M10 18h4" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      );
+    case "Sec4File":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L4 6v6c0 5.25 3.4 10.15 8 11.25 4.6-1.1 8-6 8-11.25V6l-8-4z" fill="#059669"/>
+          <path d="M9 11h6M9 14h4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M10 8h4v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V8z" fill="#fff"/>
+        </svg>
+      );
+    default:
+      return <Package className="h-4 w-4 text-muted-foreground" />;
+  }
+};
+
+const DB_ENGINES = ["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"];
 
 interface Attachment {
   name: string;
@@ -42,7 +136,7 @@ interface Attachment {
   type: string;
 }
 
-type FAQArticle = Database["public"]["Tables"]["faq_articles"]["Row"];
+type FAQArticle = DatabaseType["public"]["Tables"]["faq_articles"]["Row"];
 type FAQVisibility = "private" | "client_specific" | "global";
 
 const articleSchema = z.object({
@@ -50,13 +144,14 @@ const articleSchema = z.object({
   visibility: z.enum(["private", "client_specific", "global"]),
   client_id: z.string().uuid().optional().nullable(),
   segment: z.enum(["DB", "APP"]),
+  db_engines: z.array(z.string()).default([]),
+  app_product_ids: z.array(z.string()).default([]),
   symptoms: z.string().min(10, "Sintomas deve ter pelo menos 10 caracteres"),
   problem: z.string().min(10, "Problema deve ter pelo menos 10 caracteres"),
   solution: z.string().min(10, "Solução deve ter pelo menos 10 caracteres"),
   keywords: z.string().optional(),
   status: z.enum(["rascunho", "publicado"]),
 }).refine(data => {
-  // Cliente obrigatório para "private" e "client_specific", não para "global"
   if (data.visibility !== "global") {
     return !!data.client_id;
   }
@@ -90,6 +185,8 @@ export default function FAQArticleDialog({
       visibility: "private",
       client_id: null,
       segment: "DB",
+      db_engines: [],
+      app_product_ids: [],
       symptoms: "",
       problem: "",
       solution: "",
@@ -99,6 +196,7 @@ export default function FAQArticleDialog({
   });
 
   const visibility = form.watch("visibility");
+  const segment = form.watch("segment");
 
   const { data: clients } = useQuery({
     queryKey: ["clients-for-faq"],
@@ -113,6 +211,18 @@ export default function FAQArticleDialog({
     },
   });
 
+  const { data: appProducts } = useQuery({
+    queryKey: ["application_products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("application_products")
+        .select("id, name")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   useEffect(() => {
     if (article) {
       form.reset({
@@ -120,6 +230,8 @@ export default function FAQArticleDialog({
         visibility: (article.visibility as FAQVisibility) || "private",
         client_id: article.client_id || null,
         segment: article.segment,
+        db_engines: (article.db_engines as string[]) || [],
+        app_product_ids: (article.app_product_ids as string[]) || [],
         symptoms: article.symptoms || "",
         problem: article.problem || "",
         solution: article.solution || "",
@@ -137,6 +249,8 @@ export default function FAQArticleDialog({
         visibility: "private",
         client_id: null,
         segment: "DB",
+        db_engines: [],
+        app_product_ids: [],
         symptoms: "",
         problem: "",
         solution: "",
@@ -199,6 +313,8 @@ export default function FAQArticleDialog({
           visibility: data.visibility,
           client_id: data.visibility !== "global" ? data.client_id : null,
           segment: data.segment,
+          db_engines: data.segment === "DB" ? data.db_engines as DatabaseType["public"]["Enums"]["db_engine"][] : [],
+          app_product_ids: data.segment === "APP" ? data.app_product_ids : [],
           symptoms: data.symptoms,
           problem: data.problem,
           solution: data.solution,
@@ -251,6 +367,8 @@ export default function FAQArticleDialog({
           visibility: data.visibility,
           client_id: data.visibility !== "global" ? data.client_id : null,
           segment: data.segment,
+          db_engines: data.segment === "DB" ? data.db_engines as DatabaseType["public"]["Enums"]["db_engine"][] : [],
+          app_product_ids: data.segment === "APP" ? data.app_product_ids : [],
           symptoms: data.symptoms,
           problem: data.problem,
           solution: data.solution,
@@ -364,60 +482,40 @@ export default function FAQArticleDialog({
               )}
             />
 
-            {/* Client Selector - aparece para private e client_specific */}
-            {visibility !== "global" && (
-              <FormField
-                control={form.control}
-                name="client_id"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Cliente *</FormLabel>
-                    <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ""}
-                    >
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue placeholder="Selecione um cliente..." />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        {clients?.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
-            )}
-
-            {/* Segment and Status */}
+            {/* Cliente + Status Grid */}
             <div className="grid grid-cols-2 gap-4">
-              <FormField
-                control={form.control}
-                name="segment"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>Segmento *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
-                      <FormControl>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                      </FormControl>
-                      <SelectContent>
-                        <SelectItem value="DB">Banco de Dados</SelectItem>
-                        <SelectItem value="APP">Aplicação</SelectItem>
-                      </SelectContent>
-                    </Select>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              {/* Client Selector - aparece para private e client_specific */}
+              {visibility !== "global" ? (
+                <FormField
+                  control={form.control}
+                  name="client_id"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Cliente *</FormLabel>
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value || ""}
+                      >
+                        <FormControl>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Selecione um cliente..." />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent>
+                          {clients?.map((client) => (
+                            <SelectItem key={client.id} value={client.id}>
+                              {client.name}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              ) : (
+                <div />
+              )}
 
               <FormField
                 control={form.control}
@@ -440,6 +538,114 @@ export default function FAQArticleDialog({
                   </FormItem>
                 )}
               />
+            </div>
+
+            {/* Segmento + Tipo de Segmento Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="segment"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Segmento *</FormLabel>
+                    <Select 
+                      onValueChange={(value) => {
+                        field.onChange(value);
+                        // Limpar seleção ao trocar segmento
+                        form.setValue("db_engines", []);
+                        form.setValue("app_product_ids", []);
+                      }} 
+                      value={field.value}
+                    >
+                      <FormControl>
+                        <SelectTrigger>
+                          <SelectValue />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="DB">Banco de Dados</SelectItem>
+                        <SelectItem value="APP">Aplicação</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              {/* Tipo de Segmento - checkboxes dinâmicos */}
+              <div className="space-y-2">
+                <FormLabel>Tipo de Segmento</FormLabel>
+                {segment === "DB" ? (
+                  <FormField
+                    control={form.control}
+                    name="db_engines"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="space-y-2 max-h-[140px] overflow-y-auto border rounded-md p-2">
+                          {DB_ENGINES.map((engine) => (
+                            <div key={engine} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`engine-${engine}`}
+                                checked={field.value.includes(engine)}
+                                onCheckedChange={(checked) => {
+                                  const newValue = checked
+                                    ? [...field.value, engine]
+                                    : field.value.filter((e) => e !== engine);
+                                  field.onChange(newValue);
+                                }}
+                              />
+                              <label
+                                htmlFor={`engine-${engine}`}
+                                className="flex items-center gap-2 text-sm cursor-pointer"
+                              >
+                                <DatabaseEngineIcon engine={engine} />
+                                {engine}
+                              </label>
+                            </div>
+                          ))}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                ) : (
+                  <FormField
+                    control={form.control}
+                    name="app_product_ids"
+                    render={({ field }) => (
+                      <FormItem>
+                        <div className="space-y-2 max-h-[140px] overflow-y-auto border rounded-md p-2">
+                          {appProducts?.map((product) => (
+                            <div key={product.id} className="flex items-center space-x-2">
+                              <Checkbox
+                                id={`product-${product.id}`}
+                                checked={field.value.includes(product.id)}
+                                onCheckedChange={(checked) => {
+                                  const newValue = checked
+                                    ? [...field.value, product.id]
+                                    : field.value.filter((p) => p !== product.id);
+                                  field.onChange(newValue);
+                                }}
+                              />
+                              <label
+                                htmlFor={`product-${product.id}`}
+                                className="flex items-center gap-2 text-sm cursor-pointer"
+                              >
+                                <ApplicationProductIcon productName={product.name} />
+                                {product.name}
+                              </label>
+                            </div>
+                          ))}
+                          {(!appProducts || appProducts.length === 0) && (
+                            <p className="text-sm text-muted-foreground">Nenhum produto cadastrado</p>
+                          )}
+                        </div>
+                        <FormMessage />
+                      </FormItem>
+                    )}
+                  />
+                )}
+              </div>
             </div>
 
             {/* Symptoms */}
