@@ -132,6 +132,48 @@ const UserPermissions = () => {
     return grouped;
   };
 
+  // Contar roles por grupo de usuários
+  const countRolesByClient = (clientUsers: UserPermission[]): Record<string, number> => {
+    const roleCounts: Record<string, number> = {};
+    clientUsers.forEach((user) => {
+      if (!roleCounts[user.role]) {
+        roleCounts[user.role] = 0;
+      }
+      roleCounts[user.role]++;
+    });
+    return roleCounts;
+  };
+
+  // Labels curtos para badges
+  const roleShortLabels: Record<string, string> = {
+    super_admin: "Super Admin",
+    tenant_admin: "Admin",
+    analyst_db: "DB",
+    analyst_app: "APP",
+    user: "User"
+  };
+
+  // Cores distintivas para cada role
+  const getRoleBadgeColor = (role: string): string => {
+    switch (role) {
+      case "super_admin":
+        return "border-red-500/50 text-red-600 bg-red-500/10 dark:text-red-400 dark:bg-red-500/20";
+      case "tenant_admin":
+        return "border-orange-500/50 text-orange-600 bg-orange-500/10 dark:text-orange-400 dark:bg-orange-500/20";
+      case "analyst_db":
+        return "border-blue-500/50 text-blue-600 bg-blue-500/10 dark:text-blue-400 dark:bg-blue-500/20";
+      case "analyst_app":
+        return "border-green-500/50 text-green-600 bg-green-500/10 dark:text-green-400 dark:bg-green-500/20";
+      case "user":
+        return "border-muted-foreground/50 text-muted-foreground bg-muted/50";
+      default:
+        return "";
+    }
+  };
+
+  // Ordem de exibição das roles
+  const roleOrder = ["super_admin", "tenant_admin", "analyst_db", "analyst_app", "user"];
+
   const groupedUsers = groupUsersByClient();
   const clientNames = Object.keys(groupedUsers).sort();
 
@@ -269,9 +311,26 @@ const UserPermissions = () => {
                   className="border rounded-lg overflow-hidden"
                 >
                   <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
-                    <div className="flex items-center gap-3 flex-1">
+                    <div className="flex items-center gap-3 flex-1 flex-wrap">
                       <Building2 className="h-5 w-5 text-primary" />
                       <span className="font-semibold">{clientName}</span>
+                      
+                      {/* Badges de roles */}
+                      <div className="flex items-center gap-1.5 ml-2">
+                        {Object.entries(countRolesByClient(clientUsers))
+                          .sort((a, b) => roleOrder.indexOf(a[0]) - roleOrder.indexOf(b[0]))
+                          .map(([role, count]) => (
+                            <Badge 
+                              key={role} 
+                              variant="outline" 
+                              className={`text-xs font-medium px-2 py-0.5 ${getRoleBadgeColor(role)}`}
+                            >
+                              {count} {roleShortLabels[role] || role}
+                            </Badge>
+                          ))
+                        }
+                      </div>
+                      
                       <Badge variant="secondary" className="ml-auto mr-2">
                         {activeCount} {activeCount === 1 ? 'ativo' : 'ativos'} / {clientUsers.length} total
                       </Badge>
