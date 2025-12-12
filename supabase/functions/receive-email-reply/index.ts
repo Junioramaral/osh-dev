@@ -76,30 +76,48 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log("Received email webhook from Resend");
 
+    // SECURITY: Require webhook secret - fail if not configured
+    if (!RESEND_WEBHOOK_SECRET) {
+      console.error("RESEND_WEBHOOK_SECRET not configured - rejecting request");
+      return new Response(
+        JSON.stringify({ error: "Webhook secret not configured" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     // Obter headers para validação
     const svixId = req.headers.get("svix-id");
     const svixTimestamp = req.headers.get("svix-timestamp");
     const svixSignature = req.headers.get("svix-signature");
 
+    // SECURITY: Require signature headers
+    if (!svixSignature || !svixTimestamp) {
+      console.error("Missing webhook signature headers");
+      return new Response(
+        JSON.stringify({ error: "Missing signature headers" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const payload = await req.text();
     
-    // Validar signature do webhook
-    if (RESEND_WEBHOOK_SECRET && svixSignature && svixTimestamp) {
-      const isValid = await verifyWebhookSignature(
-        payload,
-        svixSignature,
-        svixTimestamp,
-        RESEND_WEBHOOK_SECRET
+    // Validar signature do webhook - MANDATORY
+    const isValid = await verifyWebhookSignature(
+      payload,
+      svixSignature,
+      svixTimestamp,
+      RESEND_WEBHOOK_SECRET
+    );
+    
+    if (!isValid) {
+      console.error("Invalid webhook signature");
+      return new Response(
+        JSON.stringify({ error: "Invalid signature" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
-      
-      if (!isValid) {
-        console.error("Invalid webhook signature");
-        return new Response(
-          JSON.stringify({ error: "Invalid signature" }),
-          { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
-      }
     }
+    
+    console.log("Webhook signature verified successfully");
 
     const webhookData: EmailReceivedPayload = JSON.parse(payload);
     

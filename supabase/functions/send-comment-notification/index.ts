@@ -1,7 +1,10 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.80.0";
 import { Resend } from "https://esm.sh/resend@4.0.0";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -10,6 +13,7 @@ const corsHeaders = {
 
 interface NotificationRequest {
   ticketId: string;
+  commentId: string;
   commentContent: string;
   authorName: string;
   contactEmail: string;
@@ -24,7 +28,36 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
+    // SECURITY: Verify authentication
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader) {
+      console.error("No authorization header provided");
+      return new Response(
+        JSON.stringify({ error: "Authentication required" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Create authenticated Supabase client
+    const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
+    
+    // Verify the JWT token
+    const token = authHeader.replace("Bearer ", "");
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+    
+    if (authError || !user) {
+      console.error("Invalid authentication token:", authError?.message);
+      return new Response(
+        JSON.stringify({ error: "Invalid authentication" }),
+        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    console.log("Authenticated user:", user.id);
+
     const {
+      ticketId,
+      commentId,
       commentContent,
       authorName,
       contactEmail,
@@ -32,6 +65,65 @@ const handler = async (req: Request): Promise<Response> => {
       ticketNumber,
       ticketTitle,
     }: NotificationRequest = await req.json();
+
+    // SECURITY: Validate required fields
+    if (!ticketId || !commentId || !ticketNumber) {
+      console.error("Missing required fields");
+      return new Response(
+        JSON.stringify({ error: "Missing required fields" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // SECURITY: Verify the comment exists and belongs to the ticket
+    const { data: comment, error: commentError } = await supabase
+      .from("ticket_comments")
+      .select("id, ticket_id, author_id")
+      .eq("id", commentId)
+      .eq("ticket_id", ticketId)
+      .single();
+
+    if (commentError || !comment) {
+      console.error("Comment not found or does not belong to ticket:", commentError?.message);
+      return new Response(
+        JSON.stringify({ error: "Comment not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // SECURITY: Verify user has access to the ticket (is assigned analyst, Otimizzo user, or super admin)
+    const { data: ticket, error: ticketError } = await supabase
+      .from("tickets")
+      .select("id, client_id, analyst_id, contact_email")
+      .eq("id", ticketId)
+      .single();
+
+    if (ticketError || !ticket) {
+      console.error("Ticket not found:", ticketError?.message);
+      return new Response(
+        JSON.stringify({ error: "Ticket not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Check if user is authorized (is Otimizzo user, super admin, or assigned analyst)
+    const { data: userRole } = await supabase
+      .from("user_roles")
+      .select("role, tenant_id")
+      .eq("user_id", user.id)
+      .single();
+
+    const isOtimizzoUser = userRole?.tenant_id === "00000000-0000-0000-0000-000000000001";
+    const isSuperAdmin = userRole?.role === "super_admin";
+    const isAssignedAnalyst = ticket.analyst_id === user.id;
+
+    if (!isOtimizzoUser && !isSuperAdmin && !isAssignedAnalyst) {
+      console.error("User not authorized to send notification for this ticket");
+      return new Response(
+        JSON.stringify({ error: "Not authorized" }),
+        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
 
     console.log("Sending comment notification to:", contactEmail);
 
