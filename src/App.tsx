@@ -9,6 +9,7 @@ import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
 import Dashboard from "./pages/Dashboard";
 import Tickets from "./pages/Tickets";
+import MyTickets from "./pages/MyTickets";
 import TicketDetail from "./pages/TicketDetail";
 import Clients from "./pages/Clients";
 import Databases from "./pages/Databases";
@@ -36,6 +37,7 @@ const App = () => (
               <Route path="/auth/reset-password" element={<ResetPassword />} />
               <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/tickets" element={<Tickets />} />
+            <Route path="/my-tickets" element={<MyTickets />} />
             <Route path="/tickets/:ticketId" element={<TicketDetail />} />
             <Route path="/sla-dashboard" element={<SLADashboard />} />
             <Route path="/clients" element={<Clients />} />
