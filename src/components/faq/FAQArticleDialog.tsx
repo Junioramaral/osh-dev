@@ -31,8 +31,16 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Building2, Globe, Loader2 } from "lucide-react";
-import { Database } from "@/integrations/supabase/types";
+import { Lock, Building2, Globe, Loader2, Paperclip, X } from "lucide-react";
+import { Database, Json } from "@/integrations/supabase/types";
+import { FileUploadZone, FileWithPreview } from "@/components/tickets/FileUploadZone";
+
+interface Attachment {
+  name: string;
+  path: string;
+  size: number;
+  type: string;
+}
 
 type FAQArticle = Database["public"]["Tables"]["faq_articles"]["Row"];
 type FAQVisibility = "private" | "client_specific" | "global";
@@ -45,10 +53,6 @@ const articleSchema = z.object({
   content: z.string().min(20, "Conteúdo deve ter pelo menos 20 caracteres"),
   keywords: z.string().optional(),
   status: z.enum(["rascunho", "publicado"]),
-  db_categories: z.array(z.string()).optional(),
-  db_engines: z.array(z.string()).optional(),
-  app_product_ids: z.array(z.string()).optional(),
-  app_modules: z.array(z.string()).optional(),
 }).refine(data => {
   if (data.visibility === "client_specific") {
     return !!data.client_id;
@@ -73,6 +77,9 @@ export default function FAQArticleDialog({
   const queryClient = useQueryClient();
   const isEditing = !!article;
 
+  const [attachmentFiles, setAttachmentFiles] = useState<FileWithPreview[]>([]);
+  const [existingAttachments, setExistingAttachments] = useState<Attachment[]>([]);
+
   const form = useForm<ArticleFormData>({
     resolver: zodResolver(articleSchema),
     defaultValues: {
@@ -88,7 +95,6 @@ export default function FAQArticleDialog({
 
   const visibility = form.watch("visibility");
 
-  // Load clients for dropdown
   const { data: clients } = useQuery({
     queryKey: ["clients-for-faq"],
     queryFn: async () => {
@@ -102,7 +108,6 @@ export default function FAQArticleDialog({
     },
   });
 
-  // Reset form when article changes
   useEffect(() => {
     if (article) {
       form.reset({
@@ -114,6 +119,11 @@ export default function FAQArticleDialog({
         keywords: article.keywords?.join(", ") || "",
         status: (article.status as "rascunho" | "publicado") || "rascunho",
       });
+      const attachments = Array.isArray(article.attachments)
+        ? (article.attachments as unknown as Attachment[])
+        : [];
+      setExistingAttachments(attachments);
+      setAttachmentFiles([]);
     } else {
       form.reset({
         title: "",
@@ -124,8 +134,48 @@ export default function FAQArticleDialog({
         keywords: "",
         status: "rascunho",
       });
+      setExistingAttachments([]);
+      setAttachmentFiles([]);
     }
   }, [article, form]);
+
+  const uploadAttachments = async (articleId: string, files: FileWithPreview[]) => {
+    const uploadedAttachments: Attachment[] = [];
+
+    for (const fileItem of files) {
+      const filePath = `${articleId}/${Date.now()}-${fileItem.file.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("faq-attachments")
+        .upload(filePath, fileItem.file);
+
+      if (uploadError) throw uploadError;
+
+      uploadedAttachments.push({
+        name: fileItem.file.name,
+        path: filePath,
+        size: fileItem.file.size,
+        type: fileItem.file.type,
+      });
+    }
+
+    return uploadedAttachments;
+  };
+
+  const removeExistingAttachment = async (index: number) => {
+    const attachmentToRemove = existingAttachments[index];
+    
+    const { error } = await supabase.storage
+      .from("faq-attachments")
+      .remove([attachmentToRemove.path]);
+
+    if (error) {
+      toast.error("Erro ao remover anexo");
+      return;
+    }
+
+    setExistingAttachments(prev => prev.filter((_, i) => i !== index));
+  };
 
   const createMutation = useMutation({
     mutationFn: async (data: ArticleFormData) => {
@@ -133,18 +183,33 @@ export default function FAQArticleDialog({
         ? data.keywords.split(",").map(k => k.trim()).filter(Boolean)
         : [];
 
-      const { error } = await supabase.from("faq_articles").insert({
-        title: data.title,
-        visibility: data.visibility,
-        client_id: data.visibility === "client_specific" ? data.client_id : null,
-        segment: data.segment,
-        content: data.content,
-        keywords: keywordsArray,
-        status: data.status,
-        created_by: profile?.id,
-      });
+      const { data: newArticle, error } = await supabase
+        .from("faq_articles")
+        .insert({
+          title: data.title,
+          visibility: data.visibility,
+          client_id: data.visibility === "client_specific" ? data.client_id : null,
+          segment: data.segment,
+          content: data.content,
+          keywords: keywordsArray,
+          status: data.status,
+          created_by: profile?.id,
+        })
+        .select()
+        .single();
 
       if (error) throw error;
+
+      if (attachmentFiles.length > 0) {
+        const uploadedAttachments = await uploadAttachments(newArticle.id, attachmentFiles);
+        
+        const { error: updateError } = await supabase
+          .from("faq_articles")
+          .update({ attachments: uploadedAttachments as unknown as Json[] })
+          .eq("id", newArticle.id);
+
+        if (updateError) throw updateError;
+      }
     },
     onSuccess: () => {
       toast.success("Artigo criado com sucesso");
@@ -162,6 +227,12 @@ export default function FAQArticleDialog({
         ? data.keywords.split(",").map(k => k.trim()).filter(Boolean)
         : [];
 
+      let allAttachments = [...existingAttachments];
+      if (attachmentFiles.length > 0) {
+        const uploadedAttachments = await uploadAttachments(article!.id, attachmentFiles);
+        allAttachments = [...allAttachments, ...uploadedAttachments];
+      }
+
       const { error } = await supabase
         .from("faq_articles")
         .update({
@@ -172,6 +243,7 @@ export default function FAQArticleDialog({
           content: data.content,
           keywords: keywordsArray,
           status: data.status,
+          attachments: allAttachments as unknown as Json[],
           updated_at: new Date().toISOString(),
         })
         .eq("id", article!.id);
@@ -276,7 +348,7 @@ export default function FAQArticleDialog({
               )}
             />
 
-            {/* Client Selector - only when client_specific */}
+            {/* Client Selector */}
             {visibility === "client_specific" && (
               <FormField
                 control={form.control}
@@ -372,6 +444,40 @@ export default function FAQArticleDialog({
                 </FormItem>
               )}
             />
+
+            {/* Attachments */}
+            <div className="space-y-3">
+              <FormLabel>Anexos</FormLabel>
+              <FileUploadZone
+                files={attachmentFiles}
+                onFilesChange={setAttachmentFiles}
+                maxFiles={5}
+                maxSizeMB={10}
+              />
+              
+              {existingAttachments.length > 0 && (
+                <div className="space-y-2">
+                  <p className="text-sm text-muted-foreground">Anexos atuais:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {existingAttachments.map((att, idx) => (
+                      <Badge key={idx} variant="secondary" className="gap-1 pr-1">
+                        <Paperclip className="h-3 w-3" />
+                        {att.name}
+                        <Button 
+                          type="button" 
+                          variant="ghost" 
+                          size="icon"
+                          className="h-4 w-4 ml-1 hover:bg-destructive/20"
+                          onClick={() => removeExistingAttachment(idx)}
+                        >
+                          <X className="h-3 w-3" />
+                        </Button>
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
 
             {/* Keywords */}
             <FormField

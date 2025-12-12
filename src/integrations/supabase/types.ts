@@ -995,6 +995,10 @@ export type Database = {
         }
         Returns: boolean
       }
+      increment_faq_view_count: {
+        Args: { article_id: string }
+        Returns: undefined
+      }
       is_otimizzo_user: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       update_machine_secret: {

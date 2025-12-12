@@ -36,6 +36,7 @@ import { Plus, Search, AlertCircle, BookOpen, Lock, Building2, Globe } from "luc
 import { toast } from "sonner";
 import FAQArticleDialog from "@/components/faq/FAQArticleDialog";
 import FAQArticleRow from "@/components/faq/FAQArticleRow";
+import { FAQArticleViewDialog } from "@/components/faq/FAQArticleViewDialog";
 import { Database } from "@/integrations/supabase/types";
 
 type FAQArticle = Database["public"]["Tables"]["faq_articles"]["Row"] & {
@@ -57,6 +58,8 @@ export default function FAQ() {
   const [editingArticle, setEditingArticle] = useState<FAQArticle | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [articleToDelete, setArticleToDelete] = useState<FAQArticle | null>(null);
+  const [viewDialogOpen, setViewDialogOpen] = useState(false);
+  const [viewingArticle, setViewingArticle] = useState<FAQArticle | null>(null);
 
   const canManageArticles = isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app');
   const canSeeAllFilters = isSuperAdmin || isOtimizzoUser;
@@ -129,7 +132,18 @@ export default function FAQ() {
     return matchesSearch && matchesSegment && matchesVisibility && matchesStatus && matchesClient;
   });
 
+  const handleView = (article: FAQArticle) => {
+    setViewingArticle(article);
+    setViewDialogOpen(true);
+  };
+
   const handleEdit = (article: FAQArticle) => {
+    setEditingArticle(article);
+    setDialogOpen(true);
+  };
+
+  const handleEditFromView = (article: FAQArticle) => {
+    setViewDialogOpen(false);
     setEditingArticle(article);
     setDialogOpen(true);
   };
@@ -308,6 +322,7 @@ export default function FAQ() {
                     <FAQArticleRow
                       key={article.id}
                       article={article}
+                      onView={handleView}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                     />
@@ -344,6 +359,15 @@ export default function FAQ() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         article={editingArticle}
+      />
+
+      {/* View Dialog */}
+      <FAQArticleViewDialog
+        open={viewDialogOpen}
+        onOpenChange={setViewDialogOpen}
+        article={viewingArticle}
+        onEdit={handleEditFromView}
+        canEdit={canManageArticles}
       />
 
       {/* Delete Confirmation Dialog */}
