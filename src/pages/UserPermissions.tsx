@@ -257,7 +257,7 @@ const UserPermissions = () => {
           </Card>
         ) : (
           /* Accordion agrupado por Cliente */
-          <Accordion type="multiple" className="space-y-4" defaultValue={clientNames}>
+          <Accordion type="multiple" className="space-y-4" defaultValue={[]}>
             {clientNames.map((clientName) => {
               const clientUsers = groupedUsers[clientName];
               const activeCount = clientUsers.filter(u => u.is_active).length;
