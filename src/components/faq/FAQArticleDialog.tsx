@@ -54,7 +54,8 @@ const articleSchema = z.object({
   keywords: z.string().optional(),
   status: z.enum(["rascunho", "publicado"]),
 }).refine(data => {
-  if (data.visibility === "client_specific") {
+  // Cliente obrigatório para "private" e "client_specific", não para "global"
+  if (data.visibility !== "global") {
     return !!data.client_id;
   }
   return true;
@@ -188,7 +189,7 @@ export default function FAQArticleDialog({
         .insert({
           title: data.title,
           visibility: data.visibility,
-          client_id: data.visibility === "client_specific" ? data.client_id : null,
+          client_id: data.visibility !== "global" ? data.client_id : null,
           segment: data.segment,
           content: data.content,
           keywords: keywordsArray,
@@ -238,7 +239,7 @@ export default function FAQArticleDialog({
         .update({
           title: data.title,
           visibility: data.visibility,
-          client_id: data.visibility === "client_specific" ? data.client_id : null,
+          client_id: data.visibility !== "global" ? data.client_id : null,
           segment: data.segment,
           content: data.content,
           keywords: keywordsArray,
@@ -331,7 +332,10 @@ export default function FAQArticleDialog({
                         type="button"
                         variant={field.value === "global" ? "default" : "outline"}
                         className={`flex-1 ${field.value === "global" ? "bg-blue-600 hover:bg-blue-700" : "hover:border-blue-500 hover:text-blue-600"}`}
-                        onClick={() => field.onChange("global")}
+                        onClick={() => {
+                          field.onChange("global");
+                          form.setValue("client_id", null);
+                        }}
                       >
                         <Globe className="h-4 w-4 mr-2" />
                         Todos
@@ -348,8 +352,8 @@ export default function FAQArticleDialog({
               )}
             />
 
-            {/* Client Selector */}
-            {visibility === "client_specific" && (
+            {/* Client Selector - aparece para private e client_specific */}
+            {visibility !== "global" && (
               <FormField
                 control={form.control}
                 name="client_id"
