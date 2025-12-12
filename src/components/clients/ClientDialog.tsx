@@ -60,6 +60,53 @@ const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
       return <Database className="h-4 w-4 text-muted-foreground" />;
   }
 };
+
+// Ícones SVG específicos para cada produto de aplicação
+const ApplicationProductIcon = ({ productName }: { productName: string }) => {
+  const iconProps = { className: "h-4 w-4 flex-shrink-0" };
+  
+  switch (productName) {
+    case "ContaDia":
+      // Calculadora - contabilidade (azul)
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <rect x="4" y="2" width="16" height="20" rx="2" fill="#2563EB"/>
+          <rect x="6" y="4" width="12" height="4" rx="1" fill="#fff"/>
+          <circle cx="8" cy="11" r="1" fill="#fff"/>
+          <circle cx="12" cy="11" r="1" fill="#fff"/>
+          <circle cx="16" cy="11" r="1" fill="#fff"/>
+          <circle cx="8" cy="15" r="1" fill="#fff"/>
+          <circle cx="12" cy="15" r="1" fill="#fff"/>
+          <circle cx="16" cy="15" r="1" fill="#fff"/>
+          <circle cx="8" cy="19" r="1" fill="#fff"/>
+          <circle cx="12" cy="19" r="1" fill="#fff"/>
+          <circle cx="16" cy="19" r="1" fill="#fff"/>
+        </svg>
+      );
+    case "LexisFlow":
+      // Balança - jurídico (púrpura)
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#7C3AED"/>
+          <path d="M12 6v10M8 8l4-2 4 2" stroke="#fff" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/>
+          <path d="M6 12l2-4 2 4H6zM14 12l2-4 2 4h-4z" fill="#fff"/>
+          <path d="M10 18h4" stroke="#fff" strokeWidth="2" strokeLinecap="round"/>
+        </svg>
+      );
+    case "Sec4File":
+      // Escudo com documento - segurança (verde)
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2L4 6v6c0 5.25 3.4 10.15 8 11.25 4.6-1.1 8-6 8-11.25V6l-8-4z" fill="#059669"/>
+          <path d="M9 11h6M9 14h4" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+          <path d="M10 8h4v2a1 1 0 01-1 1h-2a1 1 0 01-1-1V8z" fill="#fff"/>
+        </svg>
+      );
+    default:
+      return <Package className="h-4 w-4 text-muted-foreground" />;
+  }
+};
+
 import { useCreateClient, useUpdateClient } from "@/hooks/useClientMutations";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -441,15 +488,18 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                             productField.onChange(newProducts);
                                           }}
                                         />
-                                        <div className="flex flex-col min-w-0">
-                                          <label htmlFor={`app-${product.id}`} className="text-sm font-medium cursor-pointer">
-                                            {product.name}
-                                          </label>
-                                          {product.description && (
-                                            <span className="text-xs text-muted-foreground line-clamp-2">
-                                              {product.description}
-                                            </span>
-                                          )}
+                                        <div className="flex items-start gap-2 min-w-0">
+                                          <ApplicationProductIcon productName={product.name} />
+                                          <div className="flex flex-col min-w-0">
+                                            <label htmlFor={`app-${product.id}`} className="text-sm font-medium cursor-pointer">
+                                              {product.name}
+                                            </label>
+                                            {product.description && (
+                                              <span className="text-xs text-muted-foreground line-clamp-2">
+                                                {product.description}
+                                              </span>
+                                            )}
+                                          </div>
                                         </div>
                                       </div>
                                     ))}
