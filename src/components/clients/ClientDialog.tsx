@@ -12,6 +12,54 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Database, Package } from "lucide-react";
+
+// Ícones SVG específicos para cada engine de banco de dados
+const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
+  const iconProps = { className: "h-4 w-4 flex-shrink-0" };
+  
+  switch (engine) {
+    case "PostgreSQL":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#336791"/>
+          <path d="M17.5 14.5c0 2-1.5 3.5-3.5 3.5s-3.5-1.5-3.5-3.5c0-1.5.5-2.5 1-3l2.5-3 2.5 3c.5.5 1 1.5 1 3z" fill="#fff"/>
+          <circle cx="12" cy="9" r="2" fill="#fff"/>
+        </svg>
+      );
+    case "MySQL":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#00758F"/>
+          <path d="M8 8c1 0 2 .5 2.5 1.5s.5 2 1.5 2.5c1 .5 2 1 2 2s-.5 2-1.5 2.5-2 .5-2.5 1.5" stroke="#F29111" strokeWidth="1.5" fill="none" strokeLinecap="round"/>
+          <circle cx="15" cy="10" r="1.5" fill="#F29111"/>
+        </svg>
+      );
+    case "SQL Server":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#CC2927"/>
+          <path d="M7 8h10M7 12h10M7 16h6" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      );
+    case "Oracle":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#F80000"/>
+          <ellipse cx="12" cy="12" rx="6" ry="3" stroke="#fff" strokeWidth="1.5" fill="none"/>
+          <path d="M6 12v2c0 1.657 2.686 3 6 3s6-1.343 6-3v-2" stroke="#fff" strokeWidth="1.5" fill="none"/>
+        </svg>
+      );
+    case "MongoDB":
+      return (
+        <svg {...iconProps} viewBox="0 0 24 24" fill="none">
+          <path d="M12 2C6.477 2 2 6.477 2 12s4.477 10 10 10 10-4.477 10-10S17.523 2 12 2z" fill="#47A248"/>
+          <path d="M12 6v12M9 9c1.5-1 4.5-1 6 0M9 15c1.5 1 4.5 1 6 0" stroke="#fff" strokeWidth="1.5" strokeLinecap="round"/>
+        </svg>
+      );
+    default:
+      return <Database className="h-4 w-4 text-muted-foreground" />;
+  }
+};
 import { useCreateClient, useUpdateClient } from "@/hooks/useClientMutations";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -320,7 +368,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                   </FormLabel>
                                   <div className="space-y-3 border rounded-md p-4 bg-muted/20">
                                     {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
-                                      <div key={engine} className="flex items-center space-x-2">
+                                      <div key={engine} className="flex items-center space-x-3">
                                         <Checkbox
                                           id={`engine-${engine}`}
                                           checked={engineField.value.includes(engine)}
@@ -331,9 +379,12 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                             engineField.onChange(newEngines);
                                           }}
                                         />
-                                        <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
-                                          {engine}
-                                        </label>
+                                        <div className="flex items-center gap-2">
+                                          <DatabaseEngineIcon engine={engine} />
+                                          <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
+                                            {engine}
+                                          </label>
+                                        </div>
                                       </div>
                                     ))}
                                   </div>
