@@ -12,7 +12,10 @@ import {
   Download, 
   FileText,
   Image as ImageIcon,
-  Calendar
+  Calendar,
+  AlertTriangle,
+  HelpCircle,
+  CheckCircle
 } from "lucide-react";
 import {
   Dialog,
@@ -167,12 +170,44 @@ export function FAQArticleViewDialog({
 
         <ScrollArea className="max-h-[60vh] pr-4">
           <div className="space-y-6">
-            {/* Content */}
-            <div className="prose prose-sm max-w-none">
-              <div className="whitespace-pre-wrap text-foreground">
-                {article.content}
+            {/* Symptoms */}
+            {article.symptoms && (
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2 text-yellow-600">
+                  <AlertTriangle className="h-4 w-4" />
+                  Sintomas
+                </h3>
+                <div className="whitespace-pre-wrap text-foreground pl-6">
+                  {article.symptoms}
+                </div>
               </div>
-            </div>
+            )}
+
+            {/* Problem */}
+            {article.problem && (
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2 text-red-600">
+                  <HelpCircle className="h-4 w-4" />
+                  Problema
+                </h3>
+                <div className="whitespace-pre-wrap text-foreground pl-6">
+                  {article.problem}
+                </div>
+              </div>
+            )}
+
+            {/* Solution */}
+            {article.solution && (
+              <div className="space-y-2">
+                <h3 className="font-semibold flex items-center gap-2 text-green-600">
+                  <CheckCircle className="h-4 w-4" />
+                  Solução
+                </h3>
+                <div className="whitespace-pre-wrap text-foreground pl-6">
+                  {article.solution}
+                </div>
+              </div>
+            )}
 
             {/* Attachments */}
             {attachments.length > 0 && (

@@ -321,15 +321,17 @@ export type Database = {
           app_versions: string[] | null
           attachments: Json | null
           client_id: string | null
-          content: string
           created_at: string | null
           created_by: string | null
           db_categories: string[] | null
           db_engines: Database["public"]["Enums"]["db_engine"][] | null
           id: string
           keywords: string[] | null
+          problem: string | null
           segment: Database["public"]["Enums"]["ticket_segment"]
+          solution: string | null
           status: string | null
+          symptoms: string
           title: string
           updated_at: string | null
           view_count: number | null
@@ -341,15 +343,17 @@ export type Database = {
           app_versions?: string[] | null
           attachments?: Json | null
           client_id?: string | null
-          content: string
           created_at?: string | null
           created_by?: string | null
           db_categories?: string[] | null
           db_engines?: Database["public"]["Enums"]["db_engine"][] | null
           id?: string
           keywords?: string[] | null
+          problem?: string | null
           segment: Database["public"]["Enums"]["ticket_segment"]
+          solution?: string | null
           status?: string | null
+          symptoms: string
           title: string
           updated_at?: string | null
           view_count?: number | null
@@ -361,15 +365,17 @@ export type Database = {
           app_versions?: string[] | null
           attachments?: Json | null
           client_id?: string | null
-          content?: string
           created_at?: string | null
           created_by?: string | null
           db_categories?: string[] | null
           db_engines?: Database["public"]["Enums"]["db_engine"][] | null
           id?: string
           keywords?: string[] | null
+          problem?: string | null
           segment?: Database["public"]["Enums"]["ticket_segment"]
+          solution?: string | null
           status?: string | null
+          symptoms?: string
           title?: string
           updated_at?: string | null
           view_count?: number | null
