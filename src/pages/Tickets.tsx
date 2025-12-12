@@ -112,6 +112,21 @@ export default function Tickets() {
 
   const canUseBulkActions = isOtimizzoUser || isSuperAdmin;
 
+  // Calcular o team_id comum dos tickets selecionados
+  const getCommonTeamId = (): string | null => {
+    if (selectedTickets.size === 0) return null;
+    
+    const selectedTicketData = filteredTickets?.filter(t => selectedTickets.has(t.id)) || [];
+    const teamIds = selectedTicketData.map(t => t.team_id).filter(Boolean);
+    
+    // Se todos têm o mesmo time, retorna o ID
+    if (teamIds.length > 0 && teamIds.every(id => id === teamIds[0])) {
+      return teamIds[0] as string;
+    }
+    
+    return null;
+  };
+
   // Check if user is from Otimizzo tenant
   const { data: currentTenant } = useQuery({
     queryKey: ["current-tenant", tenantId],
@@ -348,6 +363,7 @@ export default function Tickets() {
         onOpenChange={setShowAssignTeamDialog}
         onConfirm={handleBulkAssignTeam}
         selectedCount={selectedTickets.size}
+        currentTeamId={getCommonTeamId()}
       />
     </AppLayout>
   );

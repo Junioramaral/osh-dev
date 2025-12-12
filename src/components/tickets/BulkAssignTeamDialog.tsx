@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import {
@@ -19,15 +19,26 @@ interface BulkAssignTeamDialogProps {
   onOpenChange: (open: boolean) => void;
   onConfirm: (teamId: string) => void;
   selectedCount: number;
+  currentTeamId?: string | null;
 }
 
 export function BulkAssignTeamDialog({
   open,
   onOpenChange,
   onConfirm,
-  selectedCount
+  selectedCount,
+  currentTeamId
 }: BulkAssignTeamDialogProps) {
   const [selectedTeam, setSelectedTeam] = useState<string>("");
+
+  // Sincronizar com o time atual quando o diálogo abre
+  useEffect(() => {
+    if (open && currentTeamId) {
+      setSelectedTeam(currentTeamId);
+    } else if (!open) {
+      setSelectedTeam("");
+    }
+  }, [open, currentTeamId]);
 
   // Buscar times disponíveis
   const { data: teams, isLoading } = useQuery({
