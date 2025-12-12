@@ -320,6 +320,7 @@ export type Database = {
           app_product_ids: string[] | null
           app_versions: string[] | null
           attachments: Json | null
+          client_id: string | null
           content: string
           created_at: string | null
           created_by: string | null
@@ -332,12 +333,14 @@ export type Database = {
           title: string
           updated_at: string | null
           view_count: number | null
+          visibility: Database["public"]["Enums"]["faq_visibility"] | null
         }
         Insert: {
           app_modules?: string[] | null
           app_product_ids?: string[] | null
           app_versions?: string[] | null
           attachments?: Json | null
+          client_id?: string | null
           content: string
           created_at?: string | null
           created_by?: string | null
@@ -350,12 +353,14 @@ export type Database = {
           title: string
           updated_at?: string | null
           view_count?: number | null
+          visibility?: Database["public"]["Enums"]["faq_visibility"] | null
         }
         Update: {
           app_modules?: string[] | null
           app_product_ids?: string[] | null
           app_versions?: string[] | null
           attachments?: Json | null
+          client_id?: string | null
           content?: string
           created_at?: string | null
           created_by?: string | null
@@ -368,8 +373,16 @@ export type Database = {
           title?: string
           updated_at?: string | null
           view_count?: number | null
+          visibility?: Database["public"]["Enums"]["faq_visibility"] | null
         }
         Relationships: [
+          {
+            foreignKeyName: "faq_articles_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "faq_articles_created_by_fkey"
             columns: ["created_by"]
@@ -1005,6 +1018,7 @@ export type Database = {
       criticality_level: "baixa" | "media" | "alta" | "critica"
       db_engine: "Oracle" | "PostgreSQL" | "MySQL" | "MongoDB" | "SQL Server"
       environment_type: "prod" | "hom" | "qa" | "dev"
+      faq_visibility: "private" | "client_specific" | "global"
       frequency_type: "pontual" | "intermitente" | "continuo"
       lock_status: "locked" | "unlocked"
       machine_type: "servidor" | "vm" | "desktop" | "cloud"
@@ -1158,6 +1172,7 @@ export const Constants = {
       criticality_level: ["baixa", "media", "alta", "critica"],
       db_engine: ["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"],
       environment_type: ["prod", "hom", "qa", "dev"],
+      faq_visibility: ["private", "client_specific", "global"],
       frequency_type: ["pontual", "intermitente", "continuo"],
       lock_status: ["locked", "unlocked"],
       machine_type: ["servidor", "vm", "desktop", "cloud"],
