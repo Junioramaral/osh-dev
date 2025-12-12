@@ -24,6 +24,7 @@ export default function Tickets() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [teamFilter, setTeamFilter] = useState<string>("all");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
@@ -161,6 +162,21 @@ export default function Tickets() {
     enabled: isOtimizzoUser,
   });
 
+  // Fetch all teams (only for Otimizzo/super admin users)
+  const { data: allTeams } = useQuery({
+    queryKey: ["all-teams"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, segment")
+        .order("name");
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOtimizzoUser || isSuperAdmin,
+  });
+
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["tickets", profile?.id],
     queryFn: async () => {
@@ -205,7 +221,11 @@ export default function Tickets() {
     const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
     const matchesSegment = segmentFilter === "all" || ticket.segment === segmentFilter;
     const matchesClient = clientFilter === "all" || ticket.client_id === clientFilter;
-    return matchesSearch && matchesStatus && matchesSegment && matchesClient;
+    const matchesTeam = 
+      teamFilter === "all" || 
+      (teamFilter === "none" && !ticket.team_id) || 
+      ticket.team_id === teamFilter;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam;
   }).sort((a, b) => {
     // Ordenar por urgência de SLA
     const slaA = calculateSLAStatus(a);
@@ -272,6 +292,23 @@ export default function Tickets() {
                 {allClients?.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {(isOtimizzoUser || isSuperAdmin) && (
+            <Select value={teamFilter} onValueChange={setTeamFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Todos os times" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os times</SelectItem>
+                <SelectItem value="none">Sem time atribuído</SelectItem>
+                {allTeams?.map((team) => (
+                  <SelectItem key={team.id} value={team.id}>
+                    {team.name} ({team.segment})
                   </SelectItem>
                 ))}
               </SelectContent>
