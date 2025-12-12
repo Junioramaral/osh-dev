@@ -3,6 +3,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePendingTicketsCount } from "@/hooks/usePendingTicketsCount";
+import { useMyTicketsCount } from "@/hooks/useMyTicketsCount";
 import { TicketCountBadge } from "@/components/layout/TicketCountBadge";
 import {
   LayoutDashboard,
@@ -48,6 +49,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   }
 
   const { data: pendingCount = 0 } = usePendingTicketsCount();
+  const { data: myTicketsCount = 0 } = useMyTicketsCount();
 
   const operationalNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
@@ -97,6 +99,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 <Icon className="w-4 h-4" />
                 {item.name}
                 {item.name === "Tickets" && <TicketCountBadge count={pendingCount} />}
+                {item.name === "Meus Tickets" && <TicketCountBadge count={myTicketsCount} />}
               </NavLink>
             );
           })}
