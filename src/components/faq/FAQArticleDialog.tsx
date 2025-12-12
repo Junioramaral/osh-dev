@@ -31,7 +31,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Lock, Building2, Globe, Loader2, Paperclip, X } from "lucide-react";
+import { Lock, Building2, Globe, Loader2, Paperclip, X, AlertTriangle, HelpCircle, CheckCircle } from "lucide-react";
 import { Database, Json } from "@/integrations/supabase/types";
 import { FileUploadZone, FileWithPreview } from "@/components/tickets/FileUploadZone";
 
@@ -50,7 +50,9 @@ const articleSchema = z.object({
   visibility: z.enum(["private", "client_specific", "global"]),
   client_id: z.string().uuid().optional().nullable(),
   segment: z.enum(["DB", "APP"]),
-  content: z.string().min(20, "Conteúdo deve ter pelo menos 20 caracteres"),
+  symptoms: z.string().min(10, "Sintomas deve ter pelo menos 10 caracteres"),
+  problem: z.string().min(10, "Problema deve ter pelo menos 10 caracteres"),
+  solution: z.string().min(10, "Solução deve ter pelo menos 10 caracteres"),
   keywords: z.string().optional(),
   status: z.enum(["rascunho", "publicado"]),
 }).refine(data => {
@@ -88,7 +90,9 @@ export default function FAQArticleDialog({
       visibility: "private",
       client_id: null,
       segment: "DB",
-      content: "",
+      symptoms: "",
+      problem: "",
+      solution: "",
       keywords: "",
       status: "rascunho",
     },
@@ -116,7 +120,9 @@ export default function FAQArticleDialog({
         visibility: (article.visibility as FAQVisibility) || "private",
         client_id: article.client_id || null,
         segment: article.segment,
-        content: article.content,
+        symptoms: article.symptoms || "",
+        problem: article.problem || "",
+        solution: article.solution || "",
         keywords: article.keywords?.join(", ") || "",
         status: (article.status as "rascunho" | "publicado") || "rascunho",
       });
@@ -131,7 +137,9 @@ export default function FAQArticleDialog({
         visibility: "private",
         client_id: null,
         segment: "DB",
-        content: "",
+        symptoms: "",
+        problem: "",
+        solution: "",
         keywords: "",
         status: "rascunho",
       });
@@ -191,7 +199,9 @@ export default function FAQArticleDialog({
           visibility: data.visibility,
           client_id: data.visibility !== "global" ? data.client_id : null,
           segment: data.segment,
-          content: data.content,
+          symptoms: data.symptoms,
+          problem: data.problem,
+          solution: data.solution,
           keywords: keywordsArray,
           status: data.status,
           created_by: profile?.id,
@@ -241,7 +251,9 @@ export default function FAQArticleDialog({
           visibility: data.visibility,
           client_id: data.visibility !== "global" ? data.client_id : null,
           segment: data.segment,
-          content: data.content,
+          symptoms: data.symptoms,
+          problem: data.problem,
+          solution: data.solution,
           keywords: keywordsArray,
           status: data.status,
           attachments: allAttachments as unknown as Json[],
@@ -430,17 +442,64 @@ export default function FAQArticleDialog({
               />
             </div>
 
-            {/* Content */}
+            {/* Symptoms */}
             <FormField
               control={form.control}
-              name="content"
+              name="symptoms"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Conteúdo *</FormLabel>
+                  <FormLabel className="flex items-center gap-2">
+                    <AlertTriangle className="h-4 w-4 text-yellow-500" />
+                    Sintomas *
+                  </FormLabel>
                   <FormControl>
                     <Textarea
-                      placeholder="Descreva o procedimento ou resposta..."
-                      className="min-h-[200px] resize-y"
+                      placeholder="Descreva os sintomas observados pelo usuário..."
+                      className="min-h-[100px] resize-y"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Problem */}
+            <FormField
+              control={form.control}
+              name="problem"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <HelpCircle className="h-4 w-4 text-red-500" />
+                    Problema *
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva a causa raiz do problema..."
+                      className="min-h-[100px] resize-y"
+                      {...field}
+                    />
+                  </FormControl>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
+
+            {/* Solution */}
+            <FormField
+              control={form.control}
+              name="solution"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel className="flex items-center gap-2">
+                    <CheckCircle className="h-4 w-4 text-green-500" />
+                    Solução *
+                  </FormLabel>
+                  <FormControl>
+                    <Textarea
+                      placeholder="Descreva os passos para resolver o problema..."
+                      className="min-h-[100px] resize-y"
                       {...field}
                     />
                   </FormControl>

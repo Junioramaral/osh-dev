@@ -116,12 +116,15 @@ export default function FAQ() {
 
   // Filter articles
   const filteredArticles = articles?.filter((article) => {
+    const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
-      article.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      article.content.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      article.title.toLowerCase().includes(searchLower) ||
+      (article.symptoms && article.symptoms.toLowerCase().includes(searchLower)) ||
+      (article.problem && article.problem.toLowerCase().includes(searchLower)) ||
+      (article.solution && article.solution.toLowerCase().includes(searchLower)) ||
       (article.keywords &&
         article.keywords.some((k: string) =>
-          k.toLowerCase().includes(searchTerm.toLowerCase())
+          k.toLowerCase().includes(searchLower)
         ));
     
     const matchesSegment = segmentFilter === "all" || article.segment === segmentFilter;
