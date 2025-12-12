@@ -29,11 +29,18 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Shield, Search, Info } from "lucide-react";
+import { Shield, Search, Info, Building2, Users } from "lucide-react";
 
 // Helper para obter labels das roles
 const getRoleLabel = (role: string): string => {
@@ -105,6 +112,28 @@ const UserPermissions = () => {
       return data;
     },
   });
+
+  // Agrupar usuários por cliente
+  const groupUsersByClient = (): Record<string, UserPermission[]> => {
+    if (!users) return {};
+    
+    const grouped: Record<string, UserPermission[]> = {};
+    
+    users.forEach((user) => {
+      const clientName = user.client_name || "Sem Cliente";
+      
+      if (!grouped[clientName]) {
+        grouped[clientName] = [];
+      }
+      
+      grouped[clientName].push(user);
+    });
+    
+    return grouped;
+  };
+
+  const groupedUsers = groupUsersByClient();
+  const clientNames = Object.keys(groupedUsers).sort();
 
   const handleRoleChange = (
     userId: string,
@@ -208,128 +237,141 @@ const UserPermissions = () => {
           </Select>
         </div>
 
-        {/* Tabela */}
-        <div className="border rounded-lg">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Tenant</TableHead>
-                <TableHead>
-                  <div className="flex items-center gap-2">
-                    Role Atual
-                    <TooltipProvider>
-                      <Tooltip>
-                        <TooltipTrigger>
-                          <Info className="h-4 w-4 text-muted-foreground" />
-                        </TooltipTrigger>
-                        <TooltipContent>
-                          <p className="max-w-xs">Níveis de permissão do sistema</p>
-                        </TooltipContent>
-                      </Tooltip>
-                    </TooltipProvider>
-                  </div>
-                </TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="text-right">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {isLoading ? (
-                Array.from({ length: 5 }).map((_, i) => (
-                  <TableRow key={i}>
-                    <TableCell>
-                      <Skeleton className="h-4 w-32" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-40" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-4 w-24" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-20" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-5 w-16" />
-                    </TableCell>
-                    <TableCell>
-                      <Skeleton className="h-9 w-32" />
-                    </TableCell>
-                  </TableRow>
-                ))
-              ) : users.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={6} className="text-center text-muted-foreground">
-                    Nenhum usuário encontrado
-                  </TableCell>
-                </TableRow>
-              ) : (
-                users.map((user) => {
-                  const isCurrentUser = user.id === currentUser?.id;
-                  return (
-                    <TableRow key={user.id}>
-                      <TableCell className="font-medium">{user.full_name}</TableCell>
-                      <TableCell>{user.email}</TableCell>
-                      <TableCell>{user.client_name}</TableCell>
-                      <TableCell>
-                        <TooltipProvider>
-                          <Tooltip>
-                            <TooltipTrigger>
-                              <Badge variant={getRoleBadgeVariant(user.role)}>
-                                {getRoleLabel(user.role)}
-                              </Badge>
-                            </TooltipTrigger>
-                            <TooltipContent>
-                              <p className="max-w-xs">{getRoleDescription(user.role)}</p>
-                            </TooltipContent>
-                          </Tooltip>
-                        </TooltipProvider>
-                      </TableCell>
-                      <TableCell>
-                        <Badge variant={user.is_active ? "default" : "outline"}>
-                          {user.is_active ? "Ativo" : "Inativo"}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="text-right">
-                        <Select
-                          value={user.role}
-                          onValueChange={(value: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user") =>
-                            handleRoleChange(
-                              user.id,
-                              user.full_name,
-                              user.email,
-                              user.role,
-                              value
-                            )
-                          }
-                          disabled={isCurrentUser || isUpdating}
-                        >
-                          <SelectTrigger className="w-[150px]">
-                            <SelectValue />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="super_admin">Super Admin</SelectItem>
-                            <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
-                            <SelectItem value="analyst_db">Analista DB</SelectItem>
-                            <SelectItem value="analyst_app">Analista APP</SelectItem>
-                            <SelectItem value="user">Usuário</SelectItem>
-                          </SelectContent>
-                        </Select>
-                        {isCurrentUser && (
-                          <p className="text-xs text-muted-foreground mt-1">
-                            (Você não pode alterar sua própria permissão)
-                          </p>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  );
-                })
-              )}
-            </TableBody>
-          </Table>
-        </div>
+        {/* Loading State */}
+        {isLoading ? (
+          <div className="space-y-4">
+            {Array.from({ length: 3 }).map((_, i) => (
+              <Card key={i}>
+                <div className="p-4">
+                  <Skeleton className="h-6 w-48" />
+                </div>
+              </Card>
+            ))}
+          </div>
+        ) : clientNames.length === 0 ? (
+          <Card>
+            <CardContent className="p-8 text-center text-muted-foreground">
+              <Users className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>Nenhum usuário encontrado</p>
+            </CardContent>
+          </Card>
+        ) : (
+          /* Accordion agrupado por Cliente */
+          <Accordion type="multiple" className="space-y-4" defaultValue={clientNames}>
+            {clientNames.map((clientName) => {
+              const clientUsers = groupedUsers[clientName];
+              const activeCount = clientUsers.filter(u => u.is_active).length;
+              
+              return (
+                <AccordionItem
+                  key={clientName}
+                  value={clientName}
+                  className="border rounded-lg overflow-hidden"
+                >
+                  <AccordionTrigger className="px-4 py-3 hover:no-underline hover:bg-muted/50 [&[data-state=open]]:bg-muted/30">
+                    <div className="flex items-center gap-3 flex-1">
+                      <Building2 className="h-5 w-5 text-primary" />
+                      <span className="font-semibold">{clientName}</span>
+                      <Badge variant="secondary" className="ml-auto mr-2">
+                        {activeCount} {activeCount === 1 ? 'ativo' : 'ativos'} / {clientUsers.length} total
+                      </Badge>
+                    </div>
+                  </AccordionTrigger>
+                  <AccordionContent className="px-0 pb-0">
+                    <div className="border-t">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>
+                              <div className="flex items-center gap-2">
+                                Role Atual
+                                <TooltipProvider>
+                                  <Tooltip>
+                                    <TooltipTrigger>
+                                      <Info className="h-4 w-4 text-muted-foreground" />
+                                    </TooltipTrigger>
+                                    <TooltipContent>
+                                      <p className="max-w-xs">Níveis de permissão do sistema</p>
+                                    </TooltipContent>
+                                  </Tooltip>
+                                </TooltipProvider>
+                              </div>
+                            </TableHead>
+                            <TableHead>Status</TableHead>
+                            <TableHead className="text-right">Alterar Role</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {clientUsers.map((user) => {
+                            const isCurrentUser = user.id === currentUser?.id;
+                            return (
+                              <TableRow key={user.id}>
+                                <TableCell className="font-medium">{user.full_name}</TableCell>
+                                <TableCell className="text-muted-foreground">{user.email}</TableCell>
+                                <TableCell>
+                                  <TooltipProvider>
+                                    <Tooltip>
+                                      <TooltipTrigger>
+                                        <Badge variant={getRoleBadgeVariant(user.role)}>
+                                          {getRoleLabel(user.role)}
+                                        </Badge>
+                                      </TooltipTrigger>
+                                      <TooltipContent>
+                                        <p className="max-w-xs">{getRoleDescription(user.role)}</p>
+                                      </TooltipContent>
+                                    </Tooltip>
+                                  </TooltipProvider>
+                                </TableCell>
+                                <TableCell>
+                                  <Badge variant={user.is_active ? "default" : "outline"}>
+                                    {user.is_active ? "Ativo" : "Inativo"}
+                                  </Badge>
+                                </TableCell>
+                                <TableCell className="text-right">
+                                  <Select
+                                    value={user.role}
+                                    onValueChange={(value: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user") =>
+                                      handleRoleChange(
+                                        user.id,
+                                        user.full_name,
+                                        user.email,
+                                        user.role,
+                                        value
+                                      )
+                                    }
+                                    disabled={isCurrentUser || isUpdating}
+                                  >
+                                    <SelectTrigger className="w-[150px]">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="super_admin">Super Admin</SelectItem>
+                                      <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
+                                      <SelectItem value="analyst_db">Analista DB</SelectItem>
+                                      <SelectItem value="analyst_app">Analista APP</SelectItem>
+                                      <SelectItem value="user">Usuário</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {isCurrentUser && (
+                                    <p className="text-xs text-muted-foreground mt-1">
+                                      (Você)
+                                    </p>
+                                  )}
+                                </TableCell>
+                              </TableRow>
+                            );
+                          })}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  </AccordionContent>
+                </AccordionItem>
+              );
+            })}
+          </Accordion>
+        )}
       </div>
 
       {/* Dialog de Confirmação */}
