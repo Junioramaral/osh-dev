@@ -30,6 +30,10 @@ interface AppLayoutProps {
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, profile, isSuperAdmin, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
+  
+  // Hooks must be called before any conditional returns
+  const { data: pendingCount = 0 } = usePendingTicketsCount();
+  const { data: myTicketsCount = 0 } = useMyTicketsCount();
 
   // Camada adicional de segurança: redirecionar para /auth se precisar trocar senha
   if (mustChangePassword) {
@@ -47,9 +51,6 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
     );
   }
-
-  const { data: pendingCount = 0 } = usePendingTicketsCount();
-  const { data: myTicketsCount = 0 } = useMyTicketsCount();
 
   const operationalNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
