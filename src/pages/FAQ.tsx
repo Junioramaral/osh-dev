@@ -317,7 +317,7 @@ export default function FAQ() {
                     <TableHead className="w-[150px]">Autor</TableHead>
                     <TableHead className="w-[80px]">Views</TableHead>
                     <TableHead className="w-[120px]">Atualizado</TableHead>
-                    <TableHead className="w-[60px]"></TableHead>
+                    <TableHead className="w-[60px]">Ações</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
