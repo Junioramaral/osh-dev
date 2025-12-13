@@ -50,14 +50,15 @@ serve(async (req) => {
       );
     }
 
-    // Check if user has super_admin role
+    // Check if user has super_admin role (supports multi-role system)
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id)
-      .single();
+      .eq("user_id", user.id);
 
-    if (roleError || roleData?.role !== "super_admin") {
+    const hasSuperAdmin = roleData?.some(r => r.role === "super_admin");
+    
+    if (roleError || !hasSuperAdmin) {
       console.error("[manage-user] User lacks super_admin role:", user.id);
       return new Response(
         JSON.stringify({ error: "Insufficient permissions" }),
