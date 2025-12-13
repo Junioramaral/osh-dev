@@ -157,8 +157,6 @@ export default function FAQArticleRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-background border">
-            <DropdownMenuLabel>Ações</DropdownMenuLabel>
-            <DropdownMenuSeparator />
             <DropdownMenuItem onClick={() => onView(article)}>
               <Eye className="h-4 w-4 mr-2" />
               Visualizar
