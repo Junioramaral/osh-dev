@@ -14,7 +14,8 @@ interface InviteUserRequest {
   full_name: string;
   phone?: string;
   tenant_id: string;
-  role: string; // Accept any role string from frontend
+  roles: string[]; // Changed to array for multiple roles
+  role?: string; // Keep for backward compatibility
 }
 
 serve(async (req) => {
@@ -36,12 +37,22 @@ serve(async (req) => {
     // Admin client for user creation
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const { email, full_name, phone, tenant_id, role }: InviteUserRequest = await req.json();
+    const requestData: InviteUserRequest = await req.json();
+    const { email, full_name, phone, tenant_id } = requestData;
+    
+    // Support both 'roles' array and legacy 'role' string
+    let roles: string[] = requestData.roles || [];
+    if (roles.length === 0 && requestData.role) {
+      roles = [requestData.role];
+    }
+    if (roles.length === 0) {
+      roles = ["user"];
+    }
 
-    console.log("🔍 Invite user request:", { email, full_name, phone, tenant_id, role });
+    console.log("🔍 Invite user request:", { email, full_name, phone, tenant_id, roles });
 
     // Validate input
-    if (!email || !full_name || !tenant_id || !role) {
+    if (!email || !full_name || !tenant_id || roles.length === 0) {
       return new Response(JSON.stringify({ error: "Missing required fields" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -154,11 +165,17 @@ serve(async (req) => {
     // Create user with default password
     const DEFAULT_PASSWORD = "osh@123456";
 
-    // Validate and use the role directly from the enum
+    // Validate and filter roles to only valid enum values
     const validRoles = ['super_admin', 'tenant_admin', 'analyst_db', 'analyst_app', 'user'];
-    const appRole = validRoles.includes(role) ? role : 'user';
+    const validatedRoles = roles.filter(r => validRoles.includes(r));
+    if (validatedRoles.length === 0) {
+      validatedRoles.push('user');
+    }
     
-    console.log(`📝 Using role "${role}" -> app_role "${appRole}"`);
+    console.log(`📝 Using roles: ${validatedRoles.join(', ')}`);
+
+    // Use first role for user metadata (for backward compatibility)
+    const primaryRole = validatedRoles[0];
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
@@ -167,7 +184,8 @@ serve(async (req) => {
       user_metadata: {
         full_name,
         tenant_id,
-        role: appRole, // Store role in metadata
+        role: primaryRole, // Store primary role in metadata
+        roles: validatedRoles, // Store all roles
         must_change_password: true, // Flag to force password change on first login
       },
     });
@@ -195,15 +213,17 @@ serve(async (req) => {
       console.error("❌ Error creating profile:", profileError);
     }
 
-    // Create user_roles entry with granular role
-    const { error: roleError } = await adminClient.from("user_roles").insert({
+    // Create user_roles entries for each role
+    const roleInserts = validatedRoles.map(role => ({
       user_id: newUser.user!.id,
-      role: appRole, // Use validated app_role from enum
+      role: role,
       tenant_id,
-    });
+    }));
+
+    const { error: roleError } = await adminClient.from("user_roles").insert(roleInserts);
 
     if (roleError) {
-      console.error("❌ Error creating user role:", roleError);
+      console.error("❌ Error creating user roles:", roleError);
     }
 
     // Create contact entry automatically
@@ -233,7 +253,7 @@ serve(async (req) => {
           name: full_name,
           email: email,
           phone: phone || null,
-          role: role,
+          role: validatedRoles.join(", "), // Store all roles as comma-separated
           is_primary: isPrimaryContact,
         });
 
@@ -246,6 +266,16 @@ serve(async (req) => {
     } else {
       console.log("ℹ️ Contact already exists, skipping creation");
     }
+
+    // Format roles for email display
+    const roleLabels: Record<string, string> = {
+      super_admin: "Super Admin",
+      tenant_admin: "Tenant Admin",
+      analyst_db: "Analista DB",
+      analyst_app: "Analista APP",
+      user: "Usuário",
+    };
+    const rolesDisplay = validatedRoles.map(r => roleLabels[r] || r).join(", ");
 
     // Send custom email in Portuguese via Resend
     try {
@@ -268,6 +298,7 @@ serve(async (req) => {
               .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
               .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; }
               .footer { text-align: center; color: #6b7280; font-size: 14px; margin-top: 30px; }
+              .roles-badge { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 4px; font-size: 14px; margin-top: 10px; }
             </style>
           </head>
           <body>
@@ -278,6 +309,7 @@ serve(async (req) => {
               <div class="content">
                 <p>Olá, <strong>${full_name}</strong>!</p>
                 <p>Sua conta foi criada com sucesso no tenant <strong>${tenant.name}</strong>.</p>
+                <p>Suas funções: <span class="roles-badge">${rolesDisplay}</span></p>
                 
                 <div class="credentials-box">
                   <h3 style="margin-top: 0;">🔐 Suas Credenciais de Acesso</h3>

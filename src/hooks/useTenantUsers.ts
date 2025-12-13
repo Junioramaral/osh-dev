@@ -7,7 +7,7 @@ export interface TenantUser {
   email: string;
   full_name: string;
   phone: string | null;
-  role: string;
+  roles: string[]; // Changed to array for multiple roles
   is_active: boolean;
   email_confirmed_at: string | null;
   invited_at: string | null;
@@ -33,7 +33,7 @@ export const useTenantUsers = (tenantId: string | undefined) => {
           phone,
           is_active,
           created_at,
-          user_roles!inner (
+          user_roles (
             role,
             tenant_id
           )
@@ -64,15 +64,17 @@ export const useTenantUsers = (tenantId: string | undefined) => {
         const authUser = authUsers?.find(u => u.id === profile.id);
         const userRolesArray = Array.isArray(profile.user_roles) 
           ? profile.user_roles 
-          : [profile.user_roles];
-        const userRole = userRolesArray[0];
+          : profile.user_roles ? [profile.user_roles] : [];
+        
+        // Extract all roles for this user
+        const roles = userRolesArray.map((r: any) => r?.role).filter(Boolean);
 
         return {
           id: profile.id,
           email: authUser?.email || "N/A",
           full_name: profile.full_name,
           phone: profile.phone || null,
-          role: userRole?.role || "user",
+          roles: roles.length > 0 ? roles : ["user"],
           is_active: profile.is_active,
           email_confirmed_at: authUser?.email_confirmed_at || null,
           invited_at: authUser?.invited_at || null,
@@ -91,14 +93,14 @@ export const useTenantUsers = (tenantId: string | undefined) => {
     mutationFn: async (params: {
       email: string;
       full_name: string;
-      role: string;
+      roles: string[]; // Changed to array
     }) => {
       const { data, error } = await supabase.functions.invoke("invite-user", {
         body: {
           email: params.email,
           full_name: params.full_name,
           tenant_id: tenantId,
-          role: params.role,
+          roles: params.roles, // Send array
         },
       });
 
@@ -193,7 +195,7 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       full_name?: string;
       email?: string;
       phone?: string;
-      role?: string;
+      roles?: string[]; // Changed to array
     }) => {
       // Update profile (full_name, phone)
       if (params.full_name !== undefined || params.phone !== undefined) {
@@ -223,15 +225,29 @@ export const useTenantUsers = (tenantId: string | undefined) => {
         }
       }
 
-      // Update role
-      if (params.role) {
-        const { error: roleError } = await supabase
+      // Update roles - delete existing and insert new ones
+      if (params.roles && params.roles.length > 0) {
+        // Delete existing roles for this user in this tenant
+        const { error: deleteError } = await supabase
           .from("user_roles")
-          .update({ role: params.role as any })
+          .delete()
           .eq("user_id", params.userId)
           .eq("tenant_id", tenantId);
 
-        if (roleError) throw roleError;
+        if (deleteError) throw deleteError;
+
+        // Insert new roles
+        const roleInserts = params.roles.map(role => ({
+          user_id: params.userId,
+          role: role as any,
+          tenant_id: tenantId,
+        }));
+
+        const { error: insertError } = await supabase
+          .from("user_roles")
+          .insert(roleInserts);
+
+        if (insertError) throw insertError;
       }
     },
     onSuccess: () => {

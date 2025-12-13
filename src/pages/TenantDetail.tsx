@@ -30,7 +30,7 @@ import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { RoleCheckboxGroup, getRolesLabel } from "@/components/tenants/RoleCheckboxGroup";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -73,14 +73,14 @@ const TenantDetail = () => {
     email: "",
     full_name: "",
     phone: "",
-    role: "user",
+    roles: ["user"] as string[],
   });
 
   const [editUserForm, setEditUserForm] = useState({
     full_name: "",
     email: "",
     phone: "",
-    role: "",
+    roles: [] as string[],
   });
 
   const [editForm, setEditForm] = useState({
@@ -279,14 +279,15 @@ const TenantDetail = () => {
 
     // Clean phone before sending
     const cleanedForm = {
-      ...inviteForm,
-      phone: inviteForm.phone ? cleanPhone(inviteForm.phone) : undefined,
+      email: inviteForm.email,
+      full_name: inviteForm.full_name,
+      roles: inviteForm.roles,
     };
 
     inviteUser(cleanedForm, {
       onSuccess: () => {
         setIsInviteDialogOpen(false);
-        setInviteForm({ email: "", full_name: "", phone: "", role: "user" });
+        setInviteForm({ email: "", full_name: "", phone: "", roles: ["user"] });
       },
     });
   };
@@ -324,13 +325,13 @@ const TenantDetail = () => {
         full_name: editUserForm.full_name,
         email: editUserForm.email,
         phone: editUserForm.phone ? cleanPhone(editUserForm.phone) : "",
-        role: editUserForm.role,
+        roles: editUserForm.roles,
       },
       {
         onSuccess: () => {
           setIsEditUserDialogOpen(false);
           setUserToEdit(null);
-          setEditUserForm({ full_name: "", email: "", phone: "", role: "" });
+          setEditUserForm({ full_name: "", email: "", phone: "", roles: [] });
         },
       }
     );
@@ -704,23 +705,10 @@ const TenantDetail = () => {
                             placeholder="(00) 00000-0000"
                           />
                         </div>
-                        <div className="space-y-2">
-                          <Label htmlFor="role">Função</Label>
-                          <Select
-                            value={inviteForm.role}
-                            onValueChange={(value) => setInviteForm({ ...inviteForm, role: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="user">Usuário</SelectItem>
-                              <SelectItem value="analyst_db">Analista DB</SelectItem>
-                              <SelectItem value="analyst_app">Analista APP</SelectItem>
-                              <SelectItem value="tenant_admin">Administrador</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                        <RoleCheckboxGroup
+                          selectedRoles={inviteForm.roles}
+                          onRolesChange={(roles) => setInviteForm({ ...inviteForm, roles })}
+                        />
                         <Button type="submit" className="w-full" disabled={isInviting}>
                           {isInviting ? (
                             <>
@@ -769,7 +757,7 @@ const TenantDetail = () => {
                                 full_name: user.full_name,
                                 email: user.email,
                                 phone: user.phone || "",
-                                role: user.role,
+                                roles: user.roles,
                               });
                               setIsEditUserDialogOpen(true);
                             }}
@@ -777,7 +765,7 @@ const TenantDetail = () => {
                             <TableCell className="font-medium">{user.full_name}</TableCell>
                             <TableCell>{user.email}</TableCell>
                             <TableCell>{user.phone || "-"}</TableCell>
-                            <TableCell>{getRoleLabel(user.role)}</TableCell>
+                            <TableCell>{getRolesLabel(user.roles)}</TableCell>
                             <TableCell>
                               <Badge variant={status.variant}>
                                 <StatusIcon className="mr-1 h-3 w-3" />
@@ -915,23 +903,10 @@ const TenantDetail = () => {
               />
             </div>
 
-            <div className="space-y-2">
-              <Label htmlFor="edit-role">Função *</Label>
-              <Select
-                value={editUserForm.role}
-                onValueChange={(value) =>
-                  setEditUserForm({ ...editUserForm, role: value })
-                }
-              >
-                <SelectTrigger id="edit-role">
-                  <SelectValue placeholder="Selecione a função" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="user">Usuário</SelectItem>
-                  <SelectItem value="super_admin">Super Admin</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            <RoleCheckboxGroup
+              selectedRoles={editUserForm.roles}
+              onRolesChange={(roles) => setEditUserForm({ ...editUserForm, roles })}
+            />
 
             <DialogFooter>
               <Button
