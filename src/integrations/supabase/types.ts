@@ -83,22 +83,28 @@ export type Database = {
           created_at: string | null
           description: string | null
           id: string
+          is_active: boolean | null
           modules: Json | null
           name: string
+          sort_order: number | null
         }
         Insert: {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_active?: boolean | null
           modules?: Json | null
           name: string
+          sort_order?: number | null
         }
         Update: {
           created_at?: string | null
           description?: string | null
           id?: string
+          is_active?: boolean | null
           modules?: Json | null
           name?: string
+          sort_order?: number | null
         }
         Relationships: []
       }
@@ -248,6 +254,33 @@ export type Database = {
           tags?: string[] | null
           tenant_type?: string | null
           updated_at?: string | null
+        }
+        Relationships: []
+      }
+      database_engines: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          sort_order?: number | null
         }
         Relationships: []
       }

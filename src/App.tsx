@@ -20,6 +20,7 @@ import TenantAdmin from "./pages/TenantAdmin";
 import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
 import UserPermissions from "./pages/UserPermissions";
+import SystemSettings from "./pages/SystemSettings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -48,6 +49,7 @@ const App = () => (
             <Route path="/admin/tenants" element={<TenantAdmin />} />
             <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
             <Route path="/admin/permissions" element={<UserPermissions />} />
+            <Route path="/system-settings" element={<SystemSettings />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

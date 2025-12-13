@@ -159,7 +159,16 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
   const { data: appProducts } = useQuery({
     queryKey: ["application_products"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("application_products").select("id, name, description").order("name");
+      const { data, error } = await supabase.from("application_products").select("id, name, description").eq("is_active", true).order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: dbEngines } = useQuery({
+    queryKey: ["database_engines"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("database_engines").select("id, name").eq("is_active", true).order("sort_order");
       if (error) throw error;
       return data;
     },
@@ -414,22 +423,22 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                                     Engines de Banco ({engineField.value.length})
                                   </FormLabel>
                                   <div className="space-y-3 border rounded-md p-4 bg-muted/20">
-                                    {["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"].map((engine) => (
-                                      <div key={engine} className="flex items-center space-x-3">
+                                    {dbEngines?.map((engine) => (
+                                      <div key={engine.id} className="flex items-center space-x-3">
                                         <Checkbox
-                                          id={`engine-${engine}`}
-                                          checked={engineField.value.includes(engine)}
+                                          id={`engine-${engine.name}`}
+                                          checked={engineField.value.includes(engine.name)}
                                           onCheckedChange={(checked) => {
                                             const newEngines = checked
-                                              ? [...engineField.value, engine]
-                                              : engineField.value.filter((e) => e !== engine);
+                                              ? [...engineField.value, engine.name]
+                                              : engineField.value.filter((e) => e !== engine.name);
                                             engineField.onChange(newEngines);
                                           }}
                                         />
                                         <div className="flex items-center gap-2">
-                                          <DatabaseEngineIcon engine={engine} />
-                                          <label htmlFor={`engine-${engine}`} className="text-sm cursor-pointer">
-                                            {engine}
+                                          <DatabaseEngineIcon engine={engine.name} />
+                                          <label htmlFor={`engine-${engine.name}`} className="text-sm cursor-pointer">
+                                            {engine.name}
                                           </label>
                                         </div>
                                       </div>
