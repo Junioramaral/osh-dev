@@ -127,3 +127,45 @@ All colors MUST be HSL.
     @apply bg-background text-foreground;
   }
 }
+
+/* Print Styles */
+@media print {
+  /* Hide UI elements */
+  body > *:not(#root),
+  [data-sidebar],
+  nav,
+  header,
+  [data-radix-dialog-overlay] {
+    display: none !important;
+  }
+
+  .print-hidden {
+    display: none !important;
+  }
+
+  /* Dialog takes full page */
+  [role="dialog"] {
+    position: absolute !important;
+    inset: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: none !important;
+    margin: 0 !important;
+    padding: 15mm !important;
+    box-shadow: none !important;
+    border: none !important;
+    background: white !important;
+    border-radius: 0 !important;
+  }
+
+  /* Prevent section breaks */
+  section {
+    break-inside: avoid;
+  }
+
+  /* Preserve colors */
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+}
