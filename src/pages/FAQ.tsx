@@ -118,6 +118,7 @@ export default function FAQ() {
   const filteredArticles = articles?.filter((article) => {
     const searchLower = searchTerm.toLowerCase();
     const matchesSearch =
+      (article.faq_number && article.faq_number.toLowerCase().includes(searchLower)) ||
       article.title.toLowerCase().includes(searchLower) ||
       (article.symptoms && article.symptoms.toLowerCase().includes(searchLower)) ||
       (article.problem && article.problem.toLowerCase().includes(searchLower)) ||
@@ -310,6 +311,7 @@ export default function FAQ() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-[110px]">Número</TableHead>
                     <TableHead className="w-[140px]">Visibilidade</TableHead>
                     <TableHead>Título</TableHead>
                     <TableHead className="w-[80px]">Segmento</TableHead>

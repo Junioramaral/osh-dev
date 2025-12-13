@@ -79,6 +79,13 @@ export default function FAQArticleRow({
 
   return (
     <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onEdit(article)}>
+      {/* FAQ Number */}
+      <TableCell>
+        <Badge variant="outline" className="font-mono text-xs">
+          {article.faq_number}
+        </Badge>
+      </TableCell>
+
       {/* Visibility */}
       <TableCell>
         {getVisibilityBadge()}
