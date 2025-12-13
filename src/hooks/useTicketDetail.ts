@@ -18,7 +18,8 @@ export function useTicketDetail(ticketId: string | undefined) {
           application_instances(version, environment),
           application_products(name),
           db_machine:machines!tickets_db_machine_id_fkey(hostname),
-          app_machine:machines!tickets_app_machine_id_fkey(hostname)
+          app_machine:machines!tickets_app_machine_id_fkey(hostname),
+          faq_articles(id, title, symptoms, problem, solution)
         `)
         .eq('id', ticketId)
         .single();

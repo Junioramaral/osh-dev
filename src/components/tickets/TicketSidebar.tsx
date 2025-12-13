@@ -1,12 +1,20 @@
+import { useState } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { calculateSLAStatus, formatDuration } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-
+import { BookOpen, ExternalLink } from "lucide-react";
 interface TicketSidebarProps {
   ticket: any;
 }
@@ -22,6 +30,7 @@ function InfoRow({ label, value }: { label: string; value: any }) {
 }
 
 export default function TicketSidebar({ ticket }: TicketSidebarProps) {
+  const [showFAQDialog, setShowFAQDialog] = useState(false);
   const slaStatus = calculateSLAStatus(ticket);
   const now = new Date();
   
@@ -43,6 +52,66 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   
   return (
     <div className="space-y-6">
+      {/* FAQ Relacionada */}
+      {ticket.faq_articles && (
+        <Card className="border-primary/20 bg-primary/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <BookOpen className="h-4 w-4 text-primary" />
+              FAQ Relacionada
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm font-medium line-clamp-2">{ticket.faq_articles.title}</p>
+            <p className="text-xs text-muted-foreground line-clamp-2">
+              {ticket.faq_articles.symptoms}
+            </p>
+            <Button 
+              variant="link" 
+              size="sm" 
+              className="px-0 h-auto text-xs"
+              onClick={() => setShowFAQDialog(true)}
+            >
+              <ExternalLink className="h-3 w-3 mr-1" />
+              Ver artigo completo
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* FAQ Dialog */}
+      <Dialog open={showFAQDialog} onOpenChange={setShowFAQDialog}>
+        <DialogContent className="max-w-2xl max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{ticket.faq_articles?.title}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label className="text-sm font-semibold">Sintomas</Label>
+              <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                {ticket.faq_articles?.symptoms}
+              </p>
+            </div>
+            {ticket.faq_articles?.problem && (
+              <div>
+                <Label className="text-sm font-semibold">Problema</Label>
+                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                  {ticket.faq_articles?.problem}
+                </p>
+              </div>
+            )}
+            {ticket.faq_articles?.solution && (
+              <div>
+                <Label className="text-sm font-semibold">Solução</Label>
+                <p className="text-sm text-muted-foreground mt-1 whitespace-pre-wrap">
+                  {ticket.faq_articles?.solution}
+                </p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {/* SLA Card */}
       <Card>
         <CardHeader>

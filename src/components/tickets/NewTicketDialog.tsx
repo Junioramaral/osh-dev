@@ -8,6 +8,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { TicketCreatedDialog } from "./TicketCreatedDialog";
 import { FileUploadZone, FileWithPreview } from "./FileUploadZone";
+import FAQSelector from "./FAQSelector";
 import {
   Dialog,
   DialogContent,
@@ -45,6 +46,7 @@ const ticketSchema = z.object({
   business_impact: z.enum(["nenhum", "baixo", "medio", "alto", "critico"]),
   reproduction_steps: z.string().min(1, "Passos para reprodução são obrigatórios"),
   workaround: z.string().optional(),
+  faq_article_id: z.string().uuid().optional().nullable(),
   db_engine: z.enum(["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"]).optional(),
   db_instance_id: z.string().uuid().optional(),
   db_machine_id: z.string().uuid().optional(),
@@ -290,6 +292,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         business_impact: data.business_impact,
         reproduction_steps: data.reproduction_steps,
         workaround: data.workaround,
+        faq_article_id: data.faq_article_id || null,
       };
 
       if (data.segment === "DB") {
@@ -493,6 +496,16 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             )}
 
           </div>
+
+          {/* FAQ Selector - aparece após selecionar cliente */}
+          {selectedClientId && (
+            <FAQSelector
+              clientId={selectedClientId}
+              segment={segment}
+              selectedFAQId={watch("faq_article_id")}
+              onSelectFAQ={(id) => setValue("faq_article_id", id)}
+            />
+          )}
 
           <div className="space-y-2">
             <Label htmlFor="title">Título *</Label>
