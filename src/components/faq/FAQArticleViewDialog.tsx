@@ -17,7 +17,8 @@ import {
   HelpCircle,
   CheckCircle,
   Printer,
-  History
+  History,
+  Ticket
 } from "lucide-react";
 import {
   Dialog,
@@ -32,6 +33,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { FAQHistoryTab } from "./FAQHistoryTab";
+import { FAQLinkedTicketsTab } from "./FAQLinkedTicketsTab";
 
 type FAQArticle = Tables<"faq_articles"> & {
   clients?: { name: string } | null;
@@ -192,6 +194,10 @@ export function FAQArticleViewDialog({
               <History className="h-4 w-4" />
               Histórico
             </TabsTrigger>
+            <TabsTrigger value="tickets" className="gap-2">
+              <Ticket className="h-4 w-4" />
+              Tickets Vinculados
+            </TabsTrigger>
           </TabsList>
 
           <TabsContent value="content" className="space-y-8 mt-6">
@@ -332,6 +338,10 @@ export function FAQArticleViewDialog({
 
           <TabsContent value="history" className="mt-6">
             <FAQHistoryTab articleId={article.id} />
+          </TabsContent>
+
+          <TabsContent value="tickets" className="mt-6">
+            <FAQLinkedTicketsTab articleId={article.id} />
           </TabsContent>
         </Tabs>
 
