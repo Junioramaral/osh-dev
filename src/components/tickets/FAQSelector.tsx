@@ -97,8 +97,11 @@ export default function FAQSelector({
       {selectedFAQ && (
         <div className="p-3 bg-primary/5 border border-primary/20 rounded-lg flex items-start justify-between gap-3">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center gap-2 mb-1">
+          <div className="flex items-center gap-2 mb-1">
               <Check className="h-4 w-4 text-primary flex-shrink-0" />
+              <Badge variant="outline" className="font-mono text-xs">
+                {selectedFAQ.faq_number}
+              </Badge>
               <span className="text-sm font-medium truncate">{selectedFAQ.title}</span>
             </div>
             <p className="text-xs text-muted-foreground line-clamp-2 ml-6">
