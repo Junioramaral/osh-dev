@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -16,7 +16,8 @@ import {
   AlertTriangle,
   HelpCircle,
   CheckCircle,
-  Printer
+  Printer,
+  History
 } from "lucide-react";
 import {
   Dialog,
@@ -26,10 +27,11 @@ import {
 } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
+import { FAQHistoryTab } from "./FAQHistoryTab";
 
 type FAQArticle = Tables<"faq_articles"> & {
   clients?: { name: string } | null;
@@ -59,7 +61,7 @@ export function FAQArticleViewDialog({
   canEdit = false,
 }: FAQArticleViewDialogProps) {
   const queryClient = useQueryClient();
-
+  const [activeTab, setActiveTab] = useState("content");
   const incrementViewCount = useMutation({
     mutationFn: async (articleId: string) => {
       const { error } = await supabase.rpc("increment_faq_view_count", {
@@ -174,142 +176,159 @@ export function FAQArticleViewDialog({
           </div>
         </DialogHeader>
 
-        {/* Content - Report Sections */}
-        <div className="space-y-8 py-6">
-          {/* Symptoms Section */}
-          {article.symptoms && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <AlertTriangle className="h-5 w-5 text-yellow-600" />
-                <h3 className="text-lg font-semibold uppercase tracking-wide text-yellow-600">
-                  Sintomas
-                </h3>
-              </div>
-              <Separator className="bg-yellow-600/20" />
-              <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-4">
-                <p className="whitespace-pre-wrap text-foreground leading-relaxed">
-                  {article.symptoms}
-                </p>
-              </div>
-            </section>
-          )}
+        {/* Tabs for Content and History */}
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="py-4">
+          <TabsList className="print-hidden">
+            <TabsTrigger value="content" className="gap-2">
+              <FileText className="h-4 w-4" />
+              Conteúdo
+            </TabsTrigger>
+            <TabsTrigger value="history" className="gap-2">
+              <History className="h-4 w-4" />
+              Histórico
+            </TabsTrigger>
+          </TabsList>
 
-          {/* Problem Section */}
-          {article.problem && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <HelpCircle className="h-5 w-5 text-red-600" />
-                <h3 className="text-lg font-semibold uppercase tracking-wide text-red-600">
-                  Problema
-                </h3>
-              </div>
-              <Separator className="bg-red-600/20" />
-              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
-                <p className="whitespace-pre-wrap text-foreground leading-relaxed">
-                  {article.problem}
-                </p>
-              </div>
-            </section>
-          )}
+          <TabsContent value="content" className="space-y-8 mt-6">
+            {/* Symptoms Section */}
+            {article.symptoms && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                  <h3 className="text-lg font-semibold uppercase tracking-wide text-yellow-600">
+                    Sintomas
+                  </h3>
+                </div>
+                <Separator className="bg-yellow-600/20" />
+                <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-4">
+                  <p className="whitespace-pre-wrap text-foreground leading-relaxed">
+                    {article.symptoms}
+                  </p>
+                </div>
+              </section>
+            )}
 
-          {/* Solution Section */}
-          {article.solution && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <CheckCircle className="h-5 w-5 text-green-600" />
-                <h3 className="text-lg font-semibold uppercase tracking-wide text-green-600">
-                  Solução
-                </h3>
-              </div>
-              <Separator className="bg-green-600/20" />
-              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-lg p-4">
-                <p className="whitespace-pre-wrap text-foreground leading-relaxed">
-                  {article.solution}
-                </p>
-              </div>
-            </section>
-          )}
+            {/* Problem Section */}
+            {article.problem && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <HelpCircle className="h-5 w-5 text-red-600" />
+                  <h3 className="text-lg font-semibold uppercase tracking-wide text-red-600">
+                    Problema
+                  </h3>
+                </div>
+                <Separator className="bg-red-600/20" />
+                <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
+                  <p className="whitespace-pre-wrap text-foreground leading-relaxed">
+                    {article.problem}
+                  </p>
+                </div>
+              </section>
+            )}
 
-          {/* Attachments Section */}
-          {attachments.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Paperclip className="h-5 w-5 text-blue-600" />
-                <h3 className="text-lg font-semibold uppercase tracking-wide text-blue-600">
-                  Anexos ({attachments.length})
-                </h3>
-              </div>
-              <Separator className="bg-blue-600/20" />
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                {attachments.map((attachment, idx) => (
-                  <div
-                    key={idx}
-                    className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
-                  >
-                    <div className="shrink-0">
-                      {isImage(attachment.type) ? (
-                        <ImageIcon className="h-8 w-8 text-blue-500" />
-                      ) : (
-                        <FileText className="h-8 w-8 text-muted-foreground" />
-                      )}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate">
-                        {attachment.name}
-                      </p>
-                      <p className="text-xs text-muted-foreground">
-                        {formatFileSize(attachment.size)}
-                      </p>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => handleDownload(attachment)}
+            {/* Solution Section */}
+            {article.solution && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <CheckCircle className="h-5 w-5 text-green-600" />
+                  <h3 className="text-lg font-semibold uppercase tracking-wide text-green-600">
+                    Solução
+                  </h3>
+                </div>
+                <Separator className="bg-green-600/20" />
+                <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-lg p-4">
+                  <p className="whitespace-pre-wrap text-foreground leading-relaxed">
+                    {article.solution}
+                  </p>
+                </div>
+              </section>
+            )}
+
+            {/* Attachments Section */}
+            {attachments.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Paperclip className="h-5 w-5 text-blue-600" />
+                  <h3 className="text-lg font-semibold uppercase tracking-wide text-blue-600">
+                    Anexos ({attachments.length})
+                  </h3>
+                </div>
+                <Separator className="bg-blue-600/20" />
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                  {attachments.map((attachment, idx) => (
+                    <div
+                      key={idx}
+                      className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
                     >
-                      <Download className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </section>
-          )}
+                      <div className="shrink-0">
+                        {isImage(attachment.type) ? (
+                          <ImageIcon className="h-8 w-8 text-blue-500" />
+                        ) : (
+                          <FileText className="h-8 w-8 text-muted-foreground" />
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {attachment.name}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {formatFileSize(attachment.size)}
+                        </p>
+                      </div>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleDownload(attachment)}
+                      >
+                        <Download className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
 
-          {/* Keywords Section */}
-          {keywords.length > 0 && (
-            <section className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Tag className="h-5 w-5 text-purple-600" />
-                <h3 className="text-lg font-semibold uppercase tracking-wide text-purple-600">
-                  Palavras-chave
-                </h3>
-              </div>
-              <Separator className="bg-purple-600/20" />
-              <div className="flex flex-wrap gap-2">
-                {keywords.map((keyword, idx) => (
-                  <Badge key={idx} variant="secondary" className="text-sm px-3 py-1">
-                    {keyword}
-                  </Badge>
-                ))}
-              </div>
-            </section>
-          )}
+            {/* Keywords Section */}
+            {keywords.length > 0 && (
+              <section className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <Tag className="h-5 w-5 text-purple-600" />
+                  <h3 className="text-lg font-semibold uppercase tracking-wide text-purple-600">
+                    Palavras-chave
+                  </h3>
+                </div>
+                <Separator className="bg-purple-600/20" />
+                <div className="flex flex-wrap gap-2">
+                  {keywords.map((keyword, idx) => (
+                    <Badge key={idx} variant="secondary" className="text-sm px-3 py-1">
+                      {keyword}
+                    </Badge>
+                  ))}
+                </div>
+              </section>
+            )}
 
-          {/* Metadata Footer */}
-          <div className="pt-4 border-t">
-            <div className="flex items-center gap-4 text-sm text-muted-foreground">
-              <div className="flex items-center gap-1">
-                <Calendar className="h-4 w-4" />
-                Atualizado em{" "}
-                {format(new Date(article.updated_at || article.created_at!), "dd MMM yyyy", {
-                  locale: ptBR,
-                })}
+            {/* Metadata Footer */}
+            <div className="pt-4 border-t">
+              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                <div className="flex items-center gap-1">
+                  <Calendar className="h-4 w-4" />
+                  Atualizado em{" "}
+                  {format(new Date(article.updated_at || article.created_at!), "dd MMM yyyy", {
+                    locale: ptBR,
+                  })}
+                </div>
+                {article.profiles?.full_name && (
+                  <span>por <span className="font-medium">{article.profiles.full_name}</span></span>
+                )}
               </div>
-              {article.profiles?.full_name && (
-                <span>por <span className="font-medium">{article.profiles.full_name}</span></span>
-              )}
             </div>
-          </div>
-        </div>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-6">
+            <FAQHistoryTab articleId={article.id} />
+          </TabsContent>
+        </Tabs>
 
         {/* Footer Actions */}
         <div className="flex justify-end gap-2 pt-4 border-t print-hidden">

@@ -398,6 +398,50 @@ export type Database = {
           },
         ]
       }
+      faq_history: {
+        Row: {
+          action_type: string
+          article_id: string
+          created_at: string | null
+          field_name: string | null
+          id: string
+          metadata: Json | null
+          new_value: string | null
+          old_value: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action_type: string
+          article_id: string
+          created_at?: string | null
+          field_name?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action_type?: string
+          article_id?: string
+          created_at?: string | null
+          field_name?: string | null
+          id?: string
+          metadata?: Json | null
+          new_value?: string | null
+          old_value?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "faq_history_article_id_fkey"
+            columns: ["article_id"]
+            isOneToOne: false
+            referencedRelation: "faq_articles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       machines: {
         Row: {
           additional_users: Json | null
