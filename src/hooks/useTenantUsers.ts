@@ -225,29 +225,60 @@ export const useTenantUsers = (tenantId: string | undefined) => {
         }
       }
 
-      // Update roles - delete existing and insert new ones
+      // Update roles - safer approach: insert first, then delete old ones
       if (params.roles && params.roles.length > 0) {
-        // Delete existing roles for this user in this tenant
-        const { error: deleteError } = await supabase
-          .from("user_roles")
-          .delete()
-          .eq("user_id", params.userId)
-          .eq("tenant_id", tenantId);
-
-        if (deleteError) throw deleteError;
-
-        // Insert new roles
+        // Prepare new role inserts
         const roleInserts = params.roles.map(role => ({
           user_id: params.userId,
           role: role as any,
           tenant_id: tenantId,
         }));
 
-        const { error: insertError } = await supabase
+        // First, get existing roles to compare
+        const { data: existingRoles, error: fetchError } = await supabase
           .from("user_roles")
-          .insert(roleInserts);
+          .select("id, role")
+          .eq("user_id", params.userId);
 
-        if (insertError) throw insertError;
+        if (fetchError) throw fetchError;
+
+        const existingRoleNames = existingRoles?.map(r => r.role as string) || [];
+        const newRoleNames = params.roles;
+
+        // Determine roles to add and remove
+        const rolesToAdd = newRoleNames.filter(r => !existingRoleNames.includes(r));
+        const rolesToRemove = existingRoleNames.filter(r => !newRoleNames.includes(r));
+
+        // Insert new roles first (before deleting to never leave user without roles)
+        if (rolesToAdd.length > 0) {
+          const addInserts = rolesToAdd.map(role => ({
+            user_id: params.userId,
+            role: role as any,
+            tenant_id: tenantId,
+          }));
+
+          const { error: insertError } = await supabase
+            .from("user_roles")
+            .insert(addInserts);
+
+          if (insertError) throw insertError;
+        }
+
+        // Remove old roles that are not in the new list
+        if (rolesToRemove.length > 0) {
+          const idsToRemove = existingRoles
+            ?.filter(r => rolesToRemove.includes(r.role))
+            .map(r => r.id) || [];
+
+          if (idsToRemove.length > 0) {
+            const { error: deleteError } = await supabase
+              .from("user_roles")
+              .delete()
+              .in("id", idsToRemove);
+
+            if (deleteError) throw deleteError;
+          }
+        }
       }
     },
     onSuccess: () => {
