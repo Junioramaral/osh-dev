@@ -150,131 +150,147 @@ export function FAQArticleViewDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh]">
-        <DialogHeader>
+      <DialogContent className="max-w-5xl w-full max-h-[95vh] overflow-y-auto">
+        {/* Header - Report Style */}
+        <DialogHeader className="border-b pb-4">
           <div className="flex items-start justify-between gap-4">
-            <DialogTitle className="text-xl font-semibold leading-tight">
+            <DialogTitle className="text-2xl font-bold leading-tight">
               {article.title}
             </DialogTitle>
-            <div className="flex items-center gap-2 text-muted-foreground shrink-0">
+            <div className="flex items-center gap-2 text-muted-foreground shrink-0 bg-muted/50 px-3 py-1.5 rounded-full">
               <Eye className="h-4 w-4" />
-              <span className="text-sm">{(article.view_count || 0) + 1}</span>
+              <span className="text-sm font-medium">{(article.view_count || 0) + 1} visualizações</span>
             </div>
           </div>
-          <div className="flex flex-wrap items-center gap-2 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mt-3">
             {getVisibilityBadge()}
             <Badge variant="outline">{article.segment}</Badge>
             {getStatusBadge()}
           </div>
         </DialogHeader>
 
-        <ScrollArea className="max-h-[60vh] pr-4">
-          <div className="space-y-6">
-            {/* Symptoms */}
-            {article.symptoms && (
-              <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2 text-yellow-600">
-                  <AlertTriangle className="h-4 w-4" />
+        {/* Content - Report Sections */}
+        <div className="space-y-8 py-6">
+          {/* Symptoms Section */}
+          {article.symptoms && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <AlertTriangle className="h-5 w-5 text-yellow-600" />
+                <h3 className="text-lg font-semibold uppercase tracking-wide text-yellow-600">
                   Sintomas
                 </h3>
-                <div className="whitespace-pre-wrap text-foreground pl-6">
-                  {article.symptoms}
-                </div>
               </div>
-            )}
+              <Separator className="bg-yellow-600/20" />
+              <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-4">
+                <p className="whitespace-pre-wrap text-foreground leading-relaxed">
+                  {article.symptoms}
+                </p>
+              </div>
+            </section>
+          )}
 
-            {/* Problem */}
-            {article.problem && (
-              <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2 text-red-600">
-                  <HelpCircle className="h-4 w-4" />
+          {/* Problem Section */}
+          {article.problem && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <HelpCircle className="h-5 w-5 text-red-600" />
+                <h3 className="text-lg font-semibold uppercase tracking-wide text-red-600">
                   Problema
                 </h3>
-                <div className="whitespace-pre-wrap text-foreground pl-6">
-                  {article.problem}
-                </div>
               </div>
-            )}
+              <Separator className="bg-red-600/20" />
+              <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
+                <p className="whitespace-pre-wrap text-foreground leading-relaxed">
+                  {article.problem}
+                </p>
+              </div>
+            </section>
+          )}
 
-            {/* Solution */}
-            {article.solution && (
-              <div className="space-y-2">
-                <h3 className="font-semibold flex items-center gap-2 text-green-600">
-                  <CheckCircle className="h-4 w-4" />
+          {/* Solution Section */}
+          {article.solution && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-5 w-5 text-green-600" />
+                <h3 className="text-lg font-semibold uppercase tracking-wide text-green-600">
                   Solução
                 </h3>
-                <div className="whitespace-pre-wrap text-foreground pl-6">
-                  {article.solution}
-                </div>
               </div>
-            )}
+              <Separator className="bg-green-600/20" />
+              <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-lg p-4">
+                <p className="whitespace-pre-wrap text-foreground leading-relaxed">
+                  {article.solution}
+                </p>
+              </div>
+            </section>
+          )}
 
-            {/* Attachments */}
-            {attachments.length > 0 && (
-              <>
-                <Separator />
-                <div className="space-y-3">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Paperclip className="h-4 w-4" />
-                    Anexos ({attachments.length})
+          {/* Attachments Section */}
+          {attachments.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5 text-blue-600" />
+                <h3 className="text-lg font-semibold uppercase tracking-wide text-blue-600">
+                  Anexos ({attachments.length})
+                </h3>
+              </div>
+              <Separator className="bg-blue-600/20" />
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                {attachments.map((attachment, idx) => (
+                  <div
+                    key={idx}
+                    className="flex items-center gap-3 p-3 rounded-lg border bg-muted/30 hover:bg-muted/50 transition-colors"
+                  >
+                    <div className="shrink-0">
+                      {isImage(attachment.type) ? (
+                        <ImageIcon className="h-8 w-8 text-blue-500" />
+                      ) : (
+                        <FileText className="h-8 w-8 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">
+                        {attachment.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {formatFileSize(attachment.size)}
+                      </p>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDownload(attachment)}
+                    >
+                      <Download className="h-4 w-4" />
+                    </Button>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                    {attachments.map((attachment, idx) => (
-                      <div
-                        key={idx}
-                        className="flex items-center gap-3 p-3 rounded-lg border bg-muted/50"
-                      >
-                        <div className="shrink-0">
-                          {isImage(attachment.type) ? (
-                            <ImageIcon className="h-8 w-8 text-blue-500" />
-                          ) : (
-                            <FileText className="h-8 w-8 text-muted-foreground" />
-                          )}
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
-                            {attachment.name}
-                          </p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatFileSize(attachment.size)}
-                          </p>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownload(attachment)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+                ))}
+              </div>
+            </section>
+          )}
 
-            {/* Keywords */}
-            {keywords.length > 0 && (
-              <>
-                <Separator />
-                <div className="space-y-2">
-                  <div className="flex items-center gap-2 text-sm font-medium">
-                    <Tag className="h-4 w-4" />
-                    Palavras-chave
-                  </div>
-                  <div className="flex flex-wrap gap-2">
-                    {keywords.map((keyword, idx) => (
-                      <Badge key={idx} variant="secondary">
-                        {keyword}
-                      </Badge>
-                    ))}
-                  </div>
-                </div>
-              </>
-            )}
+          {/* Keywords Section */}
+          {keywords.length > 0 && (
+            <section className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Tag className="h-5 w-5 text-purple-600" />
+                <h3 className="text-lg font-semibold uppercase tracking-wide text-purple-600">
+                  Palavras-chave
+                </h3>
+              </div>
+              <Separator className="bg-purple-600/20" />
+              <div className="flex flex-wrap gap-2">
+                {keywords.map((keyword, idx) => (
+                  <Badge key={idx} variant="secondary" className="text-sm px-3 py-1">
+                    {keyword}
+                  </Badge>
+                ))}
+              </div>
+            </section>
+          )}
 
-            {/* Metadata */}
-            <Separator />
+          {/* Metadata Footer */}
+          <div className="pt-4 border-t">
             <div className="flex items-center gap-4 text-sm text-muted-foreground">
               <div className="flex items-center gap-1">
                 <Calendar className="h-4 w-4" />
@@ -284,13 +300,14 @@ export function FAQArticleViewDialog({
                 })}
               </div>
               {article.profiles?.full_name && (
-                <span>por {article.profiles.full_name}</span>
+                <span>por <span className="font-medium">{article.profiles.full_name}</span></span>
               )}
             </div>
           </div>
-        </ScrollArea>
+        </div>
 
-        <div className="flex justify-end gap-2 mt-4">
+        {/* Footer Actions */}
+        <div className="flex justify-end gap-2 pt-4 border-t">
           {canEdit && onEdit && (
             <Button variant="outline" onClick={() => onEdit(article)}>
               Editar

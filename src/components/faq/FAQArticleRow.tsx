@@ -1,12 +1,14 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MoreHorizontal, Pencil, Trash2, Lock, Building2, Globe, Eye } from "lucide-react";
+import { MoreHorizontal, Trash2, Lock, Building2, Globe, Eye } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { TableCell, TableRow } from "@/components/ui/table";
@@ -76,7 +78,7 @@ export default function FAQArticleRow({
   };
 
   return (
-    <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onView(article)}>
+    <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onEdit(article)}>
       {/* Visibility */}
       <TableCell>
         {getVisibilityBadge()}
@@ -155,9 +157,11 @@ export default function FAQArticleRow({
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="bg-background border">
-            <DropdownMenuItem onClick={() => onEdit(article)}>
-              <Pencil className="h-4 w-4 mr-2" />
-              Editar
+            <DropdownMenuLabel>Ações</DropdownMenuLabel>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onClick={() => onView(article)}>
+              <Eye className="h-4 w-4 mr-2" />
+              Visualizar
             </DropdownMenuItem>
             <DropdownMenuItem
               onClick={() => onDelete(article)}
