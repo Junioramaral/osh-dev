@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Database, Package, Plus, Pencil, Trash2, ToggleLeft, ToggleRight } from "lucide-react";
+import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -21,6 +21,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import DatabaseEngineDialog from "@/components/settings/DatabaseEngineDialog";
 import AppProductDialog from "@/components/settings/AppProductDialog";
 
@@ -228,7 +235,14 @@ export default function SystemSettings() {
                     </TableRow>
                   ) : (
                     engines?.map((engine) => (
-                      <TableRow key={engine.id}>
+                      <TableRow 
+                        key={engine.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedEngine(engine);
+                          setEngineDialogOpen(true);
+                        }}
+                      >
                         <TableCell className="font-medium">{engine.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {engine.description || "-"}
@@ -239,37 +253,44 @@ export default function SystemSettings() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleEngineMutation.mutate({ id: engine.id, is_active: !engine.is_active })}
-                              title={engine.is_active ? "Desativar" : "Ativar"}
-                            >
-                              {engine.is_active ? (
-                                <ToggleRight className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <ToggleLeft className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setSelectedEngine(engine);
-                                setEngineDialogOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteEngineId(engine.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleEngineMutation.mutate({ id: engine.id, is_active: !engine.is_active });
+                                }}
+                              >
+                                {engine.is_active ? (
+                                  <>
+                                    <ToggleLeft className="h-4 w-4 mr-2" />
+                                    Desativar
+                                  </>
+                                ) : (
+                                  <>
+                                    <ToggleRight className="h-4 w-4 mr-2" />
+                                    Ativar
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteEngineId(engine.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remover
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
@@ -322,7 +343,14 @@ export default function SystemSettings() {
                     </TableRow>
                   ) : (
                     products?.map((product) => (
-                      <TableRow key={product.id}>
+                      <TableRow 
+                        key={product.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedProduct(product);
+                          setProductDialogOpen(true);
+                        }}
+                      >
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell className="text-muted-foreground">
                           {product.description || "-"}
@@ -333,37 +361,44 @@ export default function SystemSettings() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <div className="flex items-center gap-1">
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => toggleProductMutation.mutate({ id: product.id, is_active: !product.is_active })}
-                              title={product.is_active ? "Desativar" : "Ativar"}
-                            >
-                              {product.is_active ? (
-                                <ToggleRight className="h-4 w-4 text-green-500" />
-                              ) : (
-                                <ToggleLeft className="h-4 w-4 text-muted-foreground" />
-                              )}
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => {
-                                setSelectedProduct(product);
-                                setProductDialogOpen(true);
-                              }}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => setDeleteProductId(product.id)}
-                            >
-                              <Trash2 className="h-4 w-4 text-destructive" />
-                            </Button>
-                          </div>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleProductMutation.mutate({ id: product.id, is_active: !product.is_active });
+                                }}
+                              >
+                                {product.is_active ? (
+                                  <>
+                                    <ToggleLeft className="h-4 w-4 mr-2" />
+                                    Desativar
+                                  </>
+                                ) : (
+                                  <>
+                                    <ToggleRight className="h-4 w-4 mr-2" />
+                                    Ativar
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteProductId(product.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remover
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
