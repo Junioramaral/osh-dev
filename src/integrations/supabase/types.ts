@@ -325,6 +325,7 @@ export type Database = {
           created_by: string | null
           db_categories: string[] | null
           db_engines: Database["public"]["Enums"]["db_engine"][] | null
+          faq_number: string
           id: string
           keywords: string[] | null
           problem: string | null
@@ -347,6 +348,7 @@ export type Database = {
           created_by?: string | null
           db_categories?: string[] | null
           db_engines?: Database["public"]["Enums"]["db_engine"][] | null
+          faq_number: string
           id?: string
           keywords?: string[] | null
           problem?: string | null
@@ -369,6 +371,7 @@ export type Database = {
           created_by?: string | null
           db_categories?: string[] | null
           db_engines?: Database["public"]["Enums"]["db_engine"][] | null
+          faq_number?: string
           id?: string
           keywords?: string[] | null
           problem?: string | null

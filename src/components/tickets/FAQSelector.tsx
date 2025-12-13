@@ -36,7 +36,7 @@ export default function FAQSelector({
       // 3. Private (visibility = 'private' AND client_id = clientId) and published
       const { data, error } = await supabase
         .from("faq_articles")
-        .select("id, title, symptoms, visibility, segment")
+        .select("id, faq_number, title, symptoms, visibility, segment")
         .eq("status", "publicado")
         .or(`visibility.eq.global,and(visibility.eq.client_specific,client_id.eq.${clientId}),and(visibility.eq.private,client_id.eq.${clientId})`);
 
@@ -58,6 +58,7 @@ export default function FAQSelector({
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     return (
+      (faq.faq_number && faq.faq_number.toLowerCase().includes(search)) ||
       faq.title.toLowerCase().includes(search) ||
       faq.symptoms.toLowerCase().includes(search)
     );
@@ -162,6 +163,7 @@ export default function FAQSelector({
                       >
                         {getVisibilityIcon(faq.visibility || 'private')}
                       </Badge>
+                      <span className="font-mono text-xs text-muted-foreground mr-1.5">{faq.faq_number}</span>
                       <span className="text-sm font-medium truncate flex-1">
                         {faq.title}
                       </span>

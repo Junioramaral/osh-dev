@@ -161,9 +161,14 @@ export function FAQArticleViewDialog({
         {/* Header - Report Style */}
         <DialogHeader className="border-b pb-4">
           <div className="flex items-start justify-between gap-4">
-            <DialogTitle className="text-2xl font-bold leading-tight">
-              {article.title}
-            </DialogTitle>
+            <div className="space-y-1">
+              <Badge variant="outline" className="font-mono text-sm">
+                {article.faq_number}
+              </Badge>
+              <DialogTitle className="text-2xl font-bold leading-tight">
+                {article.title}
+              </DialogTitle>
+            </div>
             <div className="flex items-center gap-2 text-muted-foreground shrink-0 bg-muted/50 px-3 py-1.5 rounded-full">
               <Eye className="h-4 w-4" />
               <span className="text-sm font-medium">{(article.view_count || 0) + 1} visualizações</span>
