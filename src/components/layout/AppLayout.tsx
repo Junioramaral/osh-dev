@@ -18,6 +18,7 @@ import {
   Menu,
   BarChart3,
   Shield,
+  Settings,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -139,6 +140,17 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             {isSuperAdmin ? 'Super Admin' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
           </p>
         </div>
+        {isSuperAdmin && (
+          <NavLink
+            to="/system-settings"
+            className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-sidebar-accent mb-2"
+            activeClassName="bg-sidebar-accent text-sidebar-accent-foreground"
+            onClick={() => setOpen(false)}
+          >
+            <Settings className="w-4 h-4" />
+            Configurações
+          </NavLink>
+        )}
         <Button
           onClick={signOut}
           variant="ghost"

@@ -127,7 +127,7 @@ const ApplicationProductIcon = ({ productName }: { productName: string }) => {
   }
 };
 
-const DB_ENGINES = ["PostgreSQL", "MySQL", "SQL Server", "Oracle", "MongoDB"];
+
 
 interface Attachment {
   name: string;
@@ -217,7 +217,21 @@ export default function FAQArticleDialog({
       const { data, error } = await supabase
         .from("application_products")
         .select("id, name")
-        .order("name");
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const { data: dbEngines } = useQuery({
+    queryKey: ["database_engines"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("database_engines")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order");
       if (error) throw error;
       return data;
     },
@@ -583,24 +597,24 @@ export default function FAQArticleDialog({
                     render={({ field }) => (
                       <FormItem>
                         <div className="space-y-2 max-h-[140px] overflow-y-auto border rounded-md p-2">
-                          {DB_ENGINES.map((engine) => (
-                            <div key={engine} className="flex items-center space-x-2">
+                          {dbEngines?.map((engine) => (
+                            <div key={engine.id} className="flex items-center space-x-2">
                               <Checkbox
-                                id={`engine-${engine}`}
-                                checked={field.value.includes(engine)}
+                                id={`engine-${engine.name}`}
+                                checked={field.value.includes(engine.name)}
                                 onCheckedChange={(checked) => {
                                   const newValue = checked
-                                    ? [...field.value, engine]
-                                    : field.value.filter((e) => e !== engine);
+                                    ? [...field.value, engine.name]
+                                    : field.value.filter((e) => e !== engine.name);
                                   field.onChange(newValue);
                                 }}
                               />
                               <label
-                                htmlFor={`engine-${engine}`}
+                                htmlFor={`engine-${engine.name}`}
                                 className="flex items-center gap-2 text-sm cursor-pointer"
                               >
-                                <DatabaseEngineIcon engine={engine} />
-                                {engine}
+                                <DatabaseEngineIcon engine={engine.name} />
+                                {engine.name}
                               </label>
                             </div>
                           ))}
