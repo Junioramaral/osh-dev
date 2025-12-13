@@ -782,6 +782,7 @@ export type Database = {
           description: string | null
           error_displayed: string | null
           evidences: Json | null
+          faq_article_id: string | null
           first_response_at: string | null
           frequency: Database["public"]["Enums"]["frequency_type"]
           id: string
@@ -837,6 +838,7 @@ export type Database = {
           description?: string | null
           error_displayed?: string | null
           evidences?: Json | null
+          faq_article_id?: string | null
           first_response_at?: string | null
           frequency: Database["public"]["Enums"]["frequency_type"]
           id?: string
@@ -892,6 +894,7 @@ export type Database = {
           description?: string | null
           error_displayed?: string | null
           evidences?: Json | null
+          faq_article_id?: string | null
           first_response_at?: string | null
           frequency?: Database["public"]["Enums"]["frequency_type"]
           id?: string
@@ -968,6 +971,13 @@ export type Database = {
             columns: ["db_machine_id"]
             isOneToOne: false
             referencedRelation: "machines"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_faq_article_id_fkey"
+            columns: ["faq_article_id"]
+            isOneToOne: false
+            referencedRelation: "faq_articles"
             referencedColumns: ["id"]
           },
           {
