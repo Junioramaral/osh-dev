@@ -15,7 +15,8 @@ import {
   Calendar,
   AlertTriangle,
   HelpCircle,
-  CheckCircle
+  CheckCircle,
+  Printer
 } from "lucide-react";
 import {
   Dialog,
@@ -147,6 +148,10 @@ export function FAQArticleViewDialog({
   };
 
   const isImage = (type: string) => type.startsWith("image/");
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -307,7 +312,11 @@ export function FAQArticleViewDialog({
         </div>
 
         {/* Footer Actions */}
-        <div className="flex justify-end gap-2 pt-4 border-t">
+        <div className="flex justify-end gap-2 pt-4 border-t print-hidden">
+          <Button variant="outline" onClick={handlePrint} className="gap-2">
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </Button>
           {canEdit && onEdit && (
             <Button variant="outline" onClick={() => onEdit(article)}>
               Editar
