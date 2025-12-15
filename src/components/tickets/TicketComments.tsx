@@ -82,22 +82,32 @@ function CommentCard({ comment }: CommentCardProps) {
 
 interface TicketCommentsProps {
   ticketId: string;
+  ticket?: {
+    analyst_id?: string | null;
+    ticket_number?: string;
+    title?: string;
+    contact_name?: string;
+    contact_email?: string;
+  };
 }
 
-export default function TicketComments({ ticketId }: TicketCommentsProps) {
-  const { user, profile } = useAuth();
+export default function TicketComments({ ticketId, ticket }: TicketCommentsProps) {
+  const { user, profile, isOtimizzoUser, isSuperAdmin, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const { data: comments, isLoading } = useTicketComments(ticketId);
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
+  // Check if current user is a client (not Otimizzo/super_admin/analyst)
+  const isClientUser = !isOtimizzoUser && !isSuperAdmin && !hasRole('analyst_db') && !hasRole('analyst_app');
+
   const addCommentMutation = useMutation({
     mutationFn: async ({ content, is_internal }: { content: string; is_internal: boolean }) => {
       // Fetch ticket details first
-      const { data: ticket, error: ticketError } = await supabase
+      const { data: ticketData, error: ticketError } = await supabase
         .from('tickets')
-        .select('contact_email, contact_name, ticket_number, title, first_response_at')
+        .select('contact_email, contact_name, ticket_number, title, first_response_at, analyst_id')
         .eq('id', ticketId)
         .single();
       
@@ -119,15 +129,38 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
       if (commentError) throw commentError;
       
       // Check and mark first response
-      if (!ticket?.first_response_at) {
+      if (!ticketData?.first_response_at) {
         await supabase
           .from('tickets')
           .update({ first_response_at: new Date().toISOString() })
           .eq('id', ticketId);
       }
       
-      // Send email notification if comment is external
-      if (!is_internal) {
+      // If client is commenting, notify the analyst
+      if (isClientUser && ticketData?.analyst_id) {
+        try {
+          console.log('Client commented, notifying analyst...');
+          const { error: notifyError } = await supabase.functions.invoke('send-analyst-notification', {
+            body: {
+              ticketId,
+              ticketNumber: ticketData.ticket_number,
+              ticketTitle: ticketData.title,
+              commentContent: content,
+              clientName: ticketData.contact_name,
+              clientEmail: ticketData.contact_email,
+            }
+          });
+          
+          if (notifyError) {
+            console.error('Error notifying analyst:', notifyError);
+          }
+        } catch (error) {
+          console.error('Error calling analyst notification function:', error);
+        }
+      }
+      
+      // Send email notification to client if comment is external and from staff
+      if (!is_internal && !isClientUser) {
         try {
           const { error: emailError } = await supabase.functions.invoke('send-comment-notification', {
             body: {
@@ -135,10 +168,10 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
               commentId: commentData.id,
               commentContent: content,
               authorName: commentData.profiles?.full_name || 'Equipe de Suporte',
-              contactEmail: ticket.contact_email,
-              contactName: ticket.contact_name,
-              ticketNumber: ticket.ticket_number,
-              ticketTitle: ticket.title,
+              contactEmail: ticketData.contact_email,
+              contactName: ticketData.contact_name,
+              ticketNumber: ticketData.ticket_number,
+              ticketTitle: ticketData.title,
             }
           });
           
@@ -152,7 +185,7 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
         }
       }
       
-      return { commentData, isExternal: !is_internal };
+      return { commentData, isExternal: !is_internal, isClientComment: isClientUser };
     },
     onSuccess: (data) => {
       setNewComment('');
@@ -161,7 +194,12 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       
-      if (data.isExternal) {
+      if (data.isClientComment) {
+        toast({ 
+          title: 'Comentário enviado',
+          description: 'O analista responsável será notificado'
+        });
+      } else if (data.isExternal) {
         toast({ 
           title: 'Comentário enviado e cliente notificado por email',
           description: 'O cliente receberá uma notificação sobre esta atualização'
