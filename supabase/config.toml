@@ -17,3 +17,6 @@ verify_jwt = false
 
 [functions.receive-email-reply]
 verify_jwt = false
+
+[functions.send-analyst-notification]
+verify_jwt = false

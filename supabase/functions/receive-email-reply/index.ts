@@ -150,7 +150,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Buscar ticket
     const { data: ticket, error: ticketError } = await supabase
       .from("tickets")
-      .select("id, contact_email, contact_name, status")
+      .select("id, contact_email, contact_name, status, analyst_id, ticket_number, title")
       .eq("ticket_number", ticketNumber)
       .single();
 
@@ -253,6 +253,40 @@ const handler = async (req: Request): Promise<Response> => {
         .from("tickets")
         .update({ status: "em_atendimento" })
         .eq("id", ticket.id);
+    }
+
+    // Notificar analista responsável
+    if (ticket.analyst_id) {
+      try {
+        console.log("Notifying analyst about client email reply...");
+        const notifyResponse = await fetch(
+          `${SUPABASE_URL}/functions/v1/send-analyst-notification`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": `Bearer ${SUPABASE_SERVICE_ROLE_KEY}`,
+            },
+            body: JSON.stringify({
+              ticketId: ticket.id,
+              ticketNumber: ticket.ticket_number,
+              ticketTitle: ticket.title,
+              commentContent: cleanContent,
+              clientName: from.name || ticket.contact_name,
+              clientEmail: from.email,
+            }),
+          }
+        );
+        
+        if (!notifyResponse.ok) {
+          console.error("Failed to notify analyst:", await notifyResponse.text());
+        } else {
+          console.log("Analyst notified successfully");
+        }
+      } catch (notifyError) {
+        console.error("Error notifying analyst:", notifyError);
+        // Don't fail the request - the comment was saved
+      }
     }
 
     console.log("Email reply processed successfully for ticket:", ticketNumber);
