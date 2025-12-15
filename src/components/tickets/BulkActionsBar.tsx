@@ -13,7 +13,8 @@ import {
   ListChecks, 
   AlertCircle, 
   X,
-  Lock
+  Lock,
+  ListOrdered
 } from "lucide-react";
 
 interface BulkActionsBarProps {
@@ -21,6 +22,7 @@ interface BulkActionsBarProps {
   onClearSelection: () => void;
   onAssignAnalyst: () => void;
   onAssignTeam: () => void;
+  onAssignQueue: () => void;
   onChangeStatus: (status: string) => void;
   onChangePriority: (priority: string) => void;
   onLockTickets: () => void;
@@ -32,6 +34,7 @@ export function BulkActionsBar({
   onClearSelection,
   onAssignAnalyst,
   onAssignTeam,
+  onAssignQueue,
   onChangeStatus,
   onChangePriority,
   onLockTickets,
@@ -75,6 +78,15 @@ export function BulkActionsBar({
               >
                 <Users className="h-4 w-4 mr-2" />
                 Atribuir Time
+              </Button>
+
+              <Button
+                variant="secondary"
+                size="sm"
+                onClick={onAssignQueue}
+              >
+                <ListOrdered className="h-4 w-4 mr-2" />
+                Atribuir Fila
               </Button>
             </>
           )}

@@ -199,9 +199,36 @@ export function useBulkTicketActions() {
     },
   });
 
+  const bulkAssignQueue = useMutation({
+    mutationFn: async ({
+      ticketIds,
+      queueId,
+    }: {
+      ticketIds: string[];
+      queueId: string | null;
+    }) => {
+      const { error } = await supabase
+        .from("tickets")
+        .update({ queue_id: queueId })
+        .in("id", ticketIds);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${variables.ticketIds.length} ticket(s) com fila atualizada!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atribuir fila: " + error.message);
+    },
+  });
+
   return {
     bulkAssignAnalyst,
     bulkAssignTeam,
+    bulkAssignQueue,
     bulkChangeStatus,
     bulkChangeStatusWithReason,
     bulkChangePriority,
