@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal } from "lucide-react";
+import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -30,6 +30,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import DatabaseEngineDialog from "@/components/settings/DatabaseEngineDialog";
 import AppProductDialog from "@/components/settings/AppProductDialog";
+import QueueDialog, { Queue } from "@/components/settings/QueueDialog";
 
 interface DatabaseEngine {
   id: string;
@@ -55,10 +56,13 @@ export default function SystemSettings() {
 
   const [engineDialogOpen, setEngineDialogOpen] = useState(false);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
+  const [queueDialogOpen, setQueueDialogOpen] = useState(false);
   const [selectedEngine, setSelectedEngine] = useState<DatabaseEngine | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<AppProduct | null>(null);
+  const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
   const [deleteEngineId, setDeleteEngineId] = useState<string | null>(null);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
+  const [deleteQueueId, setDeleteQueueId] = useState<string | null>(null);
 
   // Fetch database engines
   const { data: engines, isLoading: enginesLoading } = useQuery({
@@ -83,6 +87,19 @@ export default function SystemSettings() {
         .order("sort_order");
       if (error) throw error;
       return data as AppProduct[];
+    },
+  });
+
+  // Fetch queues
+  const { data: queues, isLoading: queuesLoading } = useQuery({
+    queryKey: ["queues"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("queues")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return data as Queue[];
     },
   });
 
@@ -160,6 +177,43 @@ export default function SystemSettings() {
     },
   });
 
+  // Toggle queue active status
+  const toggleQueueMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("queues")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queues"] });
+      toast.success("Status atualizado");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar: " + error.message);
+    },
+  });
+
+  // Delete queue
+  const deleteQueueMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("queues")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["queues"] });
+      toast.success("Fila removida");
+      setDeleteQueueId(null);
+    },
+    onError: (error) => {
+      toast.error("Erro ao remover: " + error.message);
+    },
+  });
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -177,11 +231,11 @@ export default function SystemSettings() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Configurações do Sistema</h1>
-          <p className="text-muted-foreground">Gerencie engines de banco e produtos de aplicação</p>
+          <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação e filas de atendimento</p>
         </div>
 
         <Tabs defaultValue="engines" className="w-full">
-          <TabsList className="grid w-full max-w-md grid-cols-2">
+          <TabsList className="grid w-full max-w-2xl grid-cols-3">
             <TabsTrigger value="engines" className="gap-2">
               <Database className="h-4 w-4" />
               Engines de Banco
@@ -189,6 +243,10 @@ export default function SystemSettings() {
             <TabsTrigger value="products" className="gap-2">
               <Package className="h-4 w-4" />
               Produtos de Aplicação
+            </TabsTrigger>
+            <TabsTrigger value="queues" className="gap-2">
+              <ListOrdered className="h-4 w-4" />
+              Filas
             </TabsTrigger>
           </TabsList>
 
@@ -407,6 +465,114 @@ export default function SystemSettings() {
               </Table>
             </div>
           </TabsContent>
+
+          {/* Queues Tab */}
+          <TabsContent value="queues" className="mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Filas de Atendimento</h2>
+              <Button
+                onClick={() => {
+                  setSelectedQueue(null);
+                  setQueueDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Fila
+              </Button>
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Descrição</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[120px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {queuesLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : queues?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        Nenhuma fila cadastrada
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    queues?.map((queue) => (
+                      <TableRow 
+                        key={queue.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedQueue(queue);
+                          setQueueDialogOpen(true);
+                        }}
+                      >
+                        <TableCell className="font-medium">{queue.name}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {queue.description || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={queue.is_active ? "default" : "secondary"}>
+                            {queue.is_active ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleQueueMutation.mutate({ id: queue.id, is_active: !queue.is_active });
+                                }}
+                              >
+                                {queue.is_active ? (
+                                  <>
+                                    <ToggleLeft className="h-4 w-4 mr-2" />
+                                    Desativar
+                                  </>
+                                ) : (
+                                  <>
+                                    <ToggleRight className="h-4 w-4 mr-2" />
+                                    Ativar
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteQueueId(queue.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remover
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -422,6 +588,13 @@ export default function SystemSettings() {
         open={productDialogOpen}
         onOpenChange={setProductDialogOpen}
         product={selectedProduct}
+      />
+
+      {/* Queue Dialog */}
+      <QueueDialog
+        open={queueDialogOpen}
+        onOpenChange={setQueueDialogOpen}
+        queue={selectedQueue}
       />
 
       {/* Delete Engine Confirmation */}
@@ -458,6 +631,27 @@ export default function SystemSettings() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteProductId && deleteProductMutation.mutate(deleteProductId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Queue Confirmation */}
+      <AlertDialog open={!!deleteQueueId} onOpenChange={() => setDeleteQueueId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Fila</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover esta fila? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteQueueId && deleteQueueMutation.mutate(deleteQueueId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remover
