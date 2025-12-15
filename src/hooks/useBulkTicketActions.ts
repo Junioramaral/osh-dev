@@ -90,6 +90,59 @@ export function useBulkTicketActions() {
     },
   });
 
+  const bulkChangeStatusWithReason = useMutation({
+    mutationFn: async ({
+      ticketIds,
+      status,
+      reason,
+      userId,
+    }: {
+      ticketIds: string[];
+      status: string;
+      reason: string;
+      userId: string;
+    }) => {
+      const updates: any = { status };
+      
+      if (status === "resolvido") {
+        updates.resolved_at = new Date().toISOString();
+      }
+
+      // Update ticket status
+      const { error: updateError } = await supabase
+        .from("tickets")
+        .update(updates)
+        .in("id", ticketIds);
+
+      if (updateError) throw updateError;
+
+      // Insert comments for each ticket with the reason
+      const statusLabel = status === "resolvido" ? "Resolvido" : "Fechado";
+      const comments = ticketIds.map((ticketId) => ({
+        ticket_id: ticketId,
+        author_id: userId,
+        content: `Motivo da alteração para ${statusLabel}: ${reason}`,
+        is_internal: false,
+      }));
+
+      const { error: commentError } = await supabase
+        .from("ticket_comments")
+        .insert(comments);
+
+      if (commentError) throw commentError;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${variables.ticketIds.length} ticket(s) com status alterado!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-comments"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao alterar status: " + error.message);
+    },
+  });
+
   const bulkChangePriority = useMutation({
     mutationFn: async ({
       ticketIds,
@@ -150,6 +203,7 @@ export function useBulkTicketActions() {
     bulkAssignAnalyst,
     bulkAssignTeam,
     bulkChangeStatus,
+    bulkChangeStatusWithReason,
     bulkChangePriority,
     bulkLockTickets,
   };
