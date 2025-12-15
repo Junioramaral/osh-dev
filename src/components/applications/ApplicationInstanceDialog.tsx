@@ -365,8 +365,8 @@ export default function ApplicationInstanceDialog({
                   <FormItem>
                     <FormLabel>Máquina (opcional)</FormLabel>
                     <Select
-                      onValueChange={field.onChange}
-                      value={field.value || ""}
+                      onValueChange={(value) => field.onChange(value === "_none" ? null : value)}
+                      value={field.value || "_none"}
                     >
                       <FormControl>
                         <SelectTrigger>
@@ -374,7 +374,7 @@ export default function ApplicationInstanceDialog({
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Nenhuma</SelectItem>
+                        <SelectItem value="_none">Nenhuma</SelectItem>
                         {machines.map((machine) => (
                           <SelectItem key={machine.id} value={machine.id}>
                             {machine.hostname}
