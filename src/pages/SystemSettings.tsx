@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Tag, Settings2 } from "lucide-react";
+import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Tag, Settings2, Layers } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -33,6 +33,7 @@ import AppProductDialog from "@/components/settings/AppProductDialog";
 import QueueDialog, { Queue } from "@/components/settings/QueueDialog";
 import TeamQueuesDialog from "@/components/settings/TeamQueuesDialog";
 import CategoryDialog, { TicketCategory } from "@/components/settings/CategoryDialog";
+import SubcategoryDialog from "@/components/settings/SubcategoryDialog";
 
 interface Team {
   id: string;
@@ -77,6 +78,8 @@ export default function SystemSettings() {
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamQueuesDialogOpen, setTeamQueuesDialogOpen] = useState(false);
+  const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
+  const [selectedCategoryForSubcategories, setSelectedCategoryForSubcategories] = useState<{ id: string; name: string } | null>(null);
 
   // Fetch database engines
   const { data: engines, isLoading: enginesLoading } = useQuery({
@@ -117,16 +120,30 @@ export default function SystemSettings() {
     },
   });
 
-  // Fetch ticket categories
+  // Fetch ticket categories with subcategory counts
   const { data: categories, isLoading: categoriesLoading } = useQuery({
-    queryKey: ["ticket_categories"],
+    queryKey: ["ticket_categories_with_counts"],
     queryFn: async () => {
-      const { data, error } = await supabase
+      const { data: categoriesData, error } = await supabase
         .from("ticket_categories")
         .select("*")
         .order("sort_order");
       if (error) throw error;
-      return data as TicketCategory[];
+
+      // Get subcategory counts for each category
+      const categoriesWithCounts = await Promise.all(
+        (categoriesData as TicketCategory[]).map(async (category) => {
+          const { count, error: countError } = await supabase
+            .from("ticket_subcategories")
+            .select("*", { count: "exact", head: true })
+            .eq("category_id", category.id);
+          return {
+            ...category,
+            subcategoryCount: count || 0,
+          };
+        })
+      );
+      return categoriesWithCounts as (TicketCategory & { subcategoryCount: number })[];
     },
   });
 
@@ -694,6 +711,7 @@ export default function SystemSettings() {
                   <TableRow>
                     <TableHead>Nome</TableHead>
                     <TableHead>Segmento</TableHead>
+                    <TableHead className="w-[130px]">Subcategorias</TableHead>
                     <TableHead className="w-[100px]">Status</TableHead>
                     <TableHead className="w-[120px]">Ações</TableHead>
                   </TableRow>
@@ -705,12 +723,13 @@ export default function SystemSettings() {
                         <TableCell><Skeleton className="h-4 w-32" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                         <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
                         <TableCell><Skeleton className="h-8 w-20" /></TableCell>
                       </TableRow>
                     ))
                   ) : categories?.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                         Nenhuma categoria cadastrada
                       </TableCell>
                     </TableRow>
@@ -741,6 +760,11 @@ export default function SystemSettings() {
                           )}
                         </TableCell>
                         <TableCell>
+                          <Badge variant="outline">
+                            {category.subcategoryCount} {category.subcategoryCount === 1 ? "subcategoria" : "subcategorias"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
                           <Badge variant={category.is_active ? "default" : "secondary"}>
                             {category.is_active ? "Ativo" : "Inativo"}
                           </Badge>
@@ -753,6 +777,17 @@ export default function SystemSettings() {
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedCategoryForSubcategories({ id: category.id, name: category.name });
+                                  setSubcategoryDialogOpen(true);
+                                }}
+                              >
+                                <Layers className="h-4 w-4 mr-2" />
+                                Subcategorias
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
                               <DropdownMenuItem
                                 onClick={(e) => {
                                   e.stopPropagation();
@@ -906,6 +941,19 @@ export default function SystemSettings() {
         open={categoryDialogOpen}
         onOpenChange={setCategoryDialogOpen}
         category={selectedCategory}
+      />
+
+      {/* Subcategory Dialog */}
+      <SubcategoryDialog
+        open={subcategoryDialogOpen}
+        onOpenChange={(open) => {
+          setSubcategoryDialogOpen(open);
+          if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
+          }
+        }}
+        categoryId={selectedCategoryForSubcategories?.id || null}
+        categoryName={selectedCategoryForSubcategories?.name || null}
       />
 
       {/* Team Queues Dialog */}

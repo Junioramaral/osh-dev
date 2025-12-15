@@ -275,6 +275,27 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!segment,
   });
 
+  // Get selected category id
+  const selectedCategoryName = watch("category");
+  const selectedCategoryId = categories?.find(c => c.name === selectedCategoryName)?.id;
+
+  // Fetch subcategories filtered by selected category
+  const { data: subcategories } = useQuery({
+    queryKey: ["ticket-subcategories", selectedCategoryId],
+    queryFn: async () => {
+      if (!selectedCategoryId) return [];
+      const { data, error } = await supabase
+        .from("ticket_subcategories")
+        .select("id, name")
+        .eq("category_id", selectedCategoryId)
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedCategoryId,
+  });
+
   // Mapeamento de engine para nome de fila
   const engineToQueueName: Record<string, string> = {
     'Oracle': 'Oracle',
@@ -489,6 +510,12 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     setSegment(value);
     setValue("segment", value);
     setValue("category", ""); // Clear category when segment changes
+    setValue("subcategory", ""); // Clear subcategory when segment changes
+  };
+
+  const handleCategoryChange = (value: string) => {
+    setValue("category", value);
+    setValue("subcategory", ""); // Clear subcategory when category changes
   };
 
   return (
@@ -636,7 +663,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
             <div className="space-y-2">
               <Label htmlFor="category">Categoria *</Label>
-              <Select value={watch("category")} onValueChange={(value) => setValue("category", value)}>
+              <Select value={watch("category")} onValueChange={handleCategoryChange}>
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione a categoria" />
                 </SelectTrigger>
@@ -651,6 +678,25 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
             </div>
           </div>
+
+          {/* Subcategory - only show if category is selected and has subcategories */}
+          {selectedCategoryId && subcategories && subcategories.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">Subcategoria</Label>
+              <Select value={watch("subcategory") || ""} onValueChange={(value) => setValue("subcategory", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a subcategoria (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.name}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
 
           {/* DB Specific Fields */}
           {segment === "DB" && (
