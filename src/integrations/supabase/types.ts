@@ -715,6 +715,33 @@ export type Database = {
           },
         ]
       }
+      ticket_categories: {
+        Row: {
+          created_at: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          segment: Database["public"]["Enums"]["ticket_segment"] | null
+          sort_order: number | null
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name: string
+          segment?: Database["public"]["Enums"]["ticket_segment"] | null
+          sort_order?: number | null
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          segment?: Database["public"]["Enums"]["ticket_segment"] | null
+          sort_order?: number | null
+        }
+        Relationships: []
+      }
       ticket_comments: {
         Row: {
           attachments: Json | null

@@ -258,6 +258,23 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
+  // Fetch ticket categories filtered by segment
+  const { data: categories } = useQuery({
+    queryKey: ["ticket-categories", segment],
+    queryFn: async () => {
+      if (!segment) return [];
+      const { data, error } = await supabase
+        .from("ticket_categories")
+        .select("id, name, segment")
+        .eq("is_active", true)
+        .or(`segment.is.null,segment.eq.${segment}`)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!segment,
+  });
+
   // Mapeamento de engine para nome de fila
   const engineToQueueName: Record<string, string> = {
     'Oracle': 'Oracle',
@@ -471,6 +488,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const handleSegmentChange = (value: "DB" | "APP") => {
     setSegment(value);
     setValue("segment", value);
+    setValue("category", ""); // Clear category when segment changes
   };
 
   return (
@@ -618,7 +636,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
             <div className="space-y-2">
               <Label htmlFor="category">Categoria *</Label>
-              <Input {...register("category")} placeholder="Ex: Erro SQL" />
+              <Select value={watch("category")} onValueChange={(value) => setValue("category", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a categoria" />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories?.map((cat) => (
+                    <SelectItem key={cat.id} value={cat.name}>
+                      {cat.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
               {errors.category && <p className="text-sm text-destructive">{errors.category.message}</p>}
             </div>
           </div>

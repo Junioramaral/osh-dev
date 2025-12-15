@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Settings2 } from "lucide-react";
+import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Tag, Settings2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -32,6 +32,7 @@ import DatabaseEngineDialog from "@/components/settings/DatabaseEngineDialog";
 import AppProductDialog from "@/components/settings/AppProductDialog";
 import QueueDialog, { Queue } from "@/components/settings/QueueDialog";
 import TeamQueuesDialog from "@/components/settings/TeamQueuesDialog";
+import CategoryDialog, { TicketCategory } from "@/components/settings/CategoryDialog";
 
 interface Team {
   id: string;
@@ -65,12 +66,15 @@ export default function SystemSettings() {
   const [engineDialogOpen, setEngineDialogOpen] = useState(false);
   const [productDialogOpen, setProductDialogOpen] = useState(false);
   const [queueDialogOpen, setQueueDialogOpen] = useState(false);
+  const [categoryDialogOpen, setCategoryDialogOpen] = useState(false);
   const [selectedEngine, setSelectedEngine] = useState<DatabaseEngine | null>(null);
   const [selectedProduct, setSelectedProduct] = useState<AppProduct | null>(null);
   const [selectedQueue, setSelectedQueue] = useState<Queue | null>(null);
+  const [selectedCategory, setSelectedCategory] = useState<TicketCategory | null>(null);
   const [deleteEngineId, setDeleteEngineId] = useState<string | null>(null);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [deleteQueueId, setDeleteQueueId] = useState<string | null>(null);
+  const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
   const [teamQueuesDialogOpen, setTeamQueuesDialogOpen] = useState(false);
 
@@ -110,6 +114,19 @@ export default function SystemSettings() {
         .order("sort_order");
       if (error) throw error;
       return data as Queue[];
+    },
+  });
+
+  // Fetch ticket categories
+  const { data: categories, isLoading: categoriesLoading } = useQuery({
+    queryKey: ["ticket_categories"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("ticket_categories")
+        .select("*")
+        .order("sort_order");
+      if (error) throw error;
+      return data as TicketCategory[];
     },
   });
 
@@ -251,6 +268,43 @@ export default function SystemSettings() {
     },
   });
 
+  // Toggle category active status
+  const toggleCategoryMutation = useMutation({
+    mutationFn: async ({ id, is_active }: { id: string; is_active: boolean }) => {
+      const { error } = await supabase
+        .from("ticket_categories")
+        .update({ is_active })
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
+      toast.success("Status atualizado");
+    },
+    onError: (error) => {
+      toast.error("Erro ao atualizar: " + error.message);
+    },
+  });
+
+  // Delete category
+  const deleteCategoryMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("ticket_categories")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
+      toast.success("Categoria removida");
+      setDeleteCategoryId(null);
+    },
+    onError: (error) => {
+      toast.error("Erro ao remover: " + error.message);
+    },
+  });
+
   if (loading) {
     return (
       <div className="flex h-screen items-center justify-center bg-background">
@@ -268,11 +322,11 @@ export default function SystemSettings() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Configurações do Sistema</h1>
-          <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação, filas de atendimento e times</p>
+          <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação, filas, categorias e times</p>
         </div>
 
         <Tabs defaultValue="engines" className="w-full">
-          <TabsList className="grid w-full max-w-3xl grid-cols-4">
+          <TabsList className="grid w-full max-w-4xl grid-cols-5">
             <TabsTrigger value="engines" className="gap-2">
               <Database className="h-4 w-4" />
               Engines
@@ -284,6 +338,10 @@ export default function SystemSettings() {
             <TabsTrigger value="queues" className="gap-2">
               <ListOrdered className="h-4 w-4" />
               Filas
+            </TabsTrigger>
+            <TabsTrigger value="categories" className="gap-2">
+              <Tag className="h-4 w-4" />
+              Categorias
             </TabsTrigger>
             <TabsTrigger value="teams" className="gap-2">
               <Users className="h-4 w-4" />
@@ -615,6 +673,126 @@ export default function SystemSettings() {
             </div>
           </TabsContent>
 
+          {/* Categories Tab */}
+          <TabsContent value="categories" className="mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-lg font-semibold">Categorias de Ticket</h2>
+              <Button
+                onClick={() => {
+                  setSelectedCategory(null);
+                  setCategoryDialogOpen(true);
+                }}
+              >
+                <Plus className="h-4 w-4 mr-2" />
+                Nova Categoria
+              </Button>
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Segmento</TableHead>
+                    <TableHead className="w-[100px]">Status</TableHead>
+                    <TableHead className="w-[120px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {categoriesLoading ? (
+                    Array.from({ length: 5 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : categories?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                        Nenhuma categoria cadastrada
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    categories?.map((category) => (
+                      <TableRow 
+                        key={category.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedCategory(category);
+                          setCategoryDialogOpen(true);
+                        }}
+                      >
+                        <TableCell className="font-medium">{category.name}</TableCell>
+                        <TableCell>
+                          {category.segment === null ? (
+                            <Badge variant="outline">Ambos</Badge>
+                          ) : category.segment === "DB" ? (
+                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                              <Database className="h-3 w-3 mr-1" />
+                              DB
+                            </Badge>
+                          ) : (
+                            <Badge variant="secondary" className="bg-green-100 text-green-800">
+                              <Package className="h-3 w-3 mr-1" />
+                              APP
+                            </Badge>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant={category.is_active ? "default" : "secondary"}>
+                            {category.is_active ? "Ativo" : "Inativo"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  toggleCategoryMutation.mutate({ id: category.id, is_active: !category.is_active });
+                                }}
+                              >
+                                {category.is_active ? (
+                                  <>
+                                    <ToggleLeft className="h-4 w-4 mr-2" />
+                                    Desativar
+                                  </>
+                                ) : (
+                                  <>
+                                    <ToggleRight className="h-4 w-4 mr-2" />
+                                    Ativar
+                                  </>
+                                )}
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                className="text-destructive focus:text-destructive"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setDeleteCategoryId(category.id);
+                                }}
+                              >
+                                <Trash2 className="h-4 w-4 mr-2" />
+                                Remover
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
+
           {/* Teams Tab */}
           <TabsContent value="teams" className="mt-6">
             <div className="flex justify-between items-center mb-4">
@@ -723,6 +901,13 @@ export default function SystemSettings() {
         queue={selectedQueue}
       />
 
+      {/* Category Dialog */}
+      <CategoryDialog
+        open={categoryDialogOpen}
+        onOpenChange={setCategoryDialogOpen}
+        category={selectedCategory}
+      />
+
       {/* Team Queues Dialog */}
       <TeamQueuesDialog
         open={teamQueuesDialogOpen}
@@ -790,6 +975,27 @@ export default function SystemSettings() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteQueueId && deleteQueueMutation.mutate(deleteQueueId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Category Confirmation */}
+      <AlertDialog open={!!deleteCategoryId} onOpenChange={() => setDeleteCategoryId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Categoria</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover esta categoria? Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteCategoryId && deleteCategoryMutation.mutate(deleteCategoryId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remover
