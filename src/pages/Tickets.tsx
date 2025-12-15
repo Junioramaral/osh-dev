@@ -17,6 +17,7 @@ import { calculateSLAStatus } from "@/lib/ticketUtils";
 import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
 import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystDialog";
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
+import { BulkStatusReasonDialog } from "@/components/tickets/BulkStatusReasonDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 import { cn } from "@/lib/utils";
 
@@ -32,14 +33,19 @@ export default function Tickets() {
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
   const [showAssignTeamDialog, setShowAssignTeamDialog] = useState(false);
+  const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string>("");
 
   const {
     bulkAssignAnalyst,
     bulkAssignTeam,
     bulkChangeStatus,
+    bulkChangeStatusWithReason,
     bulkChangePriority,
     bulkLockTickets,
   } = useBulkTicketActions();
+
+  const isClient = !isOtimizzoUser && !isSuperAdmin;
 
   const toggleTicketSelection = (ticketId: string) => {
     setSelectedTickets(prev => {
@@ -78,11 +84,32 @@ export default function Tickets() {
   };
 
   const handleBulkChangeStatus = (status: string) => {
+    // Se for cliente e status for resolvido/fechado, abrir dialog de motivo
+    if (isClient && (status === "resolvido" || status === "fechado")) {
+      setPendingStatus(status);
+      setShowStatusReasonDialog(true);
+      return;
+    }
+    
     bulkChangeStatus.mutate({
       ticketIds: Array.from(selectedTickets),
       status,
     });
     setSelectedTickets(new Set());
+  };
+
+  const handleStatusReasonConfirm = (reason: string) => {
+    if (!profile?.id) return;
+    
+    bulkChangeStatusWithReason.mutate({
+      ticketIds: Array.from(selectedTickets),
+      status: pendingStatus,
+      reason,
+      userId: profile.id,
+    });
+    setSelectedTickets(new Set());
+    setShowStatusReasonDialog(false);
+    setPendingStatus("");
   };
 
   const handleBulkChangePriority = (priority: "P1" | "P2" | "P3" | "P4") => {
@@ -114,7 +141,7 @@ export default function Tickets() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedTickets]);
 
-  const canUseBulkActions = isOtimizzoUser || isSuperAdmin;
+  
 
   // Calcular o team_id comum dos tickets selecionados
   const getCommonTeamId = (): string | null => {
@@ -446,7 +473,7 @@ export default function Tickets() {
 
       <NewTicketDialog open={isNewTicketOpen} onOpenChange={setIsNewTicketOpen} />
 
-      {canUseBulkActions && selectedTickets.size > 0 && (
+      {selectedTickets.size > 0 && (
         <BulkActionsBar
           selectedCount={selectedTickets.size}
           onClearSelection={() => setSelectedTickets(new Set())}
@@ -455,6 +482,7 @@ export default function Tickets() {
           onChangeStatus={handleBulkChangeStatus}
           onChangePriority={handleBulkChangePriority}
           onLockTickets={handleBulkLockTickets}
+          isClient={isClient}
         />
       )}
 
@@ -471,6 +499,14 @@ export default function Tickets() {
         onConfirm={handleBulkAssignTeam}
         selectedCount={selectedTickets.size}
         currentTeamId={getCommonTeamId()}
+      />
+
+      <BulkStatusReasonDialog
+        open={showStatusReasonDialog}
+        onOpenChange={setShowStatusReasonDialog}
+        status={pendingStatus}
+        ticketCount={selectedTickets.size}
+        onConfirm={handleStatusReasonConfirm}
       />
     </AppLayout>
   );
