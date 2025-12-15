@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useTicketAge } from "@/hooks/useTicketAge";
 import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
 import { cn } from "@/lib/utils";
-import { User, Lock, Users } from "lucide-react";
+import { User, Lock, Users, ListOrdered } from "lucide-react";
 
 interface TicketRowProps {
   ticket: any;
@@ -81,6 +81,19 @@ export function TicketRow({ ticket, isSelected, onToggleSelect }: TicketRowProps
           </Badge>
         ) : (
           <span className="text-muted-foreground italic text-sm">Sem time</span>
+        )}
+      </TableCell>
+      <TableCell>
+        {ticket.queues ? (
+          <Badge 
+            variant="outline" 
+            className="flex items-center gap-1 w-fit border-purple-300 bg-purple-50 text-purple-700 dark:border-purple-600 dark:bg-purple-950 dark:text-purple-300"
+          >
+            <ListOrdered className="h-3 w-3" />
+            {ticket.queues.name}
+          </Badge>
+        ) : (
+          <span className="text-muted-foreground italic text-sm">Sem fila</span>
         )}
       </TableCell>
       <TableCell>

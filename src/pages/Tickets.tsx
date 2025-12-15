@@ -9,7 +9,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Search, AlertCircle } from "lucide-react";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Search, AlertCircle, ListOrdered } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import { TicketRow } from "@/components/tickets/TicketRow";
 import { calculateSLAStatus } from "@/lib/ticketUtils";
@@ -17,6 +18,7 @@ import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
 import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystDialog";
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
+import { cn } from "@/lib/utils";
 
 export default function Tickets() {
   const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser } = useAuth();
@@ -25,6 +27,7 @@ export default function Tickets() {
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [queueFilter, setQueueFilter] = useState<string>("all");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
@@ -177,6 +180,22 @@ export default function Tickets() {
     enabled: isOtimizzoUser || isSuperAdmin,
   });
 
+  // Fetch all queues (only for Otimizzo/super admin users)
+  const { data: allQueues } = useQuery({
+    queryKey: ["all-queues"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("queues")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order");
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: isOtimizzoUser || isSuperAdmin,
+  });
+
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["tickets", profile?.id],
     queryFn: async () => {
@@ -188,6 +207,7 @@ export default function Tickets() {
           profiles!tickets_analyst_id_fkey(full_name),
           lock_owner:profiles!tickets_lock_owner_id_fkey(full_name),
           teams(id, name, segment),
+          queues(id, name),
           sla_first_response_deadline,
           sla_resolution_deadline,
           sla_first_response_met,
@@ -225,7 +245,11 @@ export default function Tickets() {
       teamFilter === "all" || 
       (teamFilter === "none" && !ticket.team_id) || 
       ticket.team_id === teamFilter;
-    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam;
+    const matchesQueue = 
+      queueFilter === "all" || 
+      (queueFilter === "none" && !ticket.queue_id) || 
+      ticket.queue_id === queueFilter;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue;
   }).sort((a, b) => {
     // Ordenar por urgência de SLA
     const slaA = calculateSLAStatus(a);
@@ -316,6 +340,49 @@ export default function Tickets() {
           )}
         </div>
 
+        {/* Queue Filter Buttons */}
+        {(isOtimizzoUser || isSuperAdmin) && allQueues && allQueues.length > 0 && (
+          <div className="flex flex-wrap gap-2 items-center">
+            <span className="text-sm text-muted-foreground flex items-center gap-1">
+              <ListOrdered className="h-4 w-4" />
+              Filas:
+            </span>
+            <Badge
+              variant={queueFilter === "all" ? "default" : "outline"}
+              className={cn(
+                "cursor-pointer transition-colors",
+                queueFilter === "all" && "bg-primary text-primary-foreground"
+              )}
+              onClick={() => setQueueFilter("all")}
+            >
+              Todas
+            </Badge>
+            {allQueues.map((queue) => (
+              <Badge
+                key={queue.id}
+                variant={queueFilter === queue.id ? "default" : "outline"}
+                className={cn(
+                  "cursor-pointer transition-colors",
+                  queueFilter === queue.id && "bg-primary text-primary-foreground"
+                )}
+                onClick={() => setQueueFilter(queue.id)}
+              >
+                {queue.name}
+              </Badge>
+            ))}
+            <Badge
+              variant={queueFilter === "none" ? "default" : "outline"}
+              className={cn(
+                "cursor-pointer transition-colors",
+                queueFilter === "none" && "bg-muted-foreground text-background"
+              )}
+              onClick={() => setQueueFilter("none")}
+            >
+              Sem fila
+            </Badge>
+          </div>
+        )}
+
         {isLoading ? (
           <Card>
             <div className="p-8 space-y-4">
@@ -344,6 +411,7 @@ export default function Tickets() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Analista</TableHead>
                   <TableHead>Time</TableHead>
+                  <TableHead>Fila</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>SLA</TableHead>
