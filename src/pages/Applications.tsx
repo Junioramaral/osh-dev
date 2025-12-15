@@ -33,6 +33,7 @@ import {
 } from "@/components/ui/pagination";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import ApplicationInstanceDialog from "@/components/applications/ApplicationInstanceDialog";
 
 type SortField = "version" | "product_name" | "criticality" | "active_modules_count";
 type SortDirection = "asc" | "desc" | null;
@@ -82,6 +83,7 @@ export default function Applications() {
   const [environmentSorts, setEnvironmentSorts] = useState<Record<string, SortConfig>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedInstance, setSelectedInstance] = useState<any>(null);
+  const [dialogOpen, setDialogOpen] = useState(false);
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["application-products"],
@@ -240,6 +242,7 @@ export default function Applications() {
 
   const handleEditInstance = (instance: any) => {
     setSelectedInstance(instance);
+    setDialogOpen(true);
   };
 
   const handleDeleteInstance = async (instance: any, e: React.MouseEvent) => {
@@ -311,7 +314,10 @@ export default function Applications() {
             <p className="text-muted-foreground">Catálogo de produtos e implantações</p>
           </div>
           {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
-            <Button>
+            <Button onClick={() => {
+              setSelectedInstance(null);
+              setDialogOpen(true);
+            }}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Implantação
             </Button>
@@ -665,6 +671,12 @@ export default function Applications() {
           </TabsContent>
         </Tabs>
       </div>
+
+      <ApplicationInstanceDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        instance={selectedInstance}
+      />
     </AppLayout>
   );
 }
