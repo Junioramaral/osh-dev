@@ -28,7 +28,7 @@ function CommentCard({ comment }: CommentCardProps) {
   // Nome do autor
   const authorName = isEmailReply 
     ? `${comment.author_name || comment.author_email}${comment.author_name ? ' (via email)' : ''}`
-    : comment.profiles?.full_name || 'Usuário';
+    : comment.profiles?.full_name || comment.author_name || 'Usuário';
   
   // Iniciais do avatar
   const avatarInitial = isEmailReply
@@ -85,7 +85,7 @@ interface TicketCommentsProps {
 }
 
 export default function TicketComments({ ticketId }: TicketCommentsProps) {
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const { data: comments, isLoading } = useTicketComments(ticketId);
   const [newComment, setNewComment] = useState('');
@@ -103,12 +103,13 @@ export default function TicketComments({ ticketId }: TicketCommentsProps) {
       
       if (ticketError) throw ticketError;
       
-      // Insert comment
+      // Insert comment with author_name for client visibility
       const { data: commentData, error: commentError } = await supabase
         .from('ticket_comments')
         .insert({
           ticket_id: ticketId,
           author_id: user?.id,
+          author_name: profile?.full_name,
           content,
           is_internal
         })
