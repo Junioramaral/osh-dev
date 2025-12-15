@@ -127,6 +127,7 @@ export default function SystemSettings() {
       const { data: categoriesData, error } = await supabase
         .from("ticket_categories")
         .select("*")
+        .order("segment")
         .order("sort_order");
       if (error) throw error;
 
