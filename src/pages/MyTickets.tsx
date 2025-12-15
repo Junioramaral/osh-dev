@@ -14,6 +14,7 @@ import { calculateSLAStatus } from "@/lib/ticketUtils";
 import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
 import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystDialog";
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
+import { BulkAssignQueueDialog } from "@/components/tickets/BulkAssignQueueDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
@@ -25,10 +26,12 @@ export default function MyTickets() {
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
   const [showAssignTeamDialog, setShowAssignTeamDialog] = useState(false);
+  const [showAssignQueueDialog, setShowAssignQueueDialog] = useState(false);
 
   const {
     bulkAssignAnalyst,
     bulkAssignTeam,
+    bulkAssignQueue,
     bulkChangeStatus,
     bulkChangePriority,
     bulkLockTickets,
@@ -66,6 +69,14 @@ export default function MyTickets() {
     bulkAssignTeam.mutate({
       ticketIds: Array.from(selectedTickets),
       teamId,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  const handleBulkAssignQueue = (queueId: string | null) => {
+    bulkAssignQueue.mutate({
+      ticketIds: Array.from(selectedTickets),
+      queueId,
     });
     setSelectedTickets(new Set());
   };
@@ -118,6 +129,20 @@ export default function MyTickets() {
     
     if (teamIds.length > 0 && teamIds.every(id => id === teamIds[0])) {
       return teamIds[0] as string;
+    }
+    
+    return null;
+  };
+
+  // Calcular o queue_id comum dos tickets selecionados
+  const getCommonQueueId = (): string | null => {
+    if (selectedTickets.size === 0) return null;
+    
+    const selectedTicketData = filteredTickets?.filter(t => selectedTickets.has(t.id)) || [];
+    const queueIds = selectedTicketData.map(t => t.queue_id).filter(Boolean);
+    
+    if (queueIds.length > 0 && queueIds.every(id => id === queueIds[0])) {
+      return queueIds[0] as string;
     }
     
     return null;
@@ -318,6 +343,7 @@ export default function MyTickets() {
           onClearSelection={() => setSelectedTickets(new Set())}
           onAssignAnalyst={() => setShowAssignAnalystDialog(true)}
           onAssignTeam={() => setShowAssignTeamDialog(true)}
+          onAssignQueue={() => setShowAssignQueueDialog(true)}
           onChangeStatus={handleBulkChangeStatus}
           onChangePriority={handleBulkChangePriority}
           onLockTickets={handleBulkLockTickets}
@@ -337,6 +363,14 @@ export default function MyTickets() {
         onConfirm={handleBulkAssignTeam}
         selectedCount={selectedTickets.size}
         currentTeamId={getCommonTeamId()}
+      />
+
+      <BulkAssignQueueDialog
+        open={showAssignQueueDialog}
+        onOpenChange={setShowAssignQueueDialog}
+        onConfirm={handleBulkAssignQueue}
+        selectedCount={selectedTickets.size}
+        currentQueueId={getCommonQueueId()}
       />
     </AppLayout>
   );
