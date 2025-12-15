@@ -26,14 +26,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2, AlertCircle, Database, Package } from "lucide-react";
+import { Loader2, AlertCircle, Database, Package, ListOrdered } from "lucide-react";
 import { format } from "date-fns";
 
 const ticketSchema = z.object({
   segment: z.enum(["DB", "APP"]),
   client_id: z.string().uuid("Selecione um cliente"),
   title: z.string().min(1, "Título é obrigatório").max(100, "Máximo 100 caracteres"),
-  
+  queue_id: z.string().uuid().optional().nullable(),
   ticket_type: z.enum(["incidente", "duvida", "solicitacao"]),
   priority: z.enum(["P1", "P2", "P3", "P4"]),
   category: z.string().min(1, "Categoria é obrigatória"),
@@ -244,6 +244,20 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!selectedClientId,
   });
 
+  // Fetch active queues
+  const { data: queues } = useQuery({
+    queryKey: ["queues-active"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("queues")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Auto-selecionar produto quando houver apenas 1
   useEffect(() => {
     if (appProducts && appProducts.length === 1 && segment === "APP") {
@@ -293,6 +307,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         reproduction_steps: data.reproduction_steps,
         workaround: data.workaround,
         faq_article_id: data.faq_article_id || null,
+        queue_id: data.queue_id || null,
       };
 
       if (data.segment === "DB") {
@@ -513,7 +528,33 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
           </div>
 
-
+          {/* Queue Selector - only for Otimizzo users */}
+          {isOtimizzoUser && queues && queues.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="queue_id" className="flex items-center gap-2">
+                <ListOrdered className="h-4 w-4" />
+                Fila de Atendimento
+              </Label>
+              <Select
+                value={watch("queue_id") || ""}
+                onValueChange={(value) => setValue("queue_id", value || null)}
+              >
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione uma fila (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {queues.map((queue) => (
+                    <SelectItem key={queue.id} value={queue.id}>
+                      {queue.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-muted-foreground">
+                Direciona o ticket para a fila de atendimento específica
+              </p>
+            </div>
+          )}
           <div className="grid grid-cols-3 gap-4">
             <div className="space-y-2">
               <Label htmlFor="ticket_type">Tipo *</Label>

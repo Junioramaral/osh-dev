@@ -679,6 +679,42 @@ export type Database = {
         }
         Relationships: []
       }
+      teams_queues: {
+        Row: {
+          created_at: string | null
+          id: string
+          queue_id: string
+          team_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          queue_id: string
+          team_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          queue_id?: string
+          team_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "teams_queues_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "teams_queues_team_id_fkey"
+            columns: ["team_id"]
+            isOneToOne: false
+            referencedRelation: "teams"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_comments: {
         Row: {
           attachments: Json | null
@@ -856,6 +892,7 @@ export type Database = {
           opening_reason: string
           priority: Database["public"]["Enums"]["ticket_priority"]
           problem_faced: string
+          queue_id: string | null
           reproduction_steps: string | null
           resolved_at: string | null
           segment: Database["public"]["Enums"]["ticket_segment"]
@@ -912,6 +949,7 @@ export type Database = {
           opening_reason: string
           priority: Database["public"]["Enums"]["ticket_priority"]
           problem_faced: string
+          queue_id?: string | null
           reproduction_steps?: string | null
           resolved_at?: string | null
           segment: Database["public"]["Enums"]["ticket_segment"]
@@ -968,6 +1006,7 @@ export type Database = {
           opening_reason?: string
           priority?: Database["public"]["Enums"]["ticket_priority"]
           problem_faced?: string
+          queue_id?: string | null
           reproduction_steps?: string | null
           resolved_at?: string | null
           segment?: Database["public"]["Enums"]["ticket_segment"]
@@ -1048,6 +1087,13 @@ export type Database = {
             columns: ["lock_owner_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "tickets_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
             referencedColumns: ["id"]
           },
           {

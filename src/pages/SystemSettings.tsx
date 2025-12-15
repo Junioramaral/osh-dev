@@ -6,7 +6,7 @@ import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered } from "lucide-react";
+import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Settings2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -31,6 +31,14 @@ import {
 import DatabaseEngineDialog from "@/components/settings/DatabaseEngineDialog";
 import AppProductDialog from "@/components/settings/AppProductDialog";
 import QueueDialog, { Queue } from "@/components/settings/QueueDialog";
+import TeamQueuesDialog from "@/components/settings/TeamQueuesDialog";
+
+interface Team {
+  id: string;
+  name: string;
+  segment: "DB" | "APP";
+  specialization: string | null;
+}
 
 interface DatabaseEngine {
   id: string;
@@ -63,6 +71,8 @@ export default function SystemSettings() {
   const [deleteEngineId, setDeleteEngineId] = useState<string | null>(null);
   const [deleteProductId, setDeleteProductId] = useState<string | null>(null);
   const [deleteQueueId, setDeleteQueueId] = useState<string | null>(null);
+  const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [teamQueuesDialogOpen, setTeamQueuesDialogOpen] = useState(false);
 
   // Fetch database engines
   const { data: engines, isLoading: enginesLoading } = useQuery({
@@ -100,6 +110,33 @@ export default function SystemSettings() {
         .order("sort_order");
       if (error) throw error;
       return data as Queue[];
+    },
+  });
+
+  // Fetch teams with queue count
+  const { data: teams, isLoading: teamsLoading } = useQuery({
+    queryKey: ["teams-with-queues"],
+    queryFn: async () => {
+      const { data: teamsData, error: teamsError } = await supabase
+        .from("teams")
+        .select("id, name, segment, specialization")
+        .order("name");
+      if (teamsError) throw teamsError;
+
+      // Get queue counts for each team
+      const teamsWithCounts = await Promise.all(
+        teamsData.map(async (team) => {
+          const { count, error } = await supabase
+            .from("teams_queues")
+            .select("*", { count: "exact", head: true })
+            .eq("team_id", team.id);
+          return {
+            ...team,
+            queueCount: count || 0,
+          };
+        })
+      );
+      return teamsWithCounts as (Team & { queueCount: number })[];
     },
   });
 
@@ -231,22 +268,26 @@ export default function SystemSettings() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Configurações do Sistema</h1>
-          <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação e filas de atendimento</p>
+          <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação, filas de atendimento e times</p>
         </div>
 
         <Tabs defaultValue="engines" className="w-full">
-          <TabsList className="grid w-full max-w-2xl grid-cols-3">
+          <TabsList className="grid w-full max-w-3xl grid-cols-4">
             <TabsTrigger value="engines" className="gap-2">
               <Database className="h-4 w-4" />
-              Engines de Banco
+              Engines
             </TabsTrigger>
             <TabsTrigger value="products" className="gap-2">
               <Package className="h-4 w-4" />
-              Produtos de Aplicação
+              Produtos
             </TabsTrigger>
             <TabsTrigger value="queues" className="gap-2">
               <ListOrdered className="h-4 w-4" />
               Filas
+            </TabsTrigger>
+            <TabsTrigger value="teams" className="gap-2">
+              <Users className="h-4 w-4" />
+              Times
             </TabsTrigger>
           </TabsList>
 
@@ -573,6 +614,91 @@ export default function SystemSettings() {
               </Table>
             </div>
           </TabsContent>
+
+          {/* Teams Tab */}
+          <TabsContent value="teams" className="mt-6">
+            <div className="flex justify-between items-center mb-4">
+              <div>
+                <h2 className="text-lg font-semibold">Times</h2>
+                <p className="text-sm text-muted-foreground">
+                  Clique em um time para configurar quais filas ele atende
+                </p>
+              </div>
+            </div>
+
+            <div className="border rounded-lg">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Nome</TableHead>
+                    <TableHead>Segmento</TableHead>
+                    <TableHead>Especialização</TableHead>
+                    <TableHead className="w-[150px]">Filas Atendidas</TableHead>
+                    <TableHead className="w-[120px]">Ações</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {teamsLoading ? (
+                    Array.from({ length: 4 }).map((_, i) => (
+                      <TableRow key={i}>
+                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                        <TableCell><Skeleton className="h-6 w-12" /></TableCell>
+                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                      </TableRow>
+                    ))
+                  ) : teams?.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                        Nenhum time cadastrado
+                      </TableCell>
+                    </TableRow>
+                  ) : (
+                    teams?.map((team) => (
+                      <TableRow 
+                        key={team.id}
+                        className="cursor-pointer hover:bg-muted/50"
+                        onClick={() => {
+                          setSelectedTeam(team);
+                          setTeamQueuesDialogOpen(true);
+                        }}
+                      >
+                        <TableCell className="font-medium">{team.name}</TableCell>
+                        <TableCell>
+                          <Badge variant={team.segment === "DB" ? "default" : "secondary"}>
+                            {team.segment}
+                          </Badge>
+                        </TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {team.specialization || "-"}
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="outline">
+                            {team.queueCount} {team.queueCount === 1 ? "fila" : "filas"}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedTeam(team);
+                              setTeamQueuesDialogOpen(true);
+                            }}
+                          >
+                            <Settings2 className="h-4 w-4 mr-2" />
+                            Filas
+                          </Button>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </div>
+          </TabsContent>
         </Tabs>
       </div>
 
@@ -595,6 +721,18 @@ export default function SystemSettings() {
         open={queueDialogOpen}
         onOpenChange={setQueueDialogOpen}
         queue={selectedQueue}
+      />
+
+      {/* Team Queues Dialog */}
+      <TeamQueuesDialog
+        open={teamQueuesDialogOpen}
+        onOpenChange={(open) => {
+          setTeamQueuesDialogOpen(open);
+          if (!open) {
+            queryClient.invalidateQueries({ queryKey: ["teams-with-queues"] });
+          }
+        }}
+        team={selectedTeam}
       />
 
       {/* Delete Engine Confirmation */}
