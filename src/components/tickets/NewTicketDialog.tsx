@@ -258,6 +258,37 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
+  // Mapeamento de engine para nome de fila
+  const engineToQueueName: Record<string, string> = {
+    'Oracle': 'Oracle',
+    'PostgreSQL': 'PostgreSQL',
+    'MySQL': 'MySQL',
+    'MongoDB': 'MongoDB',
+    'SQL Server': 'SQLServer',
+  };
+
+  // Auto-atribuir fila baseado em segment e engine
+  useEffect(() => {
+    if (!queues || queues.length === 0) return;
+
+    if (segment === "APP") {
+      // Para APP, buscar fila "Aplicações"
+      const appQueue = queues.find(q => q.name === "Aplicações");
+      if (appQueue) {
+        setValue("queue_id", appQueue.id);
+      }
+    } else if (segment === "DB" && selectedDbEngine) {
+      // Para DB, buscar fila correspondente ao engine
+      const queueName = engineToQueueName[selectedDbEngine];
+      if (queueName) {
+        const matchedQueue = queues.find(q => q.name === queueName);
+        if (matchedQueue) {
+          setValue("queue_id", matchedQueue.id);
+        }
+      }
+    }
+  }, [segment, selectedDbEngine, queues, setValue]);
+
   // Auto-selecionar produto quando houver apenas 1
   useEffect(() => {
     if (appProducts && appProducts.length === 1 && segment === "APP") {
