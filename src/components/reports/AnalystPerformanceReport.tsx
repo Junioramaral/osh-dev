@@ -69,9 +69,19 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
     { name: "P4", value: priorityData.P4 },
   ].filter(d => d.value > 0);
 
+  const sanitizeForFilename = (text: string) => {
+    return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+  };
+
   const exportToPDF = () => {
     const originalTitle = document.title;
-    document.title = `Performance de Analistas - ${periodLabel}`;
+    const periodClean = sanitizeForFilename(periodLabel);
+    document.title = `Performance_Analistas_${periodClean}`;
     window.print();
     setTimeout(() => { document.title = originalTitle; }, 100);
   };

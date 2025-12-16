@@ -62,15 +62,27 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
     return [currentYear, currentYear - 1, currentYear - 2];
   }, []);
 
+  // Helper function to sanitize text for filenames
+  const sanitizeForFilename = (text: string) => {
+    return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "") // Remove accents
+      .replace(/[^a-zA-Z0-9]/g, "_")   // Replace special chars with _
+      .replace(/_+/g, "_")              // Remove duplicate underscores
+      .replace(/^_|_$/g, "");           // Remove leading/trailing underscores
+  };
+
   const exportToPDF = () => {
-    // Save original title and set report-specific title to avoid URL in browser print header
     const originalTitle = document.title;
-    const monthName = format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy", { locale: ptBR });
-    document.title = `Relatório Mensal - ${reportData?.client?.name || "Cliente"} - ${monthName}`;
+    
+    const clientName = sanitizeForFilename(reportData?.client?.name || "Cliente");
+    const monthName = format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM", { locale: ptBR });
+    const monthClean = sanitizeForFilename(monthName.charAt(0).toUpperCase() + monthName.slice(1));
+    
+    document.title = `Relatorio_Mensal_${clientName}_${monthClean}_${selectedYear}`;
     
     window.print();
     
-    // Restore original title after print dialog
     setTimeout(() => {
       document.title = originalTitle;
     }, 100);
