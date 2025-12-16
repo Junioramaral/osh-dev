@@ -14,6 +14,7 @@ import {
   AlertCircle, 
   X,
   Lock,
+  Unlock,
   ListOrdered
 } from "lucide-react";
 
@@ -26,6 +27,7 @@ interface BulkActionsBarProps {
   onChangeStatus: (status: string) => void;
   onChangePriority: (priority: string) => void;
   onLockTickets: () => void;
+  onReleaseTickets?: () => void;
   isClient?: boolean;
 }
 
@@ -38,6 +40,7 @@ export function BulkActionsBar({
   onChangeStatus,
   onChangePriority,
   onLockTickets,
+  onReleaseTickets,
   isClient = false
 }: BulkActionsBarProps) {
   return (
@@ -61,6 +64,17 @@ export function BulkActionsBar({
                 <Lock className="h-4 w-4 mr-2" />
                 Assumir Ticket
               </Button>
+
+              {onReleaseTickets && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={onReleaseTickets}
+                >
+                  <Unlock className="h-4 w-4 mr-2" />
+                  Liberar Ticket
+                </Button>
+              )}
 
               <Button
                 variant="secondary"

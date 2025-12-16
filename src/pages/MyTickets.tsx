@@ -16,6 +16,8 @@ import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystD
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
 import { BulkAssignQueueDialog } from "@/components/tickets/BulkAssignQueueDialog";
 import { BulkStatusReasonDialog } from "@/components/tickets/BulkStatusReasonDialog";
+import { TicketLockedWarningDialog } from "@/components/tickets/TicketLockedWarningDialog";
+import { ReleaseTicketDialog } from "@/components/tickets/ReleaseTicketDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
@@ -30,6 +32,13 @@ export default function MyTickets() {
   const [showAssignQueueDialog, setShowAssignQueueDialog] = useState(false);
   const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string>("");
+  
+  // Estados para o sistema de lock/warning
+  const [showLockedWarningDialog, setShowLockedWarningDialog] = useState(false);
+  const [showReleaseDialog, setShowReleaseDialog] = useState(false);
+  const [lockedTicketInfo, setLockedTicketInfo] = useState<{ lockedByName: string } | null>(null);
+  const [pendingAction, setPendingAction] = useState<"lock" | "assign" | null>(null);
+  const [pendingAnalystId, setPendingAnalystId] = useState<string | null>(null);
 
   const {
     bulkAssignAnalyst,
@@ -39,6 +48,9 @@ export default function MyTickets() {
     bulkChangeStatusWithReason,
     bulkChangePriority,
     bulkLockTickets,
+    bulkLockTicketsWithReason,
+    bulkAssignAnalystWithReason,
+    bulkUnlockTickets,
   } = useBulkTicketActions();
 
   const toggleTicketSelection = (ticketId: string) => {
@@ -61,7 +73,33 @@ export default function MyTickets() {
     }
   };
 
+  // Verificar se algum ticket selecionado está locado por outro usuário
+  const getLockedByOtherInfo = () => {
+    const selectedTicketData = filteredTickets?.filter(t => selectedTickets.has(t.id)) || [];
+    const lockedByOther = selectedTicketData.find(
+      t => t.lock_status === "locked" && t.lock_owner_id !== profile?.id
+    );
+    
+    if (lockedByOther) {
+      return {
+        lockedByName: lockedByOther.lock_owner?.full_name || "Outro analista",
+      };
+    }
+    return null;
+  };
+
   const handleBulkAssignAnalyst = (analystId: string) => {
+    // Verificar se algum ticket está locado por outro usuário
+    const lockedInfo = getLockedByOtherInfo();
+    if (lockedInfo) {
+      setLockedTicketInfo(lockedInfo);
+      setPendingAction("assign");
+      setPendingAnalystId(analystId);
+      setShowAssignAnalystDialog(false);
+      setShowLockedWarningDialog(true);
+      return;
+    }
+
     bulkAssignAnalyst.mutate({
       ticketIds: Array.from(selectedTickets),
       analystId,
@@ -124,9 +162,58 @@ export default function MyTickets() {
 
   const handleBulkLockTickets = () => {
     if (!profile?.id) return;
+    
+    // Verificar se algum ticket está locado por outro usuário
+    const lockedInfo = getLockedByOtherInfo();
+    if (lockedInfo) {
+      setLockedTicketInfo(lockedInfo);
+      setPendingAction("lock");
+      setShowLockedWarningDialog(true);
+      return;
+    }
+    
     bulkLockTickets.mutate({
       ticketIds: Array.from(selectedTickets),
       userId: profile.id,
+    });
+    setSelectedTickets(new Set());
+  };
+
+  const handleLockedWarningProceed = (reason: string) => {
+    if (!profile?.id) return;
+
+    if (pendingAction === "lock") {
+      bulkLockTicketsWithReason.mutate({
+        ticketIds: Array.from(selectedTickets),
+        userId: profile.id,
+        reason,
+      });
+    } else if (pendingAction === "assign" && pendingAnalystId) {
+      bulkAssignAnalystWithReason.mutate({
+        ticketIds: Array.from(selectedTickets),
+        analystId: pendingAnalystId,
+        reason,
+        userId: profile.id,
+      });
+    }
+
+    setSelectedTickets(new Set());
+    setShowLockedWarningDialog(false);
+    setLockedTicketInfo(null);
+    setPendingAction(null);
+    setPendingAnalystId(null);
+  };
+
+  const handleLockedWarningCancel = () => {
+    setLockedTicketInfo(null);
+    setPendingAction(null);
+    setPendingAnalystId(null);
+  };
+
+  const handleReleaseTickets = (removeAnalyst: boolean) => {
+    bulkUnlockTickets.mutate({
+      ticketIds: Array.from(selectedTickets),
+      removeAnalyst,
     });
     setSelectedTickets(new Set());
   };
@@ -374,6 +461,7 @@ export default function MyTickets() {
           onChangeStatus={handleBulkChangeStatus}
           onChangePriority={handleBulkChangePriority}
           onLockTickets={handleBulkLockTickets}
+          onReleaseTickets={() => setShowReleaseDialog(true)}
         />
       )}
 
@@ -406,6 +494,23 @@ export default function MyTickets() {
         status={pendingStatus}
         ticketCount={selectedTickets.size}
         onConfirm={handleStatusReasonConfirm}
+      />
+
+      <TicketLockedWarningDialog
+        open={showLockedWarningDialog}
+        onOpenChange={setShowLockedWarningDialog}
+        lockedByName={lockedTicketInfo?.lockedByName || "Outro analista"}
+        ticketCount={selectedTickets.size}
+        actionType={pendingAction || "lock"}
+        onCancel={handleLockedWarningCancel}
+        onProceed={handleLockedWarningProceed}
+      />
+
+      <ReleaseTicketDialog
+        open={showReleaseDialog}
+        onOpenChange={setShowReleaseDialog}
+        ticketCount={selectedTickets.size}
+        onConfirm={handleReleaseTickets}
       />
     </AppLayout>
   );
