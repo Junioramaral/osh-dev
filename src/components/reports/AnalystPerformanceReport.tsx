@@ -69,7 +69,12 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
     { name: "P4", value: priorityData.P4 },
   ].filter(d => d.value > 0);
 
-  const exportToPDF = () => window.print();
+  const exportToPDF = () => {
+    const originalTitle = document.title;
+    document.title = `Performance de Analistas - ${periodLabel}`;
+    window.print();
+    setTimeout(() => { document.title = originalTitle; }, 100);
+  };
 
   return (
     <AppLayout>

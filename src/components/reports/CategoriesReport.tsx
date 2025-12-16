@@ -55,7 +55,12 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
 
   const totalTickets = data?.categories.reduce((sum, c) => sum + c.total_tickets, 0) || 0;
 
-  const exportToPDF = () => window.print();
+  const exportToPDF = () => {
+    const originalTitle = document.title;
+    document.title = `Relatório por Categorias - ${periodLabel}`;
+    window.print();
+    setTimeout(() => { document.title = originalTitle; }, 100);
+  };
 
   return (
     <AppLayout>

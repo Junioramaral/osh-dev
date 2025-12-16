@@ -76,7 +76,12 @@ const PeriodComparisonReport = ({ onBack }: PeriodComparisonReportProps) => {
     { priority: "P4", [periodALabel]: data.periodA.tickets_by_priority.P4, [periodBLabel]: data.periodB.tickets_by_priority.P4 },
   ] : [];
 
-  const exportToPDF = () => window.print();
+  const exportToPDF = () => {
+    const originalTitle = document.title;
+    document.title = `Comparativo - ${periodALabel} vs ${periodBLabel}`;
+    window.print();
+    setTimeout(() => { document.title = originalTitle; }, 100);
+  };
 
   return (
     <AppLayout>

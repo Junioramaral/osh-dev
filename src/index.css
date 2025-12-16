@@ -130,10 +130,10 @@ All colors MUST be HSL.
 
 /* Print Styles */
 @media print {
-  /* A4 Page Configuration */
+  /* A4 Page Configuration - margin: 0 removes browser headers/footers (URL, date, page number) */
   @page {
     size: A4 portrait;
-    margin: 12mm 15mm;
+    margin: 0;
   }
 
   /* CRITICAL: Reset body and root for print */
@@ -226,11 +226,11 @@ All colors MUST be HSL.
     break-inside: avoid !important;
   }
 
-  /* Cover page - Full A4 height */
+  /* Cover page - Full A4 height with padding to compensate for margin: 0 */
   .print-cover {
-    min-height: 267mm !important;
-    height: 267mm !important;
-    max-height: 267mm !important;
+    min-height: 297mm !important;
+    height: 297mm !important;
+    max-height: 297mm !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
@@ -239,19 +239,22 @@ All colors MUST be HSL.
     break-after: page !important;
     overflow: hidden !important;
     background: white !important;
+    padding: 15mm !important;
+    box-sizing: border-box !important;
   }
 
-  /* Report section pages */
+  /* Report section pages with padding to compensate for margin: 0 */
   .print-section {
     display: block !important;
     visibility: visible !important;
     position: relative !important;
     min-height: auto;
-    padding: 8mm 0;
+    padding: 15mm !important;
     page-break-after: always !important;
     break-after: page !important;
     overflow: visible !important;
     background: white !important;
+    box-sizing: border-box !important;
   }
 
   .print-section:last-child {
