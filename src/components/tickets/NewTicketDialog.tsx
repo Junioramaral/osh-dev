@@ -506,6 +506,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   interface Evidence {
     name: string;
+    path: string;
     url: string;
     type: string;
     size: number;
@@ -534,13 +535,20 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         throw error;
       }
 
-      const { data: publicUrl } = supabase.storage
+      // Use signed URL for secure access (valid for 7 days)
+      const { data: signedUrlData, error: signedUrlError } = await supabase.storage
         .from("tickets")
-        .getPublicUrl(filePath);
+        .createSignedUrl(filePath, 60 * 60 * 24 * 7); // 7 days
+
+      if (signedUrlError) {
+        console.error(`❌ Erro ao gerar URL assinada para ${fileItem.file.name}:`, signedUrlError);
+        throw signedUrlError;
+      }
 
       evidences.push({
         name: fileItem.file.name,
-        url: publicUrl.publicUrl,
+        path: filePath, // Store path for regenerating signed URLs
+        url: signedUrlData.signedUrl,
         type: fileItem.file.type,
         size: fileItem.file.size,
         uploaded_at: new Date().toISOString(),
