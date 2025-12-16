@@ -20,6 +20,7 @@ interface NotificationRequest {
   contactName: string;
   ticketNumber: string;
   ticketTitle: string;
+  ccEmails?: string[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -64,6 +65,7 @@ const handler = async (req: Request): Promise<Response> => {
       contactName,
       ticketNumber,
       ticketTitle,
+      ccEmails,
     }: NotificationRequest = await req.json();
 
     // SECURITY: Validate required fields
@@ -125,7 +127,7 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log("Sending comment notification to:", contactEmail);
+    console.log("Sending comment notification to:", contactEmail, "CC:", ccEmails);
 
     const currentDate = new Date().toLocaleString('pt-BR', {
       day: '2-digit',
@@ -139,6 +141,7 @@ const handler = async (req: Request): Promise<Response> => {
       from: "Otimizzo Suporte <noreply@otimizzo.com>",
       replyTo: "suporte@otimizzo.com",
       to: [contactEmail],
+      cc: ccEmails && ccEmails.length > 0 ? ccEmails : undefined,
       subject: `[Ticket #${ticketNumber}] Nova atualização - ${ticketTitle}`,
       headers: {
         'X-Ticket-Number': ticketNumber,

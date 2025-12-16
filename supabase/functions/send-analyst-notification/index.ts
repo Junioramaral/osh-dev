@@ -18,6 +18,7 @@ interface NotificationRequest {
   commentContent: string;
   clientName: string;
   clientEmail: string;
+  ccEmails?: string[];
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -35,6 +36,7 @@ const handler = async (req: Request): Promise<Response> => {
       commentContent,
       clientName,
       clientEmail,
+      ccEmails,
     }: NotificationRequest = await req.json();
 
     // Validate required fields
@@ -101,7 +103,7 @@ const handler = async (req: Request): Promise<Response> => {
     const analystEmail = authUser.user.email;
     const analystName = analystProfile.full_name;
 
-    console.log("Sending analyst notification to:", analystEmail);
+    console.log("Sending analyst notification to:", analystEmail, "CC:", ccEmails);
 
     const currentDate = new Date().toLocaleString('pt-BR', {
       day: '2-digit',
@@ -114,6 +116,7 @@ const handler = async (req: Request): Promise<Response> => {
     const emailResponse = await resend.emails.send({
       from: "Otimizzo Suporte <noreply@otimizzo.com>",
       to: [analystEmail],
+      cc: ccEmails && ccEmails.length > 0 ? ccEmails : undefined,
       subject: `[Ticket #${ticketNumber}] Nova resposta do cliente - ${ticketTitle}`,
       html: `
         <!DOCTYPE html>
