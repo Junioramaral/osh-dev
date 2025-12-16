@@ -68,8 +68,13 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
     const originalTitle = document.title;
     const periodClean = sanitizeForFilename(periodLabel);
     document.title = `Relatorio_Categorias_${periodClean}`;
+    const handleAfterPrint = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+    
+    window.addEventListener('afterprint', handleAfterPrint);
     window.print();
-    setTimeout(() => { document.title = originalTitle; }, 100);
   };
 
   return (

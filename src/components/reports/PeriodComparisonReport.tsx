@@ -90,8 +90,13 @@ const PeriodComparisonReport = ({ onBack }: PeriodComparisonReportProps) => {
     const periodAClean = sanitizeForFilename(periodALabel);
     const periodBClean = sanitizeForFilename(periodBLabel);
     document.title = `Comparativo_${periodAClean}_vs_${periodBClean}`;
+    const handleAfterPrint = () => {
+      document.title = originalTitle;
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+    
+    window.addEventListener('afterprint', handleAfterPrint);
     window.print();
-    setTimeout(() => { document.title = originalTitle; }, 100);
   };
 
   return (

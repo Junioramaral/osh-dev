@@ -81,11 +81,13 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
     
     document.title = `Relatorio_Mensal_${clientName}_${monthClean}_${selectedYear}`;
     
-    window.print();
-    
-    setTimeout(() => {
+    const handleAfterPrint = () => {
       document.title = originalTitle;
-    }, 100);
+      window.removeEventListener('afterprint', handleAfterPrint);
+    };
+    
+    window.addEventListener('afterprint', handleAfterPrint);
+    window.print();
   };
 
   const exportToCSV = () => {
