@@ -157,12 +157,14 @@ const PeriodComparisonReport = ({ onBack }: PeriodComparisonReportProps) => {
           </Card>
         </div>
 
-        {/* PAGE 1: Cover */}
-        <ReportCover 
-          title="Comparativo de Períodos"
-          subtitle={`${periodALabel} vs ${periodBLabel}`}
-          periodLabel={`Análise comparativa de performance`}
-        />
+        {/* Report Content - Print Wrapper */}
+        <div className="print:block print:overflow-visible">
+          {/* PAGE 1: Cover */}
+          <ReportCover 
+            title="Comparativo de Períodos"
+            subtitle={`${periodALabel} vs ${periodBLabel}`}
+            periodLabel={`Análise comparativa de performance`}
+          />
 
         {/* PAGE 2: Variation Cards */}
         {data && (
@@ -325,6 +327,7 @@ const PeriodComparisonReport = ({ onBack }: PeriodComparisonReportProps) => {
             </Card>
           </div>
         )}
+        </div>
       </div>
     </AppLayout>
   );

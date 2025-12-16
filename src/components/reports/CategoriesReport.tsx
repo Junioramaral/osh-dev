@@ -101,12 +101,14 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
           </Select>
         </div>
 
-        {/* PAGE 1: Cover */}
-        <ReportCover 
-          title="Relatório por Categorias"
-          subtitle="Análise de Distribuição de Tickets"
-          periodLabel={periodLabel}
-        />
+        {/* Report Content - Print Wrapper */}
+        <div className="print:block print:overflow-visible">
+          {/* PAGE 1: Cover */}
+          <ReportCover 
+            title="Relatório por Categorias"
+            subtitle="Análise de Distribuição de Tickets"
+            periodLabel={periodLabel}
+          />
 
         {/* PAGE 2: Summary + Pie Chart */}
         <div className="print-section print-break-before space-y-6">
@@ -284,6 +286,7 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
             </Card>
           </div>
         )}
+        </div>
       </div>
     </AppLayout>
   );
