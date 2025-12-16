@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { useMemo } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -8,7 +9,21 @@ import { Users, UserCheck, UserX, Activity, Download, FileText } from "lucide-re
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
+import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend } from "recharts";
 
+const CHART_COLORS = {
+  status: {
+    active: "hsl(142, 76%, 36%)",    // success green
+    inactive: "hsl(220, 9%, 46%)",    // muted gray
+  },
+  roles: {
+    super_admin: "hsl(0, 84%, 60%)",      // red
+    tenant_admin: "hsl(25, 95%, 53%)",    // orange
+    analyst_db: "hsl(217, 91%, 60%)",     // blue
+    analyst_app: "hsl(142, 76%, 36%)",    // green
+    user: "hsl(220, 9%, 46%)",            // gray
+  }
+};
 interface TenantUserReportProps {
   tenantId: string;
   tenantName?: string;
@@ -154,6 +169,42 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
     return "outline";
   };
 
+  // Dados para gráficos
+  const chartData = useMemo(() => {
+    if (!stats?.users.length) return null;
+
+    // Dados para gráfico de Status (Pizza)
+    const statusData = [
+      { name: "Ativos", value: stats.summary.active, color: CHART_COLORS.status.active },
+      { name: "Inativos", value: stats.summary.inactive, color: CHART_COLORS.status.inactive },
+    ].filter(d => d.value > 0);
+
+    // Dados para gráfico de Perfis (Pizza)
+    const rolesCounts = stats.users.reduce((acc, user) => {
+      acc[user.role] = (acc[user.role] || 0) + 1;
+      return acc;
+    }, {} as Record<string, number>);
+
+    const rolesData = Object.entries(rolesCounts).map(([role, count]) => ({
+      name: getRoleLabel(role),
+      value: count,
+      color: CHART_COLORS.roles[role as keyof typeof CHART_COLORS.roles] || CHART_COLORS.roles.user,
+    }));
+
+    // Dados para gráfico de Atividade (Barras) - Top 10 usuários
+    const activityData = stats.users
+      .filter(u => u.ticketsCreated > 0 || u.commentsCreated > 0)
+      .sort((a, b) => (b.ticketsCreated + b.commentsCreated) - (a.ticketsCreated + a.commentsCreated))
+      .slice(0, 10)
+      .map(user => ({
+        name: user.fullName.split(" ")[0],
+        tickets: user.ticketsCreated,
+        comentarios: user.commentsCreated,
+      }));
+
+    return { statusData, rolesData, activityData, rolesCounts };
+  }, [stats]);
+
   const exportToCSV = () => {
     if (!stats?.users.length) return;
 
@@ -188,7 +239,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
   };
 
   const exportToPDF = () => {
-    if (!stats) return;
+    if (!stats || !chartData) return;
 
     const printWindow = window.open("", "_blank");
     if (!printWindow) return;
@@ -201,11 +252,16 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
         <style>
           body { font-family: Arial, sans-serif; padding: 20px; }
           h1 { font-size: 18px; margin-bottom: 10px; }
+          h2 { font-size: 14px; margin: 20px 0 10px; color: #333; }
           .date { font-size: 12px; color: #666; margin-bottom: 20px; }
           .summary { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
           .summary-card { border: 1px solid #ddd; padding: 12px 16px; border-radius: 4px; min-width: 120px; }
           .summary-card strong { display: block; font-size: 20px; margin-bottom: 4px; }
           .summary-card span { font-size: 12px; color: #666; }
+          .charts-summary { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+          .chart-card { border: 1px solid #ddd; padding: 12px 16px; border-radius: 4px; min-width: 180px; }
+          .chart-card h3 { font-size: 12px; font-weight: 600; margin-bottom: 8px; color: #333; }
+          .chart-card p { font-size: 11px; margin: 4px 0; color: #555; }
           table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 20px; }
           th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
           th { background-color: #f5f5f5; font-weight: 600; }
@@ -227,7 +283,23 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
           <div class="summary-card"><strong>${stats.summary.totalTickets}</strong><span>Tickets</span></div>
           <div class="summary-card"><strong>${stats.summary.totalComments}</strong><span>Comentários</span></div>
         </div>
+
+        <h2>Distribuição</h2>
+        <div class="charts-summary">
+          <div class="chart-card">
+            <h3>Por Status</h3>
+            <p>Ativos: ${stats.summary.active} (${stats.summary.total > 0 ? ((stats.summary.active / stats.summary.total) * 100).toFixed(0) : 0}%)</p>
+            <p>Inativos: ${stats.summary.inactive} (${stats.summary.total > 0 ? ((stats.summary.inactive / stats.summary.total) * 100).toFixed(0) : 0}%)</p>
+          </div>
+          <div class="chart-card">
+            <h3>Por Perfil</h3>
+            ${Object.entries(chartData.rolesCounts || {}).map(([role, count]) => 
+              `<p>${getRoleLabel(role)}: ${count}</p>`
+            ).join("")}
+          </div>
+        </div>
         
+        <h2>Detalhamento por Usuário</h2>
         <table>
           <thead>
             <tr>
@@ -280,6 +352,18 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
               <CardContent>
                 <Skeleton className="h-8 w-16 mb-2" />
                 <Skeleton className="h-3 w-32" />
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {[...Array(3)].map((_, i) => (
+            <Card key={i}>
+              <CardHeader className="pb-2">
+                <Skeleton className="h-4 w-32" />
+              </CardHeader>
+              <CardContent>
+                <Skeleton className="h-[200px] w-full" />
               </CardContent>
             </Card>
           ))}
@@ -354,6 +438,102 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
           </CardContent>
         </Card>
       </div>
+
+      {/* Gráficos */}
+      {chartData && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+          {/* Gráfico de Pizza - Status */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Distribuição por Status</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData.statusData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                      labelLine={false}
+                    >
+                      {chartData.statusData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Pizza - Perfis */}
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Distribuição por Perfil</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={chartData.rolesData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={50}
+                      outerRadius={80}
+                      paddingAngle={2}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                      labelLine={false}
+                    >
+                      {chartData.rolesData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Gráfico de Barras - Atividade por Usuário */}
+          <Card className="md:col-span-2 lg:col-span-1">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Top 10 - Atividade</CardTitle>
+              <CardDescription className="text-xs">Tickets e comentários por usuário</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <div className="h-[200px]">
+                {chartData.activityData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={chartData.activityData} layout="vertical">
+                      <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                      <XAxis type="number" fontSize={10} />
+                      <YAxis type="category" dataKey="name" width={60} fontSize={10} />
+                      <Tooltip />
+                      <Legend />
+                      <Bar dataKey="tickets" name="Tickets" fill="hsl(217, 91%, 60%)" radius={[0, 4, 4, 0]} />
+                      <Bar dataKey="comentarios" name="Comentários" fill="hsl(142, 76%, 36%)" radius={[0, 4, 4, 0]} />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="h-full flex items-center justify-center text-muted-foreground text-sm">
+                    Sem atividade registrada
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
 
       {/* Tabela de Detalhes */}
       <Card>
