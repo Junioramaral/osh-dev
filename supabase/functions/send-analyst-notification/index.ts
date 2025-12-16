@@ -106,6 +106,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Sending analyst notification to:", analystEmail, "CC:", ccEmails);
 
     const currentDate = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',

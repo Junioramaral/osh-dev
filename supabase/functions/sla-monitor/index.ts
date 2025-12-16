@@ -339,7 +339,7 @@ serve(async (req) => {
             
             <div style="text-align: center; color: #9ca3af; font-size: 14px; margin-top: 20px;">
               <p>Otimizzo Service Hub - Sistema de Monitoramento de SLA</p>
-              <p style="font-size: 12px;">Enviado em ${new Date().toLocaleString('pt-BR')}</p>
+              <p style="font-size: 12px;">Enviado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })}</p>
             </div>
           </div>
         </body>
