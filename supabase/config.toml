@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.send-resolution-notification]
 verify_jwt = false
+
+[functions.submit-feedback]
+verify_jwt = false

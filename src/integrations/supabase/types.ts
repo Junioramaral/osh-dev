@@ -986,6 +986,7 @@ export type Database = {
           created_at: string | null
           csat_comment: string | null
           csat_rating: number | null
+          csat_submitted_at: string | null
           db_engine: Database["public"]["Enums"]["db_engine"] | null
           db_environment: Database["public"]["Enums"]["environment_type"] | null
           db_instance_id: string | null
@@ -994,6 +995,7 @@ export type Database = {
           error_displayed: string | null
           evidences: Json | null
           faq_article_id: string | null
+          feedback_token: string | null
           first_response_at: string | null
           frequency: Database["public"]["Enums"]["frequency_type"]
           id: string
@@ -1041,6 +1043,7 @@ export type Database = {
           created_at?: string | null
           csat_comment?: string | null
           csat_rating?: number | null
+          csat_submitted_at?: string | null
           db_engine?: Database["public"]["Enums"]["db_engine"] | null
           db_environment?:
             | Database["public"]["Enums"]["environment_type"]
@@ -1051,6 +1054,7 @@ export type Database = {
           error_displayed?: string | null
           evidences?: Json | null
           faq_article_id?: string | null
+          feedback_token?: string | null
           first_response_at?: string | null
           frequency: Database["public"]["Enums"]["frequency_type"]
           id?: string
@@ -1098,6 +1102,7 @@ export type Database = {
           created_at?: string | null
           csat_comment?: string | null
           csat_rating?: number | null
+          csat_submitted_at?: string | null
           db_engine?: Database["public"]["Enums"]["db_engine"] | null
           db_environment?:
             | Database["public"]["Enums"]["environment_type"]
@@ -1108,6 +1113,7 @@ export type Database = {
           error_displayed?: string | null
           evidences?: Json | null
           faq_article_id?: string | null
+          feedback_token?: string | null
           first_response_at?: string | null
           frequency?: Database["public"]["Enums"]["frequency_type"]
           id?: string
