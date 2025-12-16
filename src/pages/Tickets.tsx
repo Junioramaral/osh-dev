@@ -95,8 +95,8 @@ export default function Tickets() {
   };
 
   const handleBulkChangeStatus = (status: string) => {
-    // Se for cliente e status for resolvido/fechado, abrir dialog de motivo
-    if (isClient && (status === "resolvido" || status === "fechado")) {
+    // Se status for resolvido, abrir dialog de motivo (para TODOS os usuários)
+    if (status === "resolvido") {
       setPendingStatus(status);
       setShowStatusReasonDialog(true);
       return;

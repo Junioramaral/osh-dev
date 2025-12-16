@@ -113,9 +113,6 @@ export function BulkActionsBar({
               <DropdownMenuItem onClick={() => onChangeStatus("resolvido")}>
                 Resolvido
               </DropdownMenuItem>
-              <DropdownMenuItem onClick={() => onChangeStatus("fechado")}>
-                Fechado
-              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
           
