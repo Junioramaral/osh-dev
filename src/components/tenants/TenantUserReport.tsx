@@ -42,14 +42,23 @@ export const TenantUserReport = ({ tenantId }: TenantUserReportProps) => {
 
       if (profilesError) throw profilesError;
 
-      // 2. Buscar emails dos usuários
-      const { data: { users }, error: usersError } = await supabase.auth.admin.listUsers();
-      if (usersError) throw usersError;
+      // 2. Buscar emails dos usuários via edge function
+      let authUsers: any[] = [];
+      try {
+        const { data, error: authError } = await supabase.functions.invoke("manage-user", {
+          body: { action: "list_users" }
+        });
+        if (!authError && data?.data?.users) {
+          authUsers = data.data.users;
+        }
+      } catch (err) {
+        console.error("Error fetching auth users:", err);
+      }
 
       // 3. Buscar última atividade e estatísticas de uso
       const userStats: UserStats[] = await Promise.all(
         (profiles || []).map(async (profile) => {
-          const authUser = users?.find((u: any) => u.id === profile.id);
+          const authUser = authUsers?.find((u: any) => u.id === profile.id);
           
           // Buscar tickets criados
           const { count: ticketsCount } = await supabase
