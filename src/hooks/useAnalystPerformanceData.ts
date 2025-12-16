@@ -1,6 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { startOfMonth, endOfMonth } from "date-fns";
 
 export interface AnalystMetrics {
   analyst_id: string;
@@ -12,6 +11,10 @@ export interface AnalystMetrics {
   avg_resolution_hours: number;
   tickets_by_priority: { P1: number; P2: number; P3: number; P4: number };
   tickets_by_segment: { DB: number; APP: number };
+  // CSAT metrics
+  avg_csat_rating: number | null;
+  csat_count: number;
+  csat_distribution: { 1: number; 2: number; 3: number; 4: number; 5: number };
 }
 
 interface UseAnalystPerformanceDataProps {
@@ -41,6 +44,7 @@ export const useAnalystPerformanceData = ({
           created_at,
           resolved_at,
           sla_resolution_met,
+          csat_rating,
           profiles:analyst_id (full_name)
         `)
         .gte("created_at", startDate.toISOString())
@@ -77,6 +81,9 @@ export const useAnalystPerformanceData = ({
             avg_resolution_hours: 0,
             tickets_by_priority: { P1: 0, P2: 0, P3: 0, P4: 0 },
             tickets_by_segment: { DB: 0, APP: 0 },
+            avg_csat_rating: null,
+            csat_count: 0,
+            csat_distribution: { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 },
           });
         }
 
@@ -99,15 +106,36 @@ export const useAnalystPerformanceData = ({
         if (ticket.segment === "DB" || ticket.segment === "APP") {
           metrics.tickets_by_segment[ticket.segment]++;
         }
+
+        // CSAT tracking
+        if (ticket.csat_rating !== null && ticket.csat_rating >= 1 && ticket.csat_rating <= 5) {
+          metrics.csat_count++;
+          metrics.csat_distribution[ticket.csat_rating as 1 | 2 | 3 | 4 | 5]++;
+        }
       });
 
       // Calculate rates and averages
-      const analysts = Array.from(analystMap.values()).map((analyst) => ({
-        ...analyst,
-        sla_met_rate: analyst.total_tickets > 0 
-          ? Math.round((analyst.sla_met_count / analyst.total_tickets) * 100) 
-          : 0,
-      }));
+      const analysts = Array.from(analystMap.values()).map((analyst) => {
+        // Calculate average CSAT
+        let avgCsat: number | null = null;
+        if (analyst.csat_count > 0) {
+          const totalCsatSum = 
+            analyst.csat_distribution[1] * 1 +
+            analyst.csat_distribution[2] * 2 +
+            analyst.csat_distribution[3] * 3 +
+            analyst.csat_distribution[4] * 4 +
+            analyst.csat_distribution[5] * 5;
+          avgCsat = totalCsatSum / analyst.csat_count;
+        }
+
+        return {
+          ...analyst,
+          sla_met_rate: analyst.total_tickets > 0 
+            ? Math.round((analyst.sla_met_count / analyst.total_tickets) * 100) 
+            : 0,
+          avg_csat_rating: avgCsat,
+        };
+      });
 
       // Sort by total tickets descending
       analysts.sort((a, b) => b.total_tickets - a.total_tickets);
