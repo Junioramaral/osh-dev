@@ -162,8 +162,14 @@ serve(async (req) => {
 
     console.log("✅ Validation passed, creating user...");
 
-    // Create user with default password
-    const DEFAULT_PASSWORD = "osh@123456";
+    // Generate random temporary password for each invitation
+    const generateTempPassword = (): string => {
+      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
+      const passwordArray = new Uint8Array(12);
+      crypto.getRandomValues(passwordArray);
+      return Array.from(passwordArray).map(x => chars[x % chars.length]).join('');
+    };
+    const temporaryPassword = generateTempPassword();
 
     // Validate and filter roles to only valid enum values
     const validRoles = ['super_admin', 'tenant_admin', 'analyst_db', 'analyst_app', 'user'];
@@ -179,7 +185,7 @@ serve(async (req) => {
 
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
-      password: DEFAULT_PASSWORD,
+      password: temporaryPassword,
       email_confirm: true, // Auto-confirm email
       user_metadata: {
         full_name,
@@ -319,7 +325,7 @@ serve(async (req) => {
                   </div>
                   <div class="credential-row">
                     <span class="credential-label">Senha Temporária:</span><br>
-                    <span class="credential-value">${DEFAULT_PASSWORD}</span>
+                    <span class="credential-value">${temporaryPassword}</span>
                   </div>
                 </div>
                 
