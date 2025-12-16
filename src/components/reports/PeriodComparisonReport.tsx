@@ -76,9 +76,20 @@ const PeriodComparisonReport = ({ onBack }: PeriodComparisonReportProps) => {
     { priority: "P4", [periodALabel]: data.periodA.tickets_by_priority.P4, [periodBLabel]: data.periodB.tickets_by_priority.P4 },
   ] : [];
 
+  const sanitizeForFilename = (text: string) => {
+    return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+  };
+
   const exportToPDF = () => {
     const originalTitle = document.title;
-    document.title = `Comparativo - ${periodALabel} vs ${periodBLabel}`;
+    const periodAClean = sanitizeForFilename(periodALabel);
+    const periodBClean = sanitizeForFilename(periodBLabel);
+    document.title = `Comparativo_${periodAClean}_vs_${periodBClean}`;
     window.print();
     setTimeout(() => { document.title = originalTitle; }, 100);
   };

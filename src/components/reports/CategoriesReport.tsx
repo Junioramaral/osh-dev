@@ -55,9 +55,19 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
 
   const totalTickets = data?.categories.reduce((sum, c) => sum + c.total_tickets, 0) || 0;
 
+  const sanitizeForFilename = (text: string) => {
+    return text
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .replace(/[^a-zA-Z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .replace(/^_|_$/g, "");
+  };
+
   const exportToPDF = () => {
     const originalTitle = document.title;
-    document.title = `Relatório por Categorias - ${periodLabel}`;
+    const periodClean = sanitizeForFilename(periodLabel);
+    document.title = `Relatorio_Categorias_${periodClean}`;
     window.print();
     setTimeout(() => { document.title = originalTitle; }, 100);
   };
