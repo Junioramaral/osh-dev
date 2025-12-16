@@ -15,6 +15,7 @@ import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
 import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystDialog";
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
 import { BulkAssignQueueDialog } from "@/components/tickets/BulkAssignQueueDialog";
+import { BulkStatusReasonDialog } from "@/components/tickets/BulkStatusReasonDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
@@ -27,12 +28,15 @@ export default function MyTickets() {
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
   const [showAssignTeamDialog, setShowAssignTeamDialog] = useState(false);
   const [showAssignQueueDialog, setShowAssignQueueDialog] = useState(false);
+  const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
+  const [pendingStatus, setPendingStatus] = useState<string>("");
 
   const {
     bulkAssignAnalyst,
     bulkAssignTeam,
     bulkAssignQueue,
     bulkChangeStatus,
+    bulkChangeStatusWithReason,
     bulkChangePriority,
     bulkLockTickets,
   } = useBulkTicketActions();
@@ -82,11 +86,32 @@ export default function MyTickets() {
   };
 
   const handleBulkChangeStatus = (status: string) => {
+    // Se status for resolvido, abrir dialog de motivo
+    if (status === "resolvido") {
+      setPendingStatus(status);
+      setShowStatusReasonDialog(true);
+      return;
+    }
+    
     bulkChangeStatus.mutate({
       ticketIds: Array.from(selectedTickets),
       status,
     });
     setSelectedTickets(new Set());
+  };
+
+  const handleStatusReasonConfirm = (reason: string) => {
+    if (!profile?.id) return;
+    
+    bulkChangeStatusWithReason.mutate({
+      ticketIds: Array.from(selectedTickets),
+      status: pendingStatus,
+      reason,
+      userId: profile.id,
+    });
+    setSelectedTickets(new Set());
+    setShowStatusReasonDialog(false);
+    setPendingStatus("");
   };
 
   const handleBulkChangePriority = (priority: "P1" | "P2" | "P3" | "P4") => {
@@ -371,6 +396,14 @@ export default function MyTickets() {
         onConfirm={handleBulkAssignQueue}
         selectedCount={selectedTickets.size}
         currentQueueId={getCommonQueueId()}
+      />
+
+      <BulkStatusReasonDialog
+        open={showStatusReasonDialog}
+        onOpenChange={setShowStatusReasonDialog}
+        status={pendingStatus}
+        ticketCount={selectedTickets.size}
+        onConfirm={handleStatusReasonConfirm}
       />
     </AppLayout>
   );

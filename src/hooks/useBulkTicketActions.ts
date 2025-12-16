@@ -102,13 +102,32 @@ export function useBulkTicketActions() {
       reason: string;
       userId: string;
     }) => {
+      // 1. Buscar dados do analista (autor)
+      const { data: authorProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .single();
+      
+      const authorName = authorProfile?.full_name || "Analista";
+
+      // 2. Buscar dados completos dos tickets
+      const { data: tickets } = await supabase
+        .from("tickets")
+        .select("id, ticket_number, title, contact_email, contact_name, client_id")
+        .in("id", ticketIds);
+
+      if (!tickets || tickets.length === 0) {
+        throw new Error("Tickets não encontrados");
+      }
+
       const updates: any = { status };
       
       if (status === "resolvido") {
         updates.resolved_at = new Date().toISOString();
       }
 
-      // Update ticket status
+      // 3. Atualizar status dos tickets
       const { error: updateError } = await supabase
         .from("tickets")
         .update(updates)
@@ -116,30 +135,71 @@ export function useBulkTicketActions() {
 
       if (updateError) throw updateError;
 
-      // Insert comments for each ticket with the reason
-      const statusLabel = status === "resolvido" ? "Resolvido" : "Fechado";
-      const comments = ticketIds.map((ticketId) => ({
-        ticket_id: ticketId,
-        author_id: userId,
-        content: `Motivo da alteração para ${statusLabel}: ${reason}`,
-        is_internal: false,
-      }));
+      // 4. Obter sessão para auth
+      const { data: { session } } = await supabase.auth.getSession();
 
-      const { error: commentError } = await supabase
-        .from("ticket_comments")
-        .insert(comments);
+      // 5. Inserir comentários e enviar emails para cada ticket
+      for (const ticket of tickets) {
+        const commentContent = `Motivo da Resolução: ${reason}`;
+        
+        // Inserir comentário
+        const { data: comment, error: commentError } = await supabase
+          .from("ticket_comments")
+          .insert({
+            ticket_id: ticket.id,
+            author_id: userId,
+            author_name: authorName,
+            content: commentContent,
+            is_internal: false,
+          })
+          .select()
+          .single();
 
-      if (commentError) throw commentError;
+        if (commentError) {
+          console.error("Erro ao inserir comentário:", commentError);
+          continue;
+        }
+
+        // Enviar email para o cliente
+        if (session?.access_token && ticket.contact_email) {
+          try {
+            await fetch(
+              `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/send-comment-notification`,
+              {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                  "Authorization": `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({
+                  ticketId: ticket.id,
+                  commentId: comment.id,
+                  commentContent,
+                  authorName,
+                  contactEmail: ticket.contact_email,
+                  contactName: ticket.contact_name,
+                  ticketNumber: ticket.ticket_number,
+                  ticketTitle: ticket.title,
+                }),
+              }
+            );
+            console.log(`Email enviado para ${ticket.contact_email} - Ticket ${ticket.ticket_number}`);
+          } catch (emailError) {
+            console.error(`Erro ao enviar email para ticket ${ticket.ticket_number}:`, emailError);
+          }
+        }
+      }
     },
     onSuccess: (_, variables) => {
       toast.success(
-        `${variables.ticketIds.length} ticket(s) com status alterado!`
+        `${variables.ticketIds.length} ticket(s) resolvido(s) com sucesso!`
       );
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
       queryClient.invalidateQueries({ queryKey: ["ticket-comments"] });
     },
     onError: (error: any) => {
-      toast.error("Erro ao alterar status: " + error.message);
+      toast.error("Erro ao resolver tickets: " + error.message);
     },
   });
 

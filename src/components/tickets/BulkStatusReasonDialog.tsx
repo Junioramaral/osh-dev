@@ -29,7 +29,6 @@ export function BulkStatusReasonDialog({
 }: BulkStatusReasonDialogProps) {
   const [reason, setReason] = useState("");
 
-  const statusLabel = status === "resolvido" ? "Resolvido" : "Fechado";
   const minLength = 10;
   const isValid = reason.trim().length >= minLength;
 
@@ -49,18 +48,18 @@ export function BulkStatusReasonDialog({
     <AlertDialog open={open} onOpenChange={onOpenChange}>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Motivo da Alteração de Status</AlertDialogTitle>
+          <AlertDialogTitle>Motivo da Resolução do Ticket</AlertDialogTitle>
           <AlertDialogDescription>
-            Você está alterando {ticketCount} ticket(s) para o status "{statusLabel}".
-            Por favor, explique o motivo desta alteração.
+            Você está resolvendo {ticketCount} ticket(s).
+            Descreva o motivo da resolução. Este texto será enviado ao cliente por email.
           </AlertDialogDescription>
         </AlertDialogHeader>
         
         <div className="space-y-2 py-4">
-          <Label htmlFor="reason">Motivo *</Label>
+          <Label htmlFor="reason">Motivo da Resolução *</Label>
           <Textarea
             id="reason"
-            placeholder="Descreva o motivo da alteração de status..."
+            placeholder="Descreva como o problema foi resolvido..."
             value={reason}
             onChange={(e) => setReason(e.target.value)}
             rows={4}
@@ -74,7 +73,7 @@ export function BulkStatusReasonDialog({
         <AlertDialogFooter>
           <AlertDialogCancel onClick={handleCancel}>Cancelar</AlertDialogCancel>
           <AlertDialogAction onClick={handleConfirm} disabled={!isValid}>
-            Confirmar
+            Resolver Ticket(s)
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
