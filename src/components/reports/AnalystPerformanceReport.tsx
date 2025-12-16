@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Users, Trophy, Target, Clock, FileText } from "lucide-react";
+import { ArrowLeft, Users, Trophy, Target, Clock, FileText, Star } from "lucide-react";
 import { useAnalystPerformanceData } from "@/hooks/useAnalystPerformanceData";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
 import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
@@ -17,6 +17,7 @@ interface AnalystPerformanceReportProps {
 }
 
 const COLORS = ["#3b82f6", "#22c55e", "#eab308", "#ef4444"];
+const CSAT_COLORS = ["#22c55e", "#3b82f6", "#eab308", "#f97316", "#ef4444"];
 
 const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => {
   const [period, setPeriod] = useState("current");
@@ -48,11 +49,46 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
     ? Math.round(analysts.reduce((sum, a) => sum + a.sla_met_rate, 0) / analysts.length)
     : 0;
 
+  // CSAT aggregation
+  const totalCsatResponses = analysts?.reduce((sum, a) => sum + a.csat_count, 0) || 0;
+  const avgCsatRating = analysts && totalCsatResponses > 0
+    ? analysts.reduce((sum, a) => sum + (a.avg_csat_rating || 0) * a.csat_count, 0) / totalCsatResponses
+    : 0;
+
+  // CSAT distribution aggregation
+  const csatDistribution = analysts?.reduce(
+    (acc, a) => {
+      acc[1] += a.csat_distribution[1];
+      acc[2] += a.csat_distribution[2];
+      acc[3] += a.csat_distribution[3];
+      acc[4] += a.csat_distribution[4];
+      acc[5] += a.csat_distribution[5];
+      return acc;
+    },
+    { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 }
+  ) || { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+  const csatPieData = [
+    { name: "5★", value: csatDistribution[5] },
+    { name: "4★", value: csatDistribution[4] },
+    { name: "3★", value: csatDistribution[3] },
+    { name: "2★", value: csatDistribution[2] },
+    { name: "1★", value: csatDistribution[1] },
+  ].filter(d => d.value > 0);
+
   const barChartData = analysts?.slice(0, 10).map(a => ({
     name: a.analyst_name.split(" ")[0],
     tickets: a.total_tickets,
     resolved: a.resolved_tickets,
   })) || [];
+
+  const csatBarData = analysts
+    ?.filter(a => a.csat_count > 0)
+    .slice(0, 10)
+    .map(a => ({
+      name: a.analyst_name.split(" ")[0],
+      csat: a.avg_csat_rating?.toFixed(1) || 0,
+    })) || [];
 
   const priorityData = analysts?.reduce((acc, a) => {
     acc.P1 += a.tickets_by_priority.P1;
@@ -148,7 +184,7 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
         <div className="print-section print-break-before space-y-6">
           <h2 className="text-2xl font-bold text-center mb-8">Resumo Executivo</h2>
           
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
             <Card className="print-break-avoid">
               <CardHeader className="pb-2">
                 <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
@@ -193,6 +229,21 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
                 <p className="text-3xl font-bold">{avgSlaRate}%</p>
               </CardContent>
             </Card>
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  CSAT Médio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-baseline gap-1">
+                  <p className="text-3xl font-bold">{avgCsatRating.toFixed(1)}</p>
+                  <span className="text-lg text-muted-foreground">/5</span>
+                </div>
+                <p className="text-xs text-muted-foreground">{totalCsatResponses} avaliações</p>
+              </CardContent>
+            </Card>
           </div>
 
           {/* Top Performer Highlight */}
@@ -204,6 +255,7 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
                   <p className="text-2xl font-bold text-primary">{analysts[0].analyst_name}</p>
                   <p className="text-muted-foreground">
                     {analysts[0].total_tickets} tickets • {analysts[0].resolved_tickets} resolvidos • {analysts[0].sla_met_rate}% SLA
+                    {analysts[0].csat_count > 0 && ` • ${analysts[0].avg_csat_rating?.toFixed(1)}★ CSAT`}
                   </p>
                 </div>
               </CardContent>
@@ -262,6 +314,71 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
               </CardContent>
             </Card>
           </div>
+
+          {/* CSAT Charts */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="print-break-avoid">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  Distribuição CSAT
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {csatPieData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <PieChart>
+                      <Pie
+                        data={csatPieData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={60}
+                        outerRadius={100}
+                        dataKey="value"
+                        label={({ name, value }) => `${name}: ${value}`}
+                      >
+                        {csatPieData.map((_, index) => (
+                          <Cell key={`cell-csat-${index}`} fill={CSAT_COLORS[index % CSAT_COLORS.length]} />
+                        ))}
+                      </Pie>
+                      <Legend />
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    Sem avaliações no período
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            <Card className="print-break-avoid">
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Star className="h-4 w-4 text-yellow-500" />
+                  CSAT por Analista
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {csatBarData.length > 0 ? (
+                  <ResponsiveContainer width="100%" height={300}>
+                    <BarChart data={csatBarData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="name" />
+                      <YAxis domain={[0, 5]} />
+                      <Tooltip />
+                      <Bar dataKey="csat" fill="hsl(45, 93%, 47%)" name="CSAT" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                ) : (
+                  <div className="flex items-center justify-center h-[300px] text-muted-foreground">
+                    Sem avaliações no período
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
         {/* PAGE 4+: Ranking Table */}
@@ -278,6 +395,7 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
                     <TableHead className="text-center">Total</TableHead>
                     <TableHead className="text-center">Resolvidos</TableHead>
                     <TableHead className="text-center">SLA</TableHead>
+                    <TableHead className="text-center">CSAT</TableHead>
                     <TableHead className="text-center">DB</TableHead>
                     <TableHead className="text-center">APP</TableHead>
                   </TableRow>
@@ -303,6 +421,16 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
                         >
                           {analyst.sla_met_rate}%
                         </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">
+                        {analyst.csat_count > 0 ? (
+                          <div className="flex items-center justify-center gap-1">
+                            <Star className="h-3 w-3 fill-yellow-400 text-yellow-400" />
+                            <span>{analyst.avg_csat_rating?.toFixed(1)}</span>
+                          </div>
+                        ) : (
+                          <span className="text-muted-foreground">-</span>
+                        )}
                       </TableCell>
                       <TableCell className="text-center">{analyst.tickets_by_segment.DB}</TableCell>
                       <TableCell className="text-center">{analyst.tickets_by_segment.APP}</TableCell>

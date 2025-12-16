@@ -20,6 +20,7 @@ import {
   Shield,
   Settings,
   FileBarChart,
+  Star,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -59,6 +60,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
     { name: "Meus Tickets", href: "/my-tickets", icon: UserCheck, show: isOtimizzoUser || isSuperAdmin },
     { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Satisfação (CSAT)", href: "/csat", icon: Star, show: isSuperAdmin || isOtimizzoUser },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
     { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isSuperAdmin || isOtimizzoUser },
   ].filter(item => item.show);
