@@ -138,12 +138,22 @@ export function useBulkTicketActions() {
       // 4. Obter sessão para auth
       const { data: { session } } = await supabase.auth.getSession();
 
-      // 5. Inserir comentários e enviar emails para cada ticket
+      // 5. Buscar dados de created_at dos tickets
+      const { data: ticketsWithDates } = await supabase
+        .from("tickets")
+        .select("id, created_at")
+        .in("id", ticketIds);
+
+      const ticketCreatedAtMap = new Map(
+        ticketsWithDates?.map(t => [t.id, t.created_at]) || []
+      );
+
+      // 6. Inserir comentários e enviar emails para cada ticket
       for (const ticket of tickets) {
         const commentContent = `Motivo da Resolução: ${reason}`;
         
         // Inserir comentário
-        const { data: comment, error: commentError } = await supabase
+        const { error: commentError } = await supabase
           .from("ticket_comments")
           .insert({
             ticket_id: ticket.id,
@@ -151,20 +161,18 @@ export function useBulkTicketActions() {
             author_name: authorName,
             content: commentContent,
             is_internal: false,
-          })
-          .select()
-          .single();
+          });
 
         if (commentError) {
           console.error("Erro ao inserir comentário:", commentError);
           continue;
         }
 
-        // Enviar email para o cliente
+        // Enviar email de resolução para o cliente
         if (session?.access_token && ticket.contact_email) {
           try {
             await fetch(
-              `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/send-comment-notification`,
+              `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/send-resolution-notification`,
               {
                 method: "POST",
                 headers: {
@@ -173,17 +181,18 @@ export function useBulkTicketActions() {
                 },
                 body: JSON.stringify({
                   ticketId: ticket.id,
-                  commentId: comment.id,
-                  commentContent,
-                  authorName,
-                  contactEmail: ticket.contact_email,
-                  contactName: ticket.contact_name,
                   ticketNumber: ticket.ticket_number,
                   ticketTitle: ticket.title,
+                  contactEmail: ticket.contact_email,
+                  contactName: ticket.contact_name,
+                  resolutionReason: reason,
+                  analystName: authorName,
+                  createdAt: ticketCreatedAtMap.get(ticket.id) || new Date().toISOString(),
+                  resolvedAt: updates.resolved_at,
                 }),
               }
             );
-            console.log(`Email enviado para ${ticket.contact_email} - Ticket ${ticket.ticket_number}`);
+            console.log(`Email de resolução enviado para ${ticket.contact_email} - Ticket ${ticket.ticket_number}`);
           } catch (emailError) {
             console.error(`Erro ao enviar email para ticket ${ticket.ticket_number}:`, emailError);
           }

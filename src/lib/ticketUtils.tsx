@@ -152,9 +152,9 @@ export const getStatusColor = (status: string) => {
   switch (status) {
     case 'novo':
       return 'bg-blue-100 text-blue-800 border-blue-300';
-    case 'em-atendimento':
+    case 'em_atendimento':
       return 'bg-purple-100 text-purple-800 border-purple-300';
-    case 'aguardando':
+    case 'aguardando_cliente':
       return 'bg-yellow-100 text-yellow-800 border-yellow-300';
     case 'resolvido':
       return 'bg-green-100 text-green-800 border-green-300';
@@ -162,5 +162,22 @@ export const getStatusColor = (status: string) => {
       return 'bg-gray-100 text-gray-800 border-gray-300';
     default:
       return 'bg-gray-100 text-gray-800 border-gray-300';
+  }
+};
+
+export const getStatusLabel = (status: string) => {
+  switch (status) {
+    case 'novo':
+      return 'Novo';
+    case 'em_atendimento':
+      return 'Em Atendimento';
+    case 'aguardando_cliente':
+      return 'Aguardando Cliente';
+    case 'resolvido':
+      return 'Resolvido';
+    case 'fechado':
+      return 'Fechado';
+    default:
+      return status;
   }
 };
