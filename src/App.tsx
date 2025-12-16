@@ -21,6 +21,7 @@ import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
 import UserPermissions from "./pages/UserPermissions";
 import SystemSettings from "./pages/SystemSettings";
+import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -46,6 +47,7 @@ const App = () => (
             <Route path="/applications" element={<Applications />} />
             <Route path="/machines" element={<Machines />} />
             <Route path="/faq" element={<FAQ />} />
+            <Route path="/reports" element={<Reports />} />
             <Route path="/admin/tenants" element={<TenantAdmin />} />
             <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
             <Route path="/admin/permissions" element={<UserPermissions />} />
