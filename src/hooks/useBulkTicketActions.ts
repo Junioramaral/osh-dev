@@ -252,6 +252,7 @@ export function useBulkTicketActions() {
           lock_status: "locked",
           lock_owner_id: userId,
           lock_at: new Date().toISOString(),
+          analyst_id: userId,
         })
         .in("id", ticketIds);
 
@@ -262,6 +263,9 @@ export function useBulkTicketActions() {
         `${variables.ticketIds.length} ticket(s) assumido(s) com sucesso!`
       );
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history"] });
     },
     onError: (error: any) => {
       toast.error("Erro ao assumir tickets: " + error.message);
