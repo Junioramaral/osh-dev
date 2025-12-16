@@ -10,9 +10,11 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Send, Paperclip, Info, Lock, Mail, Reply } from "lucide-react";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
+import { Send, Paperclip, Info, Lock, Mail, Reply, Plus, ChevronDown, Users } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 
@@ -100,7 +102,25 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
   const { data: comments, isLoading } = useTicketComments(ticketId);
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
+  const [showCcField, setShowCcField] = useState(false);
+  const [ccEmails, setCcEmails] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  
+  // Validate and parse CC emails
+  const validateEmails = (emailString: string): string[] => {
+    if (!emailString.trim()) return [];
+    
+    const emails = emailString.split(',').map(e => e.trim()).filter(Boolean);
+    const validEmails: string[] = [];
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    
+    for (const email of emails) {
+      if (emailRegex.test(email)) {
+        validEmails.push(email);
+      }
+    }
+    return validEmails;
+  };
   
   // IMPROVED: Detect client using profile.client_id as PRIMARY indicator
   // This is more reliable than tenantId from roles which may not be loaded yet
@@ -122,7 +142,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async ({ content, is_internal }: { content: string; is_internal: boolean }) => {
+    mutationFn: async ({ content, is_internal, ccEmails }: { content: string; is_internal: boolean; ccEmails: string[] }) => {
       // Fetch ticket details first
       const { data: ticketData, error: ticketError } = await supabase
         .from('tickets')
@@ -176,6 +196,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
               commentContent: content,
               clientName: ticketData.contact_name,
               clientEmail: ticketData.contact_email,
+              ccEmails: ccEmails.length > 0 ? ccEmails : undefined,
             }
           });
           
@@ -203,6 +224,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
               contactName: ticketData.contact_name,
               ticketNumber: ticketData.ticket_number,
               ticketTitle: ticketData.title,
+              ccEmails: ccEmails.length > 0 ? ccEmails : undefined,
             }
           });
           
@@ -216,24 +238,28 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
         }
       }
       
-      return { commentData, isExternal: !is_internal, isClientComment: isClientUser };
+      return { commentData, isExternal: !is_internal, isClientComment: isClientUser, hasCc: ccEmails.length > 0 };
     },
     onSuccess: (data) => {
       setNewComment('');
       setIsInternal(false);
+      setCcEmails('');
+      setShowCcField(false);
       queryClient.invalidateQueries({ queryKey: ['ticket-comments', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
       
+      const ccMessage = data.hasCc ? ' (com cópia)' : '';
+      
       if (data.isClientComment) {
         toast({ 
           title: 'Comentário enviado',
-          description: 'O analista responsável será notificado'
+          description: `O analista responsável será notificado${ccMessage}`
         });
       } else if (data.isExternal) {
         toast({ 
           title: 'Comentário enviado e cliente notificado por email',
-          description: 'O cliente receberá uma notificação sobre esta atualização'
+          description: `O cliente receberá uma notificação sobre esta atualização${ccMessage}`
         });
       } else {
         toast({ title: 'Comentário interno adicionado com sucesso' });
@@ -260,7 +286,8 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
       return;
     }
     
-    addCommentMutation.mutate({ content: newComment, is_internal: isInternal });
+    const validatedCcEmails = validateEmails(ccEmails);
+    addCommentMutation.mutate({ content: newComment, is_internal: isInternal, ccEmails: validatedCcEmails });
   };
   
   return (
@@ -289,6 +316,34 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           </p>
         </div>
         
+        {/* CC Field - Collapsible */}
+        {!isInternal && (
+          <Collapsible open={showCcField} onOpenChange={setShowCcField} className="mb-3">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground h-8 px-2">
+                {showCcField ? <ChevronDown className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                {showCcField ? 'Ocultar CC' : 'Adicionar emails em cópia (CC)'}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <div className="space-y-1">
+                <div className="flex items-center gap-2">
+                  <Users className="h-4 w-4 text-muted-foreground" />
+                  <Input
+                    value={ccEmails}
+                    onChange={(e) => setCcEmails(e.target.value)}
+                    placeholder="email1@exemplo.com, email2@exemplo.com"
+                    className="text-sm"
+                  />
+                </div>
+                <p className="text-xs text-muted-foreground ml-6">
+                  Separe múltiplos emails por vírgula. Eles receberão uma cópia da notificação.
+                </p>
+              </div>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
+        
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
             <div className="flex items-center gap-2">
@@ -315,7 +370,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
             {!isInternal && (
               <span className="text-xs text-muted-foreground flex items-center gap-1">
                 <Mail className="h-3 w-3" />
-                Cliente será notificado
+                {ccEmails.trim() ? `Cliente + ${validateEmails(ccEmails).length} CC` : 'Cliente será notificado'}
               </span>
             )}
             <Button 
