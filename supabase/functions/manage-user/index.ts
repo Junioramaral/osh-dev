@@ -1,10 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schemas
+const ManageUserSchema = z.object({
+  action: z.enum(['update_email', 'delete', 'resend_invite', 'get_user', 'list_users']),
+  userId: z.string().uuid().optional(),
+  data: z.object({
+    email: z.string().email().max(255).optional(),
+  }).optional(),
+});
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -13,7 +23,22 @@ serve(async (req) => {
   }
 
   try {
-    const { action, userId, data } = await req.json();
+    // Validate input using Zod schema
+    const rawData = await req.json();
+    const validationResult = ManageUserSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error('[manage-user] Validation error:', validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, userId, data } = validationResult.data;
     
     console.log(`[manage-user] Action: ${action}, UserId: ${userId}`);
 
@@ -70,26 +95,26 @@ serve(async (req) => {
 
     switch (action) {
       case "update_email":
-        console.log(`[manage-user] Updating email for user ${userId} to ${data.email}`);
-        result = await supabaseAdmin.auth.admin.updateUserById(userId, { 
-          email: data.email,
+        console.log(`[manage-user] Updating email for user ${userId} to ${data?.email}`);
+        result = await supabaseAdmin.auth.admin.updateUserById(userId!, { 
+          email: data?.email,
           email_confirm: true
         });
         break;
 
       case "delete":
         console.log(`[manage-user] Deleting user ${userId}`);
-        result = await supabaseAdmin.auth.admin.deleteUser(userId);
+        result = await supabaseAdmin.auth.admin.deleteUser(userId!);
         break;
 
       case "resend_invite":
-        console.log(`[manage-user] Resending invite to ${data.email}`);
-        result = await supabaseAdmin.auth.admin.inviteUserByEmail(data.email);
+        console.log(`[manage-user] Resending invite to ${data?.email}`);
+        result = await supabaseAdmin.auth.admin.inviteUserByEmail(data?.email!);
         break;
 
       case "get_user":
         console.log(`[manage-user] Getting user ${userId}`);
-        result = await supabaseAdmin.auth.admin.getUserById(userId);
+        result = await supabaseAdmin.auth.admin.getUserById(userId!);
         break;
 
       case "list_users":
