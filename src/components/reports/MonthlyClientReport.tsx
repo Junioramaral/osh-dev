@@ -63,7 +63,17 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
   }, []);
 
   const exportToPDF = () => {
+    // Save original title and set report-specific title to avoid URL in browser print header
+    const originalTitle = document.title;
+    const monthName = format(new Date(selectedYear, selectedMonth - 1, 1), "MMMM yyyy", { locale: ptBR });
+    document.title = `Relatório Mensal - ${reportData?.client?.name || "Cliente"} - ${monthName}`;
+    
     window.print();
+    
+    // Restore original title after print dialog
+    setTimeout(() => {
+      document.title = originalTitle;
+    }, 100);
   };
 
   const exportToCSV = () => {
