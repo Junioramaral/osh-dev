@@ -7,7 +7,8 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Building2, AlertCircle } from "lucide-react";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Plus, Building2, AlertCircle, Mail } from "lucide-react";
 import ClientDialog from "@/components/clients/ClientDialog";
 import type { Tables } from "@/integrations/supabase/types";
 
@@ -110,7 +111,19 @@ export default function Clients() {
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">
                     <Building2 className="h-5 w-5 text-primary" />
-                    {client.name}
+                    <span className="flex-1">{client.name}</span>
+                    {(client as any).receive_monthly_report && (
+                      <TooltipProvider>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <Mail className="h-4 w-4 text-primary" />
+                          </TooltipTrigger>
+                          <TooltipContent>
+                            <p>Recebe relatório mensal</p>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
+                    )}
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">

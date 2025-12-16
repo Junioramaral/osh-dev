@@ -5,13 +5,14 @@ import * as z from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Loader2, Database, Package } from "lucide-react";
+import { Switch } from "@/components/ui/switch";
+import { Loader2, Database, Package, Mail } from "lucide-react";
 
 // Ícones SVG específicos para cada engine de banco de dados
 const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
@@ -140,6 +141,7 @@ const clientSchema = z.object({
   sla_app_p3_resolution: z.coerce.number().min(1).default(960),
   sla_app_p4_first_response: z.coerce.number().min(1).default(120),
   sla_app_p4_resolution: z.coerce.number().min(1).default(1920),
+  receive_monthly_report: z.boolean().default(false),
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
@@ -204,6 +206,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
       sla_app_p3_resolution: 960,
       sla_app_p4_first_response: 120,
       sla_app_p4_resolution: 1920,
+      receive_monthly_report: false,
     },
   });
 
@@ -238,6 +241,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         sla_app_p3_resolution: client.sla_app_p3_resolution || 960,
         sla_app_p4_first_response: client.sla_app_p4_first_response || 120,
         sla_app_p4_resolution: client.sla_app_p4_resolution || 1920,
+        receive_monthly_report: (client as any).receive_monthly_report || false,
       });
     } else {
       setSelectedSegments([]);
@@ -256,6 +260,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         app_product_ids: data.app_product_ids || [],
         contract_start_date: data.contract_start_date || null,
         contract_end_date: data.contract_end_date || null,
+        receive_monthly_report: data.receive_monthly_report || false,
       };
 
       if (mode === "create") {
@@ -570,6 +575,31 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                     )}
                   />
                 </div>
+
+                {/* Relatório Mensal Automático */}
+                <FormField
+                  control={form.control}
+                  name="receive_monthly_report"
+                  render={({ field }) => (
+                    <FormItem className="flex flex-row items-center justify-between rounded-lg border p-4 bg-muted/30">
+                      <div className="space-y-0.5">
+                        <FormLabel className="text-base flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-primary" />
+                          Relatório Mensal Automático
+                        </FormLabel>
+                        <FormDescription>
+                          Enviar relatório mensal por email no 1º dia de cada mês para os contatos do cliente
+                        </FormDescription>
+                      </div>
+                      <FormControl>
+                        <Switch
+                          checked={field.value}
+                          onCheckedChange={field.onChange}
+                        />
+                      </FormControl>
+                    </FormItem>
+                  )}
+                />
               </TabsContent>
 
               <TabsContent value="sla" className="space-y-6">
