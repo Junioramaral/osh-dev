@@ -1,5 +1,4 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { format } from "date-fns";
 
 interface TicketDetailsProps {
@@ -27,8 +26,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 export default function TicketDetails({ ticket }: TicketDetailsProps) {
   return (
-    <ScrollArea className="h-[600px]">
-      <div className="space-y-6 p-6">
+    <div className="space-y-6 p-6">
         <Section title="Descrição do Problema">
           <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.description}</p>
         </Section>
@@ -100,6 +98,5 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
           </div>
         </Section>
       </div>
-    </ScrollArea>
   );
 }
