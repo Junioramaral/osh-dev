@@ -3,13 +3,15 @@ import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { Users, UserCheck, UserX, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Users, UserCheck, UserX, Activity, Download, FileText } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Skeleton } from "@/components/ui/skeleton";
 
 interface TenantUserReportProps {
   tenantId: string;
+  tenantName?: string;
 }
 
 interface UserStats {
@@ -24,7 +26,7 @@ interface UserStats {
   commentsCreated: number;
 }
 
-export const TenantUserReport = ({ tenantId }: TenantUserReportProps) => {
+export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUserReportProps) => {
   const { data: stats, isLoading } = useQuery({
     queryKey: ["tenant-user-report", tenantId],
     queryFn: async () => {
@@ -137,6 +139,7 @@ export const TenantUserReport = ({ tenantId }: TenantUserReportProps) => {
 
   const getRoleLabel = (role: string) => {
     const labels: Record<string, string> = {
+      super_admin: "Super Admin",
       tenant_admin: "Administrador",
       analyst_db: "Analista DB",
       analyst_app: "Analista APP",
@@ -149,6 +152,119 @@ export const TenantUserReport = ({ tenantId }: TenantUserReportProps) => {
     if (role === "tenant_admin") return "default";
     if (role.includes("analyst")) return "secondary";
     return "outline";
+  };
+
+  const exportToCSV = () => {
+    if (!stats?.users.length) return;
+
+    const headers = [
+      "Nome", "Email", "Status", "Perfil",
+      "Tickets", "Comentários", "Última Atividade", "Cadastrado em"
+    ];
+
+    const rows = stats.users.map(user => [
+      user.fullName,
+      user.email,
+      user.isActive ? "Ativo" : "Inativo",
+      getRoleLabel(user.role),
+      user.ticketsCreated,
+      user.commentsCreated,
+      user.lastActivity ? format(new Date(user.lastActivity), "dd/MM/yyyy HH:mm") : "Sem atividade",
+      format(new Date(user.createdAt), "dd/MM/yyyy")
+    ]);
+
+    const csvContent = [
+      headers.join(";"),
+      ...rows.map(row => row.join(";"))
+    ].join("\n");
+
+    const blob = new Blob(["\ufeff" + csvContent], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `relatorio-usuarios-${tenantName.replace(/\s+/g, "-")}-${format(new Date(), "yyyy-MM-dd")}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const exportToPDF = () => {
+    if (!stats) return;
+
+    const printWindow = window.open("", "_blank");
+    if (!printWindow) return;
+
+    const printContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Relatório de Usuários - ${tenantName}</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; }
+          h1 { font-size: 18px; margin-bottom: 10px; }
+          .date { font-size: 12px; color: #666; margin-bottom: 20px; }
+          .summary { display: flex; gap: 20px; margin-bottom: 20px; flex-wrap: wrap; }
+          .summary-card { border: 1px solid #ddd; padding: 12px 16px; border-radius: 4px; min-width: 120px; }
+          .summary-card strong { display: block; font-size: 20px; margin-bottom: 4px; }
+          .summary-card span { font-size: 12px; color: #666; }
+          table { width: 100%; border-collapse: collapse; font-size: 11px; margin-top: 20px; }
+          th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+          th { background-color: #f5f5f5; font-weight: 600; }
+          .badge { padding: 2px 8px; border-radius: 4px; font-size: 10px; }
+          .active { background: #dcfce7; color: #166534; }
+          .inactive { background: #f3f4f6; color: #6b7280; }
+          .footer { margin-top: 30px; font-size: 10px; color: #666; text-align: center; border-top: 1px solid #eee; padding-top: 10px; }
+          @media print { body { padding: 0; } }
+        </style>
+      </head>
+      <body>
+        <h1>Relatório de Usuários - ${tenantName}</h1>
+        <p class="date">Gerado em: ${format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}</p>
+        
+        <div class="summary">
+          <div class="summary-card"><strong>${stats.summary.total}</strong><span>Total de Usuários</span></div>
+          <div class="summary-card"><strong>${stats.summary.active}</strong><span>Usuários Ativos</span></div>
+          <div class="summary-card"><strong>${stats.summary.inactive}</strong><span>Usuários Inativos</span></div>
+          <div class="summary-card"><strong>${stats.summary.totalTickets}</strong><span>Tickets</span></div>
+          <div class="summary-card"><strong>${stats.summary.totalComments}</strong><span>Comentários</span></div>
+        </div>
+        
+        <table>
+          <thead>
+            <tr>
+              <th>Nome</th>
+              <th>Email</th>
+              <th>Status</th>
+              <th>Perfil</th>
+              <th>Tickets</th>
+              <th>Comentários</th>
+              <th>Última Atividade</th>
+              <th>Cadastro</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${stats.users.map(user => `
+              <tr>
+                <td>${user.fullName}</td>
+                <td>${user.email}</td>
+                <td><span class="badge ${user.isActive ? "active" : "inactive"}">${user.isActive ? "Ativo" : "Inativo"}</span></td>
+                <td>${getRoleLabel(user.role)}</td>
+                <td style="text-align: center">${user.ticketsCreated}</td>
+                <td style="text-align: center">${user.commentsCreated}</td>
+                <td>${user.lastActivity ? format(new Date(user.lastActivity), "dd/MM/yyyy HH:mm") : "-"}</td>
+                <td>${format(new Date(user.createdAt), "dd/MM/yyyy")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+        
+        <div class="footer">Otimizzo Suporte - Relatório de Usuários</div>
+      </body>
+      </html>
+    `;
+
+    printWindow.document.write(printContent);
+    printWindow.document.close();
+    printWindow.print();
   };
 
   if (isLoading) {
@@ -241,11 +357,23 @@ export const TenantUserReport = ({ tenantId }: TenantUserReportProps) => {
 
       {/* Tabela de Detalhes */}
       <Card>
-        <CardHeader>
-          <CardTitle>Detalhamento por Usuário</CardTitle>
-          <CardDescription>
-            Informações detalhadas de atividade e uso de recursos
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Detalhamento por Usuário</CardTitle>
+            <CardDescription>
+              Informações detalhadas de atividade e uso de recursos
+            </CardDescription>
+          </div>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" onClick={exportToCSV} disabled={!stats?.users.length}>
+              <Download className="h-4 w-4 mr-2" />
+              Exportar CSV
+            </Button>
+            <Button variant="outline" size="sm" onClick={exportToPDF} disabled={!stats?.users.length}>
+              <FileText className="h-4 w-4 mr-2" />
+              Exportar PDF
+            </Button>
+          </div>
         </CardHeader>
         <CardContent>
           <Table>
