@@ -77,10 +77,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Verify ticket exists
+    // Verify ticket exists and get feedback token
     const { data: ticket, error: ticketError } = await supabase
       .from("tickets")
-      .select("id, client_id, analyst_id")
+      .select("id, client_id, analyst_id, feedback_token")
       .eq("id", ticketId)
       .single();
 
@@ -123,6 +123,10 @@ const handler = async (req: Request): Promise<Response> => {
         minute: '2-digit'
       });
     };
+
+    // Build feedback URL
+    const appUrl = Deno.env.get("APP_URL") || "https://otimizzo.lovable.app";
+    const feedbackUrl = `${appUrl}/feedback/${ticketId}/${ticket.feedback_token}`;
 
     const emailResponse = await resend.emails.send({
       from: "Otimizzo Suporte <noreply@otimizzo.com>",
@@ -183,6 +187,38 @@ const handler = async (req: Request): Promise<Response> => {
                 <h4>📋 Motivo da Resolução</h4>
                 <p>${resolutionReason}</p>
                 <p class="analyst">Resolvido por: <strong>${analystName}</strong></p>
+              </div>
+              
+              <!-- CSAT Feedback Section -->
+              <div style="text-align: center; margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px;">
+                <h3 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">⭐ Como foi nosso atendimento?</h3>
+                <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">Sua opinião é muito importante para nós</p>
+                
+                <div style="margin: 20px 0;">
+                  <a href="${feedbackUrl}?rating=1" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
+                  <a href="${feedbackUrl}?rating=2" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
+                  <a href="${feedbackUrl}?rating=3" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
+                  <a href="${feedbackUrl}?rating=4" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
+                  <a href="${feedbackUrl}?rating=5" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
+                </div>
+                
+                <p style="margin: 0 0 15px 0; font-size: 12px; color: #888;">
+                  Clique em uma estrela para avaliar rapidamente
+                </p>
+                
+                <a href="${feedbackUrl}" style="
+                  display: inline-block;
+                  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
+                  color: white;
+                  padding: 12px 28px;
+                  border-radius: 25px;
+                  text-decoration: none;
+                  font-weight: bold;
+                  font-size: 14px;
+                  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
+                ">
+                  Avaliar Atendimento
+                </a>
               </div>
               
               <div class="feedback-note">

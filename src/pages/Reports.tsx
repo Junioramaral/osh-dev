@@ -3,15 +3,16 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileBarChart, TrendingUp, PieChart, GitCompare, Clock, History } from "lucide-react";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, Clock, History, Timer } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
 import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
 import CategoriesReport from "@/components/reports/CategoriesReport";
 import PeriodComparisonReport from "@/components/reports/PeriodComparisonReport";
+import ResolutionTimeReport from "@/components/reports/ResolutionTimeReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
 
-type ReportType = "monthly" | "categories" | "performance" | "comparison" | null;
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | null;
 
 const reportTypes = [
   {
@@ -42,6 +43,13 @@ const reportTypes = [
     icon: GitCompare,
     highlight: false,
   },
+  {
+    id: "resolution-time" as const,
+    title: "Tempo de Resolução",
+    description: "Análise detalhada de tempo médio de resolução por analista, categoria e prioridade",
+    icon: Timer,
+    highlight: false,
+  },
 ];
 
 const Reports = () => {
@@ -62,6 +70,10 @@ const Reports = () => {
 
   if (selectedReport === "comparison") {
     return <PeriodComparisonReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "resolution-time") {
+    return <ResolutionTimeReport onBack={() => setSelectedReport(null)} />;
   }
 
   return (

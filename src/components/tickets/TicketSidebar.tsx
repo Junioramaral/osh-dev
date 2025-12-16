@@ -21,10 +21,11 @@ import {
 } from "@/components/ui/select";
 import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink, CheckCircle } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle, Star } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useAuth } from "@/contexts/AuthContext";
+import { cn } from "@/lib/utils";
 
 interface TicketSidebarProps {
   ticket: any;
@@ -151,6 +152,39 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         onConfirm={handleResolveConfirm}
         isLoading={resolveTicketWithReason.isPending}
       />
+
+      {/* CSAT Rating Card */}
+      {ticket.csat_rating && (
+        <Card className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20 dark:border-yellow-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Star className="h-4 w-4 text-yellow-500" />
+              Avaliação do Cliente
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex items-center gap-1">
+              {[1, 2, 3, 4, 5].map((star) => (
+                <Star
+                  key={star}
+                  className={cn(
+                    "h-5 w-5",
+                    star <= ticket.csat_rating
+                      ? "fill-yellow-400 text-yellow-400"
+                      : "text-muted-foreground/30"
+                  )}
+                />
+              ))}
+              <span className="ml-2 font-semibold">{ticket.csat_rating}/5</span>
+            </div>
+            {ticket.csat_comment && (
+              <p className="mt-2 text-sm text-muted-foreground italic">
+                "{ticket.csat_comment}"
+              </p>
+            )}
+          </CardContent>
+        </Card>
+      )}
 
       {/* FAQ Relacionada */}
       {ticket.faq_articles && (

@@ -11,6 +11,7 @@ import Dashboard from "./pages/Dashboard";
 import Tickets from "./pages/Tickets";
 import MyTickets from "./pages/MyTickets";
 import TicketDetail from "./pages/TicketDetail";
+import TicketFeedback from "./pages/TicketFeedback";
 import Clients from "./pages/Clients";
 import Databases from "./pages/Databases";
 import Applications from "./pages/Applications";
@@ -41,6 +42,7 @@ const App = () => (
             <Route path="/tickets" element={<Tickets />} />
             <Route path="/my-tickets" element={<MyTickets />} />
             <Route path="/tickets/:ticketId" element={<TicketDetail />} />
+            <Route path="/feedback/:ticketId/:token" element={<TicketFeedback />} />
             <Route path="/sla-dashboard" element={<SLADashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/databases" element={<Databases />} />
