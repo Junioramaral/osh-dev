@@ -91,7 +91,7 @@ interface TicketCommentsProps {
   };
 }
 
-// Otimizzo tenant ID for client detection
+// Otimizzo client/tenant ID for client detection
 const OTIMIZZO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 export default function TicketComments({ ticketId, ticket }: TicketCommentsProps) {
@@ -102,9 +102,14 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
   const [isInternal, setIsInternal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Check if current user is a client using tenantId (more reliable than role checks)
-  // A client is someone whose tenantId is NOT Otimizzo
-  const isClientUser = tenantId !== null && tenantId !== OTIMIZZO_TENANT_ID;
+  // IMPROVED: Detect client using profile.client_id as PRIMARY indicator
+  // This is more reliable than tenantId from roles which may not be loaded yet
+  // A user is a client if their profile.client_id is NOT Otimizzo
+  const isClientByProfile = profile?.client_id !== null && 
+                            profile?.client_id !== undefined && 
+                            profile?.client_id !== OTIMIZZO_TENANT_ID;
+  const isClientByTenant = tenantId !== null && tenantId !== OTIMIZZO_TENANT_ID;
+  const isClientUser = isClientByProfile || isClientByTenant;
   
   // Debug logging for troubleshooting notification issues
   console.log('[TicketComments] Auth state:', {
