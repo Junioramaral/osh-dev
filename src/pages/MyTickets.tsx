@@ -202,6 +202,7 @@ export default function MyTickets() {
           profiles!tickets_analyst_id_fkey(full_name),
           lock_owner:profiles!tickets_lock_owner_id_fkey(full_name),
           teams(id, name, segment),
+          queues(id, name),
           sla_first_response_deadline,
           sla_resolution_deadline,
           sla_first_response_met,
@@ -330,6 +331,7 @@ export default function MyTickets() {
                   <TableHead>Cliente</TableHead>
                   <TableHead>Analista</TableHead>
                   <TableHead>Time</TableHead>
+                  <TableHead>Fila</TableHead>
                   <TableHead>Prioridade</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead>SLA</TableHead>
