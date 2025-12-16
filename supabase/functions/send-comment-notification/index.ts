@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.80.0";
 import { Resend } from "https://esm.sh/resend@4.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
@@ -11,17 +12,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-interface NotificationRequest {
-  ticketId: string;
-  commentId: string;
-  commentContent: string;
-  authorName: string;
-  contactEmail: string;
-  contactName: string;
-  ticketNumber: string;
-  ticketTitle: string;
-  ccEmails?: string[];
-}
+// Input validation schema
+const CommentNotificationSchema = z.object({
+  ticketId: z.string().uuid(),
+  commentId: z.string().uuid(),
+  commentContent: z.string().min(1).max(10000),
+  authorName: z.string().min(1).max(255),
+  contactEmail: z.string().email().max(255),
+  contactName: z.string().min(1).max(255),
+  ticketNumber: z.string().regex(/^[0-9]+$/, "Must be numeric"),
+  ticketTitle: z.string().min(1).max(500),
+  ccEmails: z.array(z.string().email()).max(10).optional(),
+});
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === "OPTIONS") {
@@ -56,6 +58,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log("Authenticated user:", user.id);
 
+    // Validate input using Zod schema
+    const rawData = await req.json();
+    const validationResult = CommentNotificationSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error("Validation error:", validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const {
       ticketId,
       commentId,
@@ -66,16 +83,7 @@ const handler = async (req: Request): Promise<Response> => {
       ticketNumber,
       ticketTitle,
       ccEmails,
-    }: NotificationRequest = await req.json();
-
-    // SECURITY: Validate required fields
-    if (!ticketId || !commentId || !ticketNumber) {
-      console.error("Missing required fields");
-      return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
-    }
+    } = validationResult.data;
 
     // SECURITY: Verify the comment exists and belongs to the ticket
     const { data: comment, error: commentError } = await supabase

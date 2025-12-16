@@ -1,6 +1,7 @@
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.80.0";
 import { Resend } from "https://esm.sh/resend@4.0.0";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -9,14 +10,17 @@ const corsHeaders = {
 
 const resend = new Resend(Deno.env.get("RESEND_API_KEY"));
 
-interface InviteUserRequest {
-  email: string;
-  full_name: string;
-  phone?: string;
-  tenant_id: string;
-  roles: string[]; // Changed to array for multiple roles
-  role?: string; // Keep for backward compatibility
-}
+// Input validation schema
+const InviteUserSchema = z.object({
+  email: z.string().email("Invalid email format").max(255, "Email too long"),
+  full_name: z.string().min(1, "Name is required").max(255, "Name too long").trim(),
+  phone: z.string().max(20, "Phone number too long").regex(/^[0-9+() -]*$/, "Invalid phone format").optional().nullable(),
+  tenant_id: z.string().uuid("Invalid tenant ID format"),
+  roles: z.array(
+    z.enum(['super_admin', 'tenant_admin', 'analyst_db', 'analyst_app', 'user'])
+  ).min(1).max(5).optional(),
+  role: z.enum(['super_admin', 'tenant_admin', 'analyst_db', 'analyst_app', 'user']).optional(),
+});
 
 serve(async (req) => {
   if (req.method === "OPTIONS") {
@@ -37,27 +41,33 @@ serve(async (req) => {
     // Admin client for user creation
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
-    const requestData: InviteUserRequest = await req.json();
-    const { email, full_name, phone, tenant_id } = requestData;
+    // Validate input using Zod schema
+    const rawData = await req.json();
+    const validationResult = InviteUserSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error("❌ Validation error:", validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: "Invalid input", 
+          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        }), 
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    const { email, full_name, phone, tenant_id } = validationResult.data;
     
     // Support both 'roles' array and legacy 'role' string
-    let roles: string[] = requestData.roles || [];
-    if (roles.length === 0 && requestData.role) {
-      roles = [requestData.role];
+    let roles: string[] = validationResult.data.roles || [];
+    if (roles.length === 0 && validationResult.data.role) {
+      roles = [validationResult.data.role];
     }
     if (roles.length === 0) {
       roles = ["user"];
     }
 
     console.log("🔍 Invite user request:", { email, full_name, phone, tenant_id, roles });
-
-    // Validate input
-    if (!email || !full_name || !tenant_id || roles.length === 0) {
-      return new Response(JSON.stringify({ error: "Missing required fields" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
 
     // Get current user
     const {

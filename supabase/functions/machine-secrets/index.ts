@@ -1,10 +1,20 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+// Input validation schema
+const MachineSecretsSchema = z.object({
+  action: z.enum(['create', 'decrypt', 'update']),
+  password: z.string().min(1).max(500).optional(),
+  secretId: z.string().uuid().optional(),
+  name: z.string().min(1).max(100).optional(),
+  machineId: z.string().uuid().optional(),
+});
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -46,7 +56,22 @@ serve(async (req) => {
     const isSuperAdmin = userRole.role === 'super_admin';
     const isOtimizzoUser = userRole.tenant_id === '00000000-0000-0000-0000-000000000001';
 
-    const { action, password, secretId, name, machineId } = await req.json();
+    // Validate input using Zod schema
+    const rawData = await req.json();
+    const validationResult = MachineSecretsSchema.safeParse(rawData);
+    
+    if (!validationResult.success) {
+      console.error('❌ Validation error:', validationResult.error.errors);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Invalid input', 
+          details: validationResult.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const { action, password, secretId, name, machineId } = validationResult.data;
 
     console.log(`🔐 Machine Secrets: Action=${action}, User=${user.email}, IsSuperAdmin=${isSuperAdmin}`);
 
