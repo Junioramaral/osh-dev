@@ -166,14 +166,14 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   );
 
   return (
-    <div className="flex h-screen bg-background">
+    <div className="flex h-screen bg-background print:block print:h-auto print:overflow-visible">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:flex-col w-64 bg-sidebar text-sidebar-foreground">
+      <aside className="hidden md:flex md:flex-col w-64 bg-sidebar text-sidebar-foreground print:hidden">
         <SidebarContent />
       </aside>
 
       {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card">
+      <div className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card print:hidden">
         <div className="flex items-center gap-2">
           <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
             <Server className="w-4 h-4 text-primary-foreground" />
@@ -195,8 +195,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
-        <div className="container mx-auto p-6">
+      <main className="flex-1 overflow-auto print:overflow-visible print:h-auto print:block">
+        <div className="container mx-auto p-6 print:max-w-none print:p-0 print:m-0">
           {children}
         </div>
       </main>

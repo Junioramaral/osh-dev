@@ -273,9 +273,9 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
           </div>
         )}
 
-        {/* Report Content */}
+        {/* Report Content - Print Wrapper */}
         {selectedClient && reportData && !isLoading && (
-          <>
+          <div className="print:block print:overflow-visible">
             {/* PAGE 1: Cover Page */}
             <ReportCover
               clientName={reportData.client?.name || "Cliente"}
@@ -578,7 +578,7 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
                 </CardContent>
               </Card>
             </div>
-          </>
+          </div>
         )}
       </div>
     </AppLayout>

@@ -136,18 +136,54 @@ All colors MUST be HSL.
     margin: 12mm 15mm;
   }
 
-  /* Reset body for print */
-  body {
+  /* CRITICAL: Reset body and root for print */
+  html, body {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     background: white !important;
     margin: 0 !important;
     padding: 0 !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* CRITICAL: Root container must be block with auto height */
+  #root,
+  #root > div {
+    display: block !important;
+    height: auto !important;
+    overflow: visible !important;
+  }
+
+  /* CRITICAL: Reset ALL overflow containers */
+  main,
+  .overflow-auto,
+  .overflow-y-auto,
+  .overflow-x-auto,
+  .overflow-hidden,
+  [class*="overflow"] {
+    overflow: visible !important;
+    max-height: none !important;
+    height: auto !important;
+  }
+
+  /* Container without limits */
+  .container {
+    max-width: none !important;
+    width: 100% !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Flex-1 needs to be block for print */
+  .flex-1 {
+    flex: none !important;
+    display: block !important;
   }
 
   /* Hide UI elements */
-  body > *:not(#root),
   [data-sidebar],
+  aside,
   nav,
   header,
   [data-radix-dialog-overlay],
@@ -194,22 +230,33 @@ All colors MUST be HSL.
   .print-cover {
     min-height: 267mm !important;
     height: 267mm !important;
+    max-height: 267mm !important;
     display: flex !important;
     flex-direction: column !important;
     justify-content: center !important;
     align-items: center !important;
     page-break-after: always !important;
+    break-after: page !important;
+    overflow: hidden !important;
+    background: white !important;
   }
 
   /* Report section pages */
   .print-section {
-    min-height: 267mm;
+    display: block !important;
+    visibility: visible !important;
+    position: relative !important;
+    min-height: auto;
     padding: 8mm 0;
     page-break-after: always !important;
+    break-after: page !important;
+    overflow: visible !important;
+    background: white !important;
   }
 
   .print-section:last-child {
     page-break-after: auto !important;
+    break-after: auto !important;
   }
 
   /* Tables don't break mid-row */
@@ -223,8 +270,10 @@ All colors MUST be HSL.
   }
 
   /* Cards don't break */
-  [class*="Card"] {
-    page-break-inside: avoid;
+  [class*="Card"],
+  .print-break-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
   }
 
   /* Preserve colors in all elements */
@@ -236,5 +285,10 @@ All colors MUST be HSL.
   /* Reset backgrounds for cards */
   .bg-card, .bg-background {
     background: white !important;
+  }
+
+  /* Ensure space-y works in print */
+  .space-y-6 > * + * {
+    margin-top: 1.5rem;
   }
 }
