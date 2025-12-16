@@ -91,16 +91,30 @@ interface TicketCommentsProps {
   };
 }
 
+// Otimizzo tenant ID for client detection
+const OTIMIZZO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
+
 export default function TicketComments({ ticketId, ticket }: TicketCommentsProps) {
-  const { user, profile, isOtimizzoUser, isSuperAdmin, hasRole } = useAuth();
+  const { user, profile, isOtimizzoUser, isSuperAdmin, hasRole, tenantId } = useAuth();
   const queryClient = useQueryClient();
   const { data: comments, isLoading } = useTicketComments(ticketId);
   const [newComment, setNewComment] = useState('');
   const [isInternal, setIsInternal] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  // Check if current user is a client (not Otimizzo/super_admin/analyst)
-  const isClientUser = !isOtimizzoUser && !isSuperAdmin && !hasRole('analyst_db') && !hasRole('analyst_app');
+  // Check if current user is a client using tenantId (more reliable than role checks)
+  // A client is someone whose tenantId is NOT Otimizzo
+  const isClientUser = tenantId !== null && tenantId !== OTIMIZZO_TENANT_ID;
+  
+  // Debug logging for troubleshooting notification issues
+  console.log('[TicketComments] Auth state:', {
+    userId: user?.id,
+    tenantId,
+    isOtimizzoUser,
+    isSuperAdmin,
+    isClientUser,
+    profileName: profile?.full_name
+  });
 
   const addCommentMutation = useMutation({
     mutationFn: async ({ content, is_internal }: { content: string; is_internal: boolean }) => {
@@ -136,10 +150,19 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           .eq('id', ticketId);
       }
       
-      // If client is commenting, notify the analyst
-      if (isClientUser && ticketData?.analyst_id) {
+      // Debug: Log notification decision
+      console.log('[TicketComments] Notification decision:', {
+        isClientUser,
+        analystId: ticketData?.analyst_id,
+        isInternal: is_internal,
+        willNotifyAnalyst: isClientUser && ticketData?.analyst_id && !is_internal,
+        willNotifyClient: !isClientUser && !is_internal
+      });
+      
+      // If client is commenting (and not internal), notify the analyst
+      if (isClientUser && ticketData?.analyst_id && !is_internal) {
         try {
-          console.log('Client commented, notifying analyst...');
+          console.log('[TicketComments] Calling send-analyst-notification...');
           const { error: notifyError } = await supabase.functions.invoke('send-analyst-notification', {
             body: {
               ticketId,
@@ -152,16 +175,19 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           });
           
           if (notifyError) {
-            console.error('Error notifying analyst:', notifyError);
+            console.error('[TicketComments] Error notifying analyst:', notifyError);
+          } else {
+            console.log('[TicketComments] Analyst notification sent successfully');
           }
         } catch (error) {
-          console.error('Error calling analyst notification function:', error);
+          console.error('[TicketComments] Error calling analyst notification function:', error);
         }
       }
       
-      // Send email notification to client if comment is external and from staff
+      // Send email notification to client if comment is external and from staff (not client)
       if (!is_internal && !isClientUser) {
         try {
+          console.log('[TicketComments] Calling send-comment-notification (staff to client)...');
           const { error: emailError } = await supabase.functions.invoke('send-comment-notification', {
             body: {
               ticketId,
@@ -176,12 +202,12 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           });
           
           if (emailError) {
-            console.error('Error sending email notification:', emailError);
-            // Don't throw error - comment was saved successfully
+            console.error('[TicketComments] Error sending email to client:', emailError);
+          } else {
+            console.log('[TicketComments] Client notification sent successfully');
           }
         } catch (error) {
-          console.error('Error calling email notification function:', error);
-          // Don't throw error - comment was saved successfully
+          console.error('[TicketComments] Error calling client notification function:', error);
         }
       }
       
