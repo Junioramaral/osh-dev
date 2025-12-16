@@ -159,7 +159,7 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
 
   return (
     <AppLayout>
-      <div className="space-y-6 print:space-y-4">
+      <div className="space-y-6">
         {/* Header - Hide on print */}
         <div className="flex items-center justify-between print:hidden">
           <div className="flex items-center gap-4">
@@ -276,64 +276,65 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
         {/* Report Content */}
         {selectedClient && reportData && !isLoading && (
           <>
-            {/* Cover Page */}
+            {/* PAGE 1: Cover Page */}
             <ReportCover
               clientName={reportData.client?.name || "Cliente"}
               month={selectedMonth}
               year={selectedYear}
             />
 
-            {/* Executive Summary */}
-            <div className="print:page-break-before">
-              <h2 className="text-xl font-semibold mb-4">Resumo Executivo</h2>
-              <div className="grid gap-4 md:grid-cols-4">
-                <Card>
+            {/* PAGE 2: Executive Summary */}
+            <div className="print-section print-break-before space-y-6">
+              <h2 className="text-2xl font-bold text-center mb-8">Resumo Executivo</h2>
+              
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <Card className="print-break-avoid">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-primary/10 rounded-lg">
                         <Ticket className="h-5 w-5 text-primary" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{reportData.metrics.total}</p>
+                        <p className="text-3xl font-bold">{reportData.metrics.total}</p>
                         <p className="text-sm text-muted-foreground">Total de Tickets</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="print-break-avoid">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-green-500/10 rounded-lg">
                         <CheckCircle className="h-5 w-5 text-green-500" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{reportData.metrics.resolved}</p>
+                        <p className="text-3xl font-bold">{reportData.metrics.resolved}</p>
                         <p className="text-sm text-muted-foreground">Resolvidos</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="print-break-avoid">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-yellow-500/10 rounded-lg">
                         <Clock className="h-5 w-5 text-yellow-500" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{reportData.metrics.avgResolutionHours}h</p>
+                        <p className="text-3xl font-bold">{reportData.metrics.avgResolutionHours}h</p>
                         <p className="text-sm text-muted-foreground">Tempo Médio</p>
                       </div>
                     </div>
                   </CardContent>
                 </Card>
-                <Card>
+                <Card className="print-break-avoid">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
                       <div className="p-2 bg-blue-500/10 rounded-lg">
                         <TrendingUp className="h-5 w-5 text-blue-500" />
                       </div>
                       <div>
-                        <p className="text-2xl font-bold">{reportData.metrics.slaMetRate}%</p>
+                        <p className="text-3xl font-bold">{reportData.metrics.slaMetRate}%</p>
                         <p className="text-sm text-muted-foreground">SLA Cumprido</p>
                       </div>
                     </div>
@@ -342,246 +343,244 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
               </div>
             </div>
 
-            {/* Charts Section */}
-            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 print:grid-cols-3">
-              {/* SLA Compliance Pie Chart */}
-              <Card>
+            {/* PAGE 3: Charts - Part 1 */}
+            <div className="print-section print-break-before space-y-6">
+              <h2 className="text-2xl font-bold text-center mb-8">Análise de Performance</h2>
+              
+              <div className="grid gap-6 md:grid-cols-3 print:grid-cols-3">
+                {/* SLA Compliance Pie Chart */}
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Cumprimento de SLA</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[220px]">
+                      {reportData.metrics.slaCompliance.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <PieChart>
+                            <Pie
+                              data={reportData.metrics.slaCompliance}
+                              cx="50%"
+                              cy="50%"
+                              innerRadius={40}
+                              outerRadius={70}
+                              paddingAngle={2}
+                              dataKey="value"
+                              label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
+                              labelLine={false}
+                            >
+                              {reportData.metrics.slaCompliance.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Pie>
+                            <Tooltip />
+                            <Legend />
+                          </PieChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                          Sem dados
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Volume by Segment */}
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Volume por Segmento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[220px]">
+                      {reportData.metrics.bySegment.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={reportData.metrics.bySegment} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                            <XAxis type="number" />
+                            <YAxis type="category" dataKey="name" width={100} fontSize={12} />
+                            <Tooltip />
+                            <Bar dataKey="value" name="Tickets" radius={[0, 4, 4, 0]}>
+                              {reportData.metrics.bySegment.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                          Sem dados
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Volume by Priority */}
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Volume por Prioridade</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[220px]">
+                      {reportData.metrics.byPriority.length > 0 ? (
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={reportData.metrics.byPriority}>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                            <XAxis dataKey="name" fontSize={12} />
+                            <YAxis />
+                            <Tooltip />
+                            <Bar dataKey="value" name="Tickets" radius={[4, 4, 0, 0]}>
+                              {reportData.metrics.byPriority.map((entry, index) => (
+                                <Cell key={`cell-${index}`} fill={entry.color} />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-muted-foreground">
+                          Sem dados
+                        </div>
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              </div>
+            </div>
+
+            {/* PAGE 4: Charts - Part 2 */}
+            <div className="print-section print-break-before space-y-6">
+              <h2 className="text-2xl font-bold text-center mb-8">Evolução e Categorias</h2>
+
+              {/* Daily Volume Chart */}
+              <Card className="print-break-avoid">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Cumprimento de SLA</CardTitle>
+                  <CardTitle className="text-base">Evolução Diária de Tickets</CardTitle>
+                  <CardDescription>Volume de tickets abertos por dia no período</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="h-[200px]">
-                    {reportData.metrics.slaCompliance.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <PieChart>
-                          <Pie
-                            data={reportData.metrics.slaCompliance}
-                            cx="50%"
-                            cy="50%"
-                            innerRadius={40}
-                            outerRadius={70}
-                            paddingAngle={2}
-                            dataKey="value"
-                            label={({ name, percent }) => `${(percent * 100).toFixed(0)}%`}
-                            labelLine={false}
-                          >
-                            {reportData.metrics.slaCompliance.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Pie>
-                          <Tooltip />
-                          <Legend />
-                        </PieChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Sem dados
-                      </div>
-                    )}
+                  <div className="h-[280px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={reportData.metrics.dailyVolume}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="date" fontSize={10} interval="preserveStartEnd" />
+                        <YAxis />
+                        <Tooltip />
+                        <Line
+                          type="monotone"
+                          dataKey="tickets"
+                          name="Tickets"
+                          stroke="hsl(215, 65%, 45%)"
+                          strokeWidth={2}
+                          dot={{ r: 2 }}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
                   </div>
                 </CardContent>
               </Card>
 
-              {/* Volume by Segment */}
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Volume por Segmento</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[200px]">
-                    {reportData.metrics.bySegment.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={reportData.metrics.bySegment} layout="vertical">
-                          <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                          <XAxis type="number" />
-                          <YAxis type="category" dataKey="name" width={100} fontSize={12} />
-                          <Tooltip />
-                          <Bar dataKey="value" name="Tickets" radius={[0, 4, 4, 0]}>
-                            {reportData.metrics.bySegment.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Sem dados
-                      </div>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
+              {/* Top Categories */}
+              {reportData.metrics.topCategories.length > 0 && (
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Top 5 Categorias</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="space-y-3">
+                      {reportData.metrics.topCategories.map((cat, index) => (
+                        <div key={cat.name} className="flex items-center justify-between">
+                          <div className="flex items-center gap-3">
+                            <span className="text-lg font-bold text-muted-foreground w-8">{index + 1}.</span>
+                            <span className="font-medium">{cat.name}</span>
+                          </div>
+                          <Badge variant="secondary" className="text-lg px-3">{cat.count}</Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </CardContent>
+                </Card>
+              )}
+            </div>
 
-              {/* Volume by Priority */}
+            {/* PAGE 5+: Tickets List */}
+            <div className="print-section print-break-before">
+              <h2 className="text-2xl font-bold text-center mb-8">Listagem de Tickets</h2>
+              <p className="text-center text-muted-foreground mb-6">{reportData.tickets.length} tickets no período</p>
+              
               <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Volume por Prioridade</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="h-[200px]">
-                    {reportData.metrics.byPriority.length > 0 ? (
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart data={reportData.metrics.byPriority}>
-                          <CartesianGrid strokeDasharray="3 3" vertical={false} />
-                          <XAxis dataKey="name" fontSize={12} />
-                          <YAxis />
-                          <Tooltip />
-                          <Bar dataKey="value" name="Tickets" radius={[4, 4, 0, 0]}>
-                            {reportData.metrics.byPriority.map((entry, index) => (
-                              <Cell key={`cell-${index}`} fill={entry.color} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    ) : (
-                      <div className="flex items-center justify-center h-full text-muted-foreground">
-                        Sem dados
-                      </div>
-                    )}
-                  </div>
+                <CardContent className="pt-6">
+                  {reportData.tickets.length > 0 ? (
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Número</TableHead>
+                          <TableHead>Título</TableHead>
+                          <TableHead>Segmento</TableHead>
+                          <TableHead>Prioridade</TableHead>
+                          <TableHead>Status</TableHead>
+                          <TableHead>Abertura</TableHead>
+                          <TableHead>SLA</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.tickets.map((ticket) => (
+                          <TableRow key={ticket.id} className="print-break-avoid">
+                            <TableCell className="font-mono text-xs">{ticket.ticket_number}</TableCell>
+                            <TableCell className="max-w-[200px] truncate">{ticket.title}</TableCell>
+                            <TableCell>
+                              <Badge variant={ticket.segment === "DB" ? "default" : "secondary"}>
+                                {ticket.segment}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getPriorityBadgeVariant(ticket.priority)}>
+                                {ticket.priority}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={getStatusBadgeVariant(ticket.status)}>
+                                {getStatusLabel(ticket.status)}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="text-xs">
+                              {ticket.created_at && format(new Date(ticket.created_at), "dd/MM/yy HH:mm")}
+                            </TableCell>
+                            <TableCell>
+                              {ticket.sla_resolution_met === true && (
+                                <Badge variant="outline" className="text-green-600 border-green-600">
+                                  <CheckCircle className="h-3 w-3 mr-1" />
+                                  OK
+                                </Badge>
+                              )}
+                              {ticket.sla_resolution_met === false && (
+                                <Badge variant="outline" className="text-red-600 border-red-600">
+                                  <AlertCircle className="h-3 w-3 mr-1" />
+                                  Não
+                                </Badge>
+                              )}
+                              {ticket.sla_resolution_met === null && (
+                                <Badge variant="outline" className="text-yellow-600 border-yellow-600">
+                                  <Clock className="h-3 w-3 mr-1" />
+                                  —
+                                </Badge>
+                              )}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  ) : (
+                    <div className="text-center py-8 text-muted-foreground">
+                      Nenhum ticket encontrado no período selecionado
+                    </div>
+                  )}
                 </CardContent>
               </Card>
             </div>
-
-            {/* Daily Volume Chart */}
-            <Card className="print:page-break-before">
-              <CardHeader className="pb-2">
-                <CardTitle className="text-base">Evolução Diária de Tickets</CardTitle>
-                <CardDescription>Volume de tickets abertos por dia no período</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-[250px]">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <LineChart data={reportData.metrics.dailyVolume}>
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" fontSize={10} interval="preserveStartEnd" />
-                      <YAxis />
-                      <Tooltip />
-                      <Line
-                        type="monotone"
-                        dataKey="tickets"
-                        name="Tickets"
-                        stroke="hsl(var(--primary))"
-                        strokeWidth={2}
-                        dot={{ r: 2 }}
-                      />
-                    </LineChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Top Categories */}
-            {reportData.metrics.topCategories.length > 0 && (
-              <Card>
-                <CardHeader className="pb-2">
-                  <CardTitle className="text-base">Top 5 Categorias</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {reportData.metrics.topCategories.map((cat, index) => (
-                      <div key={cat.name} className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-medium text-muted-foreground w-6">{index + 1}.</span>
-                          <span className="text-sm">{cat.name}</span>
-                        </div>
-                        <Badge variant="secondary">{cat.count}</Badge>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            )}
-
-            {/* Tickets List */}
-            <Card className="print:page-break-before">
-              <CardHeader>
-                <CardTitle className="text-base">Listagem de Tickets</CardTitle>
-                <CardDescription>{reportData.tickets.length} tickets no período</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {reportData.tickets.length > 0 ? (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Número</TableHead>
-                        <TableHead>Título</TableHead>
-                        <TableHead>Segmento</TableHead>
-                        <TableHead>Prioridade</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Abertura</TableHead>
-                        <TableHead>SLA</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {reportData.tickets.map((ticket) => (
-                        <TableRow key={ticket.id}>
-                          <TableCell className="font-mono text-xs">{ticket.ticket_number}</TableCell>
-                          <TableCell className="max-w-[200px] truncate">{ticket.title}</TableCell>
-                          <TableCell>
-                            <Badge variant={ticket.segment === "DB" ? "default" : "secondary"}>
-                              {ticket.segment}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getPriorityBadgeVariant(ticket.priority)}>
-                              {ticket.priority}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <Badge variant={getStatusBadgeVariant(ticket.status)}>
-                              {getStatusLabel(ticket.status)}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="text-xs">
-                            {ticket.created_at && format(new Date(ticket.created_at), "dd/MM/yy HH:mm")}
-                          </TableCell>
-                          <TableCell>
-                            {ticket.sla_resolution_met === true && (
-                              <Badge variant="outline" className="text-green-600 border-green-600">
-                                <CheckCircle className="h-3 w-3 mr-1" />
-                                OK
-                              </Badge>
-                            )}
-                            {ticket.sla_resolution_met === false && (
-                              <Badge variant="outline" className="text-red-600 border-red-600">
-                                <AlertCircle className="h-3 w-3 mr-1" />
-                                Não
-                              </Badge>
-                            )}
-                            {ticket.sla_resolution_met === null && (
-                              <Badge variant="outline" className="text-yellow-600 border-yellow-600">
-                                <Clock className="h-3 w-3 mr-1" />
-                                —
-                              </Badge>
-                            )}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                ) : (
-                  <div className="text-center py-8 text-muted-foreground">
-                    Nenhum ticket encontrado no período selecionado
-                  </div>
-                )}
-              </CardContent>
-            </Card>
           </>
         )}
       </div>
-
-      {/* Print Styles */}
-      <style>{`
-        @media print {
-          body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-          .print\\:hidden { display: none !important; }
-          .print\\:page-break-before { page-break-before: always; }
-          .print\\:page-break-after { page-break-after: always; }
-          .print\\:space-y-4 > :not([hidden]) ~ :not([hidden]) { margin-top: 1rem; }
-          .print\\:grid-cols-3 { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-        }
-      `}</style>
     </AppLayout>
   );
 };
