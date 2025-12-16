@@ -128,11 +128,33 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!tenantId,
   });
 
-  // Determine available segments
-  const availableSegments = currentTenant?.segments || [];
-  const hasOnlyOneSegment = availableSegments.length === 1;
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
-  const availableDbEngines = currentTenant?.db_engines || [];
+
+  // Fetch selected client data (when Otimizzo user selects a different client)
+  const { data: selectedClientData } = useQuery({
+    queryKey: ["selected-client-data", selectedClientId],
+    queryFn: async () => {
+      if (!selectedClientId) return null;
+      
+      const { data, error } = await supabase
+        .from("clients")
+        .select("id, name, segments, db_engines, app_product_ids")
+        .eq("id", selectedClientId)
+        .single();
+      
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedClientId && isOtimizzoTenant,
+  });
+
+  // Determine available data based on context:
+  // - If Otimizzo user selected another client: use selected client's data
+  // - If direct client user: use currentTenant data
+  const effectiveClientData = isOtimizzoTenant ? selectedClientData : currentTenant;
+  const availableSegments = effectiveClientData?.segments || currentTenant?.segments || [];
+  const hasOnlyOneSegment = availableSegments.length === 1;
+  const availableDbEngines = effectiveClientData?.db_engines || [];
 
   // Initialize segment when tenant loads
   useEffect(() => {
@@ -347,6 +369,28 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       setValue("db_engine", availableDbEngines[0] as any);
     }
   }, [availableDbEngines, segment, setValue]);
+
+  // Limpar campos dependentes quando cliente muda (para usuários Otimizzo)
+  useEffect(() => {
+    if (isOtimizzoTenant && selectedClientId) {
+      // Limpar campos DB
+      setValue("db_engine", undefined);
+      setValue("db_instance_id", undefined);
+      setValue("db_machine_id", undefined);
+      setValue("db_environment", undefined);
+      // Limpar campos APP
+      setValue("app_product_id", undefined);
+      setValue("app_instance_id", undefined);
+      setValue("app_machine_id", undefined);
+      setValue("app_environment", undefined);
+      setValue("app_module", undefined);
+      setValue("app_version", undefined);
+      // Limpar categoria/subcategoria
+      setValue("category", "");
+      setValue("subcategory", "");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedClientId]);
 
   const createTicketMutation = useMutation({
     mutationFn: async (data: TicketFormData) => {
