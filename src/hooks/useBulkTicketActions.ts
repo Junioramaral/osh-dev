@@ -25,6 +25,8 @@ export function useBulkTicketActions() {
         `${variables.ticketIds.length} ticket(s) atribuído(s) com sucesso!`
       );
       queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
     },
     onError: (error: any) => {
       toast.error("Erro ao atribuir tickets: " + error.message);
@@ -272,6 +274,183 @@ export function useBulkTicketActions() {
     },
   });
 
+  const bulkLockTicketsWithReason = useMutation({
+    mutationFn: async ({
+      ticketIds,
+      userId,
+      reason,
+    }: {
+      ticketIds: string[];
+      userId: string;
+      reason: string;
+    }) => {
+      // 1. Buscar nome do analista
+      const { data: authorProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .single();
+      
+      const authorName = authorProfile?.full_name || "Analista";
+
+      // 2. Atualizar tickets
+      const { error } = await supabase
+        .from("tickets")
+        .update({
+          lock_status: "locked",
+          lock_owner_id: userId,
+          lock_at: new Date().toISOString(),
+          analyst_id: userId,
+        })
+        .in("id", ticketIds);
+
+      if (error) throw error;
+
+      // 3. Inserir nota interna com o motivo para cada ticket
+      for (const ticketId of ticketIds) {
+        const { error: commentError } = await supabase
+          .from("ticket_comments")
+          .insert({
+            ticket_id: ticketId,
+            author_id: userId,
+            author_name: authorName,
+            content: `📋 Ticket transferido de outro analista.\n\nMotivo: ${reason}`,
+            is_internal: true,
+          });
+
+        if (commentError) {
+          console.error("Erro ao inserir nota interna:", commentError);
+        }
+      }
+    },
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${variables.ticketIds.length} ticket(s) assumido(s) com sucesso!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-comments"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao assumir tickets: " + error.message);
+    },
+  });
+
+  const bulkAssignAnalystWithReason = useMutation({
+    mutationFn: async ({
+      ticketIds,
+      analystId,
+      reason,
+      userId,
+    }: {
+      ticketIds: string[];
+      analystId: string;
+      reason: string;
+      userId: string;
+    }) => {
+      // 1. Buscar nome do autor (quem está atribuindo)
+      const { data: authorProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", userId)
+        .single();
+      
+      const authorName = authorProfile?.full_name || "Analista";
+
+      // 2. Buscar nome do novo analista
+      const { data: newAnalystProfile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", analystId)
+        .single();
+      
+      const newAnalystName = newAnalystProfile?.full_name || "Novo analista";
+
+      // 3. Atualizar tickets (também transfere o lock)
+      const { error } = await supabase
+        .from("tickets")
+        .update({
+          analyst_id: analystId,
+          lock_status: "locked",
+          lock_owner_id: analystId,
+          lock_at: new Date().toISOString(),
+        })
+        .in("id", ticketIds);
+
+      if (error) throw error;
+
+      // 4. Inserir nota interna com o motivo para cada ticket
+      for (const ticketId of ticketIds) {
+        const { error: commentError } = await supabase
+          .from("ticket_comments")
+          .insert({
+            ticket_id: ticketId,
+            author_id: userId,
+            author_name: authorName,
+            content: `📋 Ticket transferido para ${newAnalystName}.\n\nMotivo: ${reason}`,
+            is_internal: true,
+          });
+
+        if (commentError) {
+          console.error("Erro ao inserir nota interna:", commentError);
+        }
+      }
+    },
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${variables.ticketIds.length} ticket(s) atribuído(s) com sucesso!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-comments"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atribuir tickets: " + error.message);
+    },
+  });
+
+  const bulkUnlockTickets = useMutation({
+    mutationFn: async ({
+      ticketIds,
+      removeAnalyst,
+    }: {
+      ticketIds: string[];
+      removeAnalyst: boolean;
+    }) => {
+      const updates: any = {
+        lock_status: "unlocked",
+        lock_owner_id: null,
+        lock_at: null,
+      };
+
+      if (removeAnalyst) {
+        updates.analyst_id = null;
+      }
+
+      const { error } = await supabase
+        .from("tickets")
+        .update(updates)
+        .in("id", ticketIds);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success(
+        `${variables.ticketIds.length} ticket(s) liberado(s) com sucesso!`
+      );
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao liberar tickets: " + error.message);
+    },
+  });
+
   const bulkAssignQueue = useMutation({
     mutationFn: async ({
       ticketIds,
@@ -306,5 +485,8 @@ export function useBulkTicketActions() {
     bulkChangeStatusWithReason,
     bulkChangePriority,
     bulkLockTickets,
+    bulkLockTicketsWithReason,
+    bulkAssignAnalystWithReason,
+    bulkUnlockTickets,
   };
 }
