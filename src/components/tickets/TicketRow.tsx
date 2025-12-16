@@ -11,9 +11,10 @@ interface TicketRowProps {
   ticket: any;
   isSelected: boolean;
   onToggleSelect: () => void;
+  showClientColumn?: boolean;
 }
 
-export function TicketRow({ ticket, isSelected, onToggleSelect }: TicketRowProps) {
+export function TicketRow({ ticket, isSelected, onToggleSelect, showClientColumn = true }: TicketRowProps) {
   const navigate = useNavigate();
   const age = useTicketAge(ticket.created_at, ticket.resolved_at);
   const slaStatus = calculateSLAStatus(ticket);
@@ -47,9 +48,11 @@ export function TicketRow({ ticket, isSelected, onToggleSelect }: TicketRowProps
       <TableCell className="max-w-md truncate">
         {ticket.title}
       </TableCell>
-      <TableCell>
-        {ticket.clients?.name}
-      </TableCell>
+      {showClientColumn && (
+        <TableCell>
+          {ticket.clients?.name}
+        </TableCell>
+      )}
       <TableCell className="text-muted-foreground">
         <div className="flex items-center gap-2">
           {ticket.profiles?.full_name ? (

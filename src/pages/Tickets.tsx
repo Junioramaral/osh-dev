@@ -461,7 +461,7 @@ export default function Tickets() {
                   <TableHead>Número</TableHead>
                   <TableHead>Tempo de Vida</TableHead>
                   <TableHead>Título</TableHead>
-                  <TableHead>Cliente</TableHead>
+                  {!isClient && <TableHead>Cliente</TableHead>}
                   <TableHead>Analista</TableHead>
                   <TableHead>Time</TableHead>
                   <TableHead>Fila</TableHead>
@@ -477,6 +477,7 @@ export default function Tickets() {
                     ticket={ticket}
                     isSelected={selectedTickets.has(ticket.id)}
                     onToggleSelect={() => toggleTicketSelection(ticket.id)}
+                    showClientColumn={!isClient}
                   />
                 ))}
               </TableBody>
