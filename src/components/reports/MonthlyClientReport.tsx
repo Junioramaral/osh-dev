@@ -8,12 +8,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
-import { ArrowLeft, Download, FileText, Ticket, CheckCircle, Clock, TrendingUp, AlertCircle } from "lucide-react";
+import { ArrowLeft, Download, FileText, Ticket, CheckCircle, Clock, TrendingUp, AlertCircle, Mail, Loader2 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, LineChart, Line } from "recharts";
 import ReportCover from "./ReportCover";
 import { useReportData } from "@/hooks/useReportData";
+import { toast } from "sonner";
 
 interface MonthlyClientReportProps {
   onBack: () => void;
@@ -24,6 +25,7 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
   const [selectedClient, setSelectedClient] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<number>(currentDate.getMonth() + 1);
   const [selectedYear, setSelectedYear] = useState<number>(currentDate.getFullYear());
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Fetch clients
   const { data: clients = [] } = useQuery({
@@ -90,6 +92,39 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
     URL.revokeObjectURL(url);
   };
 
+  const sendReportByEmail = async () => {
+    if (!selectedClient) {
+      toast.error("Selecione um cliente para enviar o relatório");
+      return;
+    }
+
+    setIsSendingEmail(true);
+    try {
+      const { data, error } = await supabase.functions.invoke("send-monthly-report", {
+        body: {
+          clientId: selectedClient,
+          month: selectedMonth,
+          year: selectedYear,
+        },
+      });
+
+      if (error) throw error;
+
+      if (data?.results?.[0]?.status === "sent") {
+        toast.success(`Relatório enviado com sucesso para ${data.results[0].recipients?.join(", ")}`);
+      } else if (data?.results?.[0]?.status === "skipped") {
+        toast.warning("Cliente não possui contatos cadastrados");
+      } else {
+        toast.error(data?.results?.[0]?.error || "Erro ao enviar relatório");
+      }
+    } catch (error: any) {
+      console.error("Error sending report:", error);
+      toast.error("Erro ao enviar relatório: " + (error.message || "Erro desconhecido"));
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
   const getStatusBadgeVariant = (status: string) => {
     switch (status) {
       case "novo": return "default";
@@ -137,6 +172,18 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
             </div>
           </div>
           <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              onClick={sendReportByEmail} 
+              disabled={!selectedClient || isSendingEmail}
+            >
+              {isSendingEmail ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <Mail className="h-4 w-4 mr-2" />
+              )}
+              Enviar Email
+            </Button>
             <Button variant="outline" onClick={exportToCSV} disabled={!reportData?.tickets.length}>
               <Download className="h-4 w-4 mr-2" />
               CSV

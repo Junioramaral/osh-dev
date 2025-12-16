@@ -165,6 +165,7 @@ export type Database = {
           is_active: boolean | null
           max_users: number | null
           name: string
+          receive_monthly_report: boolean | null
           segments: string[] | null
           sla_app_p1_first_response: number | null
           sla_app_p1_resolution: number | null
@@ -199,6 +200,7 @@ export type Database = {
           is_active?: boolean | null
           max_users?: number | null
           name: string
+          receive_monthly_report?: boolean | null
           segments?: string[] | null
           sla_app_p1_first_response?: number | null
           sla_app_p1_resolution?: number | null
@@ -233,6 +235,7 @@ export type Database = {
           is_active?: boolean | null
           max_users?: number | null
           name?: string
+          receive_monthly_report?: boolean | null
           segments?: string[] | null
           sla_app_p1_first_response?: number | null
           sla_app_p1_resolution?: number | null
@@ -613,6 +616,53 @@ export type Database = {
           sort_order?: number | null
         }
         Relationships: []
+      }
+      report_send_logs: {
+        Row: {
+          client_id: string | null
+          created_at: string | null
+          error_message: string | null
+          id: string
+          month: number
+          recipients: string[]
+          report_type: string
+          sent_at: string | null
+          status: string
+          year: number
+        }
+        Insert: {
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          month: number
+          recipients?: string[]
+          report_type?: string
+          sent_at?: string | null
+          status?: string
+          year: number
+        }
+        Update: {
+          client_id?: string | null
+          created_at?: string | null
+          error_message?: string | null
+          id?: string
+          month?: number
+          recipients?: string[]
+          report_type?: string
+          sent_at?: string | null
+          status?: string
+          year?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_send_logs_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       sla_notifications: {
         Row: {
