@@ -130,6 +130,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.log("Sending comment notification to:", contactEmail, "CC:", ccEmails);
 
     const currentDate = new Date().toLocaleString('pt-BR', {
+      timeZone: 'America/Sao_Paulo',
       day: '2-digit',
       month: '2-digit',
       year: 'numeric',
