@@ -130,15 +130,27 @@ All colors MUST be HSL.
 
 /* Print Styles */
 @media print {
+  /* A4 Page Configuration */
+  @page {
+    size: A4 portrait;
+    margin: 12mm 15mm;
+  }
+
+  /* Reset body for print */
+  body {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    background: white !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   /* Hide UI elements */
   body > *:not(#root),
   [data-sidebar],
   nav,
   header,
-  [data-radix-dialog-overlay] {
-    display: none !important;
-  }
-
+  [data-radix-dialog-overlay],
   .print-hidden {
     display: none !important;
   }
@@ -151,21 +163,78 @@ All colors MUST be HSL.
     max-width: 100% !important;
     max-height: none !important;
     margin: 0 !important;
-    padding: 15mm !important;
+    padding: 0 !important;
     box-shadow: none !important;
     border: none !important;
     background: white !important;
     border-radius: 0 !important;
   }
 
-  /* Prevent section breaks */
-  section {
-    break-inside: avoid;
+  /* Page break controls */
+  .print-page {
+    page-break-inside: avoid;
   }
 
-  /* Preserve colors */
+  .print-break-before {
+    page-break-before: always !important;
+    break-before: page !important;
+  }
+
+  .print-break-after {
+    page-break-after: always !important;
+    break-after: page !important;
+  }
+
+  .print-break-avoid {
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+  }
+
+  /* Cover page - Full A4 height */
+  .print-cover {
+    min-height: 267mm !important;
+    height: 267mm !important;
+    display: flex !important;
+    flex-direction: column !important;
+    justify-content: center !important;
+    align-items: center !important;
+    page-break-after: always !important;
+  }
+
+  /* Report section pages */
+  .print-section {
+    min-height: 267mm;
+    padding: 8mm 0;
+    page-break-after: always !important;
+  }
+
+  .print-section:last-child {
+    page-break-after: auto !important;
+  }
+
+  /* Tables don't break mid-row */
+  tr {
+    page-break-inside: avoid;
+  }
+
+  /* Charts stay together */
+  .recharts-wrapper {
+    page-break-inside: avoid;
+  }
+
+  /* Cards don't break */
+  [class*="Card"] {
+    page-break-inside: avoid;
+  }
+
+  /* Preserve colors in all elements */
   * {
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
+  }
+
+  /* Reset backgrounds for cards */
+  .bg-card, .bg-background {
+    background: white !important;
   }
 }

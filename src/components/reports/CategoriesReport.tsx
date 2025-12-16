@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, FolderTree, Layers } from "lucide-react";
+import { ArrowLeft, FolderTree, Layers, FileText } from "lucide-react";
 import { useCategoriesReportData } from "@/hooks/useCategoriesReportData";
 import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from "recharts";
-import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import ReportCover from "./ReportCover";
 
 interface CategoriesReportProps {
   onBack: () => void;
@@ -32,6 +34,8 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
       ? endOfMonth(subMonths(now, 1))
       : endOfMonth(subMonths(now, 2));
 
+  const periodLabel = format(startDate, "MMMM 'de' yyyy", { locale: ptBR });
+
   const { data, isLoading } = useCategoriesReportData({
     startDate,
     endDate,
@@ -51,11 +55,13 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
 
   const totalTickets = data?.categories.reduce((sum, c) => sum + c.total_tickets, 0) || 0;
 
+  const exportToPDF = () => window.print();
+
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header - Hide on print */}
+        <div className="flex items-center justify-between print:hidden">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={onBack}>
               <ArrowLeft className="h-5 w-5" />
@@ -65,10 +71,14 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
               <p className="text-muted-foreground">Distribuição de tickets por categoria e subcategoria</p>
             </div>
           </div>
+          <Button onClick={exportToPDF}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-4">
+        {/* Filters - Hide on print */}
+        <div className="flex gap-4 print:hidden">
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Período" />
@@ -91,58 +101,69 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
           </Select>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <FolderTree className="h-4 w-4" />
-                Total de Categorias
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{data?.categories.length || 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Layers className="h-4 w-4" />
-                Total de Tickets
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{totalTickets}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground">
-                Categoria Mais Comum
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-lg font-bold truncate">
-                {data?.categories[0]?.category || "-"}
-              </p>
-            </CardContent>
-          </Card>
-        </div>
+        {/* PAGE 1: Cover */}
+        <ReportCover 
+          title="Relatório por Categorias"
+          subtitle="Análise de Distribuição de Tickets"
+          periodLabel={periodLabel}
+        />
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
+        {/* PAGE 2: Summary + Pie Chart */}
+        <div className="print-section print-break-before space-y-6">
+          <h2 className="text-2xl font-bold text-center mb-8">Visão Geral</h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <FolderTree className="h-4 w-4" />
+                  Total de Categorias
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{data?.categories.length || 0}</p>
+              </CardContent>
+            </Card>
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Layers className="h-4 w-4" />
+                  Total de Tickets
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{totalTickets}</p>
+              </CardContent>
+            </Card>
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Categoria Mais Comum
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-xl font-bold truncate">
+                  {data?.categories[0]?.category || "-"}
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  {data?.categories[0]?.total_tickets || 0} tickets
+                </p>
+              </CardContent>
+            </Card>
+          </div>
+
+          <Card className="print-break-avoid">
             <CardHeader>
               <CardTitle className="text-base">Distribuição por Categoria</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={350}>
                 <PieChart>
                   <Pie
                     data={pieData}
                     cx="50%"
                     cy="50%"
-                    outerRadius={100}
+                    outerRadius={120}
                     dataKey="value"
                     label={({ name, percent }) => `${name} (${(percent * 100).toFixed(0)}%)`}
                   >
@@ -151,101 +172,69 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
                     ))}
                   </Pie>
                   <Tooltip />
+                  <Legend />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
+        </div>
 
-          <Card>
+        {/* PAGE 3: Bar Chart */}
+        <div className="print-section print-break-before space-y-6">
+          <h2 className="text-2xl font-bold text-center mb-8">Top Categorias</h2>
+          
+          <Card className="print-break-avoid">
             <CardHeader>
-              <CardTitle className="text-base">Top 10 Categorias</CardTitle>
+              <CardTitle className="text-base">Top 10 Categorias por Volume</CardTitle>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
+              <ResponsiveContainer width="100%" height={400}>
                 <BarChart data={barData} layout="vertical">
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis type="number" />
-                  <YAxis dataKey="name" type="category" width={100} />
+                  <YAxis dataKey="name" type="category" width={120} />
                   <Tooltip />
                   <Legend />
-                  <Bar dataKey="total" fill="hsl(var(--primary))" name="Total" />
-                  <Bar dataKey="resolved" fill="hsl(var(--chart-2))" name="Resolvidos" />
+                  <Bar dataKey="total" fill="hsl(215, 65%, 45%)" name="Total" />
+                  <Bar dataKey="resolved" fill="hsl(142, 71%, 45%)" name="Resolvidos" />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
 
-        {/* Categories Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Detalhamento por Categoria</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Categoria</TableHead>
-                  <TableHead>Segmento</TableHead>
-                  <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-center">Resolvidos</TableHead>
-                  <TableHead className="text-center">SLA</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {data?.categories.map((cat, index) => (
-                  <TableRow key={index}>
-                    <TableCell className="font-medium">{cat.category}</TableCell>
-                    <TableCell>
-                      <Badge variant={cat.segment === "DB" ? "default" : "secondary"}>
-                        {cat.segment}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">{cat.total_tickets}</TableCell>
-                    <TableCell className="text-center">{cat.resolved_tickets}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge 
-                        variant={cat.sla_met_rate >= 90 ? "default" : cat.sla_met_rate >= 70 ? "secondary" : "destructive"}
-                      >
-                        {cat.sla_met_rate}%
-                      </Badge>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
-
-        {/* Subcategories Table */}
-        {data?.subcategories && data.subcategories.length > 0 && (
+        {/* PAGE 4+: Categories Table */}
+        <div className="print-section print-break-before">
+          <h2 className="text-2xl font-bold text-center mb-8">Detalhamento por Categoria</h2>
+          
           <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Detalhamento por Subcategoria</CardTitle>
-            </CardHeader>
-            <CardContent>
+            <CardContent className="pt-6">
               <Table>
                 <TableHeader>
                   <TableRow>
                     <TableHead>Categoria</TableHead>
-                    <TableHead>Subcategoria</TableHead>
+                    <TableHead>Segmento</TableHead>
                     <TableHead className="text-center">Total</TableHead>
                     <TableHead className="text-center">Resolvidos</TableHead>
                     <TableHead className="text-center">SLA</TableHead>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.subcategories.slice(0, 20).map((sub, index) => (
-                    <TableRow key={index}>
-                      <TableCell className="text-muted-foreground">{sub.category}</TableCell>
-                      <TableCell className="font-medium">{sub.subcategory}</TableCell>
-                      <TableCell className="text-center">{sub.total_tickets}</TableCell>
-                      <TableCell className="text-center">{sub.resolved_tickets}</TableCell>
+                  {data?.categories.map((cat, index) => (
+                    <TableRow key={index} className="print-break-avoid">
+                      <TableCell className="font-medium">{cat.category}</TableCell>
+                      <TableCell>
+                        <Badge variant={cat.segment === "DB" ? "default" : "secondary"}>
+                          {cat.segment}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center font-semibold">{cat.total_tickets}</TableCell>
+                      <TableCell className="text-center">{cat.resolved_tickets}</TableCell>
                       <TableCell className="text-center">
                         <Badge 
-                          variant={sub.sla_met_rate >= 90 ? "default" : sub.sla_met_rate >= 70 ? "secondary" : "destructive"}
+                          variant={cat.sla_met_rate >= 90 ? "default" : cat.sla_met_rate >= 70 ? "secondary" : "destructive"}
                         >
-                          {sub.sla_met_rate}%
+                          {cat.sla_met_rate}%
                         </Badge>
                       </TableCell>
                     </TableRow>
@@ -254,6 +243,46 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
               </Table>
             </CardContent>
           </Card>
+        </div>
+
+        {/* PAGE 5+: Subcategories Table (if any) */}
+        {data?.subcategories && data.subcategories.length > 0 && (
+          <div className="print-section print-break-before">
+            <h2 className="text-2xl font-bold text-center mb-8">Detalhamento por Subcategoria</h2>
+            
+            <Card>
+              <CardContent className="pt-6">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Categoria</TableHead>
+                      <TableHead>Subcategoria</TableHead>
+                      <TableHead className="text-center">Total</TableHead>
+                      <TableHead className="text-center">Resolvidos</TableHead>
+                      <TableHead className="text-center">SLA</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {data.subcategories.map((sub, index) => (
+                      <TableRow key={index} className="print-break-avoid">
+                        <TableCell className="text-muted-foreground">{sub.category}</TableCell>
+                        <TableCell className="font-medium">{sub.subcategory}</TableCell>
+                        <TableCell className="text-center">{sub.total_tickets}</TableCell>
+                        <TableCell className="text-center">{sub.resolved_tickets}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge 
+                            variant={sub.sla_met_rate >= 90 ? "default" : sub.sla_met_rate >= 70 ? "secondary" : "destructive"}
+                          >
+                            {sub.sla_met_rate}%
+                          </Badge>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </div>
         )}
       </div>
     </AppLayout>

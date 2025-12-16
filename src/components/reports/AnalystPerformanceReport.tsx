@@ -5,10 +5,12 @@ import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { ArrowLeft, Users, Trophy, Target, Clock } from "lucide-react";
+import { ArrowLeft, Users, Trophy, Target, Clock, FileText } from "lucide-react";
 import { useAnalystPerformanceData } from "@/hooks/useAnalystPerformanceData";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend } from "recharts";
-import { startOfMonth, endOfMonth, subMonths } from "date-fns";
+import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import ReportCover from "./ReportCover";
 
 interface AnalystPerformanceReportProps {
   onBack: () => void;
@@ -31,6 +33,8 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
     : period === "last"
       ? endOfMonth(subMonths(now, 1))
       : endOfMonth(subMonths(now, 2));
+
+  const periodLabel = format(startDate, "MMMM 'de' yyyy", { locale: ptBR });
 
   const { data: analysts, isLoading } = useAnalystPerformanceData({
     startDate,
@@ -65,11 +69,13 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
     { name: "P4", value: priorityData.P4 },
   ].filter(d => d.value > 0);
 
+  const exportToPDF = () => window.print();
+
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Header */}
-        <div className="flex items-center justify-between">
+        {/* Header - Hide on print */}
+        <div className="flex items-center justify-between print:hidden">
           <div className="flex items-center gap-4">
             <Button variant="ghost" size="icon" onClick={onBack}>
               <ArrowLeft className="h-5 w-5" />
@@ -79,10 +85,14 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
               <p className="text-muted-foreground">Métricas de produtividade por analista</p>
             </div>
           </div>
+          <Button onClick={exportToPDF}>
+            <FileText className="h-4 w-4 mr-2" />
+            PDF
+          </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex gap-4">
+        {/* Filters - Hide on print */}
+        <div className="flex gap-4 print:hidden">
           <Select value={period} onValueChange={setPeriod}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Período" />
@@ -105,150 +115,182 @@ const AnalystPerformanceReport = ({ onBack }: AnalystPerformanceReportProps) => 
           </Select>
         </div>
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Users className="h-4 w-4" />
-                Analistas Ativos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{analysts?.length || 0}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Trophy className="h-4 w-4" />
-                Total de Tickets
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{totalTickets}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Target className="h-4 w-4" />
-                Resolvidos
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold text-green-600">{totalResolved}</p>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardHeader className="pb-2">
-              <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
-                <Clock className="h-4 w-4" />
-                SLA Médio
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-2xl font-bold">{avgSlaRate}%</p>
-            </CardContent>
-          </Card>
+        {/* PAGE 1: Cover */}
+        <ReportCover 
+          title="Relatório de Performance"
+          subtitle="Análise de Produtividade dos Analistas"
+          periodLabel={periodLabel}
+        />
+
+        {/* PAGE 2: Summary Cards */}
+        <div className="print-section print-break-before space-y-6">
+          <h2 className="text-2xl font-bold text-center mb-8">Resumo Executivo</h2>
+          
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Users className="h-4 w-4" />
+                  Analistas Ativos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{analysts?.length || 0}</p>
+              </CardContent>
+            </Card>
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Trophy className="h-4 w-4" />
+                  Total de Tickets
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{totalTickets}</p>
+              </CardContent>
+            </Card>
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Target className="h-4 w-4" />
+                  Resolvidos
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold text-green-600">{totalResolved}</p>
+              </CardContent>
+            </Card>
+            <Card className="print-break-avoid">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <Clock className="h-4 w-4" />
+                  SLA Médio
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold">{avgSlaRate}%</p>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Top Performer Highlight */}
+          {analysts && analysts.length > 0 && (
+            <Card className="bg-primary/5 border-primary/20">
+              <CardContent className="pt-6">
+                <div className="text-center">
+                  <p className="text-sm text-muted-foreground mb-2">🏆 Destaque do Período</p>
+                  <p className="text-2xl font-bold text-primary">{analysts[0].analyst_name}</p>
+                  <p className="text-muted-foreground">
+                    {analysts[0].total_tickets} tickets • {analysts[0].resolved_tickets} resolvidos • {analysts[0].sla_met_rate}% SLA
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          )}
         </div>
 
-        {/* Charts */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Top 10 Analistas por Volume</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={barChartData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="name" />
-                  <YAxis />
-                  <Tooltip />
-                  <Bar dataKey="tickets" fill="hsl(var(--primary))" name="Total" />
-                  <Bar dataKey="resolved" fill="hsl(var(--chart-2))" name="Resolvidos" />
-                </BarChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+        {/* PAGE 3: Charts */}
+        <div className="print-section print-break-before space-y-6">
+          <h2 className="text-2xl font-bold text-center mb-8">Análise Gráfica</h2>
+          
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <Card className="print-break-avoid">
+              <CardHeader>
+                <CardTitle className="text-base">Top 10 Analistas por Volume</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <BarChart data={barChartData}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis dataKey="name" />
+                    <YAxis />
+                    <Tooltip />
+                    <Legend />
+                    <Bar dataKey="tickets" fill="hsl(215, 65%, 45%)" name="Total" />
+                    <Bar dataKey="resolved" fill="hsl(142, 71%, 45%)" name="Resolvidos" />
+                  </BarChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Distribuição por Prioridade</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <PieChart>
-                  <Pie
-                    data={pieData}
-                    cx="50%"
-                    cy="50%"
-                    innerRadius={60}
-                    outerRadius={100}
-                    dataKey="value"
-                    label
-                  >
-                    {pieData.map((_, index) => (
-                      <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                    ))}
-                  </Pie>
-                  <Legend />
-                  <Tooltip />
-                </PieChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
+            <Card className="print-break-avoid">
+              <CardHeader>
+                <CardTitle className="text-base">Distribuição por Prioridade</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ResponsiveContainer width="100%" height={300}>
+                  <PieChart>
+                    <Pie
+                      data={pieData}
+                      cx="50%"
+                      cy="50%"
+                      innerRadius={60}
+                      outerRadius={100}
+                      dataKey="value"
+                      label={({ name, value }) => `${name}: ${value}`}
+                    >
+                      {pieData.map((_, index) => (
+                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
+                      ))}
+                    </Pie>
+                    <Legend />
+                    <Tooltip />
+                  </PieChart>
+                </ResponsiveContainer>
+              </CardContent>
+            </Card>
+          </div>
         </div>
 
-        {/* Table */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Ranking de Analistas</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>#</TableHead>
-                  <TableHead>Analista</TableHead>
-                  <TableHead className="text-center">Total</TableHead>
-                  <TableHead className="text-center">Resolvidos</TableHead>
-                  <TableHead className="text-center">SLA</TableHead>
-                  <TableHead className="text-center">DB</TableHead>
-                  <TableHead className="text-center">APP</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {analysts?.map((analyst, index) => (
-                  <TableRow key={analyst.analyst_id}>
-                    <TableCell>
-                      {index < 3 ? (
-                        <Badge variant={index === 0 ? "default" : "secondary"}>
-                          {index + 1}º
-                        </Badge>
-                      ) : (
-                        index + 1
-                      )}
-                    </TableCell>
-                    <TableCell className="font-medium">{analyst.analyst_name}</TableCell>
-                    <TableCell className="text-center">{analyst.total_tickets}</TableCell>
-                    <TableCell className="text-center">{analyst.resolved_tickets}</TableCell>
-                    <TableCell className="text-center">
-                      <Badge 
-                        variant={analyst.sla_met_rate >= 90 ? "default" : analyst.sla_met_rate >= 70 ? "secondary" : "destructive"}
-                      >
-                        {analyst.sla_met_rate}%
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-center">{analyst.tickets_by_segment.DB}</TableCell>
-                    <TableCell className="text-center">{analyst.tickets_by_segment.APP}</TableCell>
+        {/* PAGE 4+: Ranking Table */}
+        <div className="print-section print-break-before">
+          <h2 className="text-2xl font-bold text-center mb-8">Ranking de Analistas</h2>
+          
+          <Card>
+            <CardContent className="pt-6">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">#</TableHead>
+                    <TableHead>Analista</TableHead>
+                    <TableHead className="text-center">Total</TableHead>
+                    <TableHead className="text-center">Resolvidos</TableHead>
+                    <TableHead className="text-center">SLA</TableHead>
+                    <TableHead className="text-center">DB</TableHead>
+                    <TableHead className="text-center">APP</TableHead>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                </TableHeader>
+                <TableBody>
+                  {analysts?.map((analyst, index) => (
+                    <TableRow key={analyst.analyst_id} className="print-break-avoid">
+                      <TableCell>
+                        {index < 3 ? (
+                          <Badge variant={index === 0 ? "default" : "secondary"}>
+                            {index + 1}º
+                          </Badge>
+                        ) : (
+                          <span className="text-muted-foreground">{index + 1}</span>
+                        )}
+                      </TableCell>
+                      <TableCell className="font-medium">{analyst.analyst_name}</TableCell>
+                      <TableCell className="text-center font-semibold">{analyst.total_tickets}</TableCell>
+                      <TableCell className="text-center">{analyst.resolved_tickets}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge 
+                          variant={analyst.sla_met_rate >= 90 ? "default" : analyst.sla_met_rate >= 70 ? "secondary" : "destructive"}
+                        >
+                          {analyst.sla_met_rate}%
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-center">{analyst.tickets_by_segment.DB}</TableCell>
+                      <TableCell className="text-center">{analyst.tickets_by_segment.APP}</TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        </div>
       </div>
     </AppLayout>
   );
