@@ -845,7 +845,7 @@ const TenantDetail = () => {
           </TabsContent>
 
           <TabsContent value="report">
-            <TenantUserReport tenantId={tenantId!} />
+            <TenantUserReport tenantId={tenantId!} tenantName={tenant?.name} />
           </TabsContent>
         </Tabs>
       </div>
