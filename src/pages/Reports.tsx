@@ -1,10 +1,17 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { FileBarChart, Calendar, TrendingUp, PieChart, ListOrdered, Clock } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Badge } from "@/components/ui/badge";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, Clock, History } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
+import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
+import CategoriesReport from "@/components/reports/CategoriesReport";
+import PeriodComparisonReport from "@/components/reports/PeriodComparisonReport";
+import ReportSendHistory from "@/components/reports/ReportSendHistory";
+import { useReportSendHistory } from "@/hooks/useReportSendHistory";
 
-type ReportType = "monthly" | "sla" | "categories" | "performance" | "history" | null;
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | null;
 
 const reportTypes = [
   {
@@ -15,10 +22,10 @@ const reportTypes = [
     highlight: true,
   },
   {
-    id: "sla" as const,
-    title: "Relatório de SLA",
-    description: "Análise detalhada de cumprimento de SLA por período e prioridade",
-    icon: Clock,
+    id: "performance" as const,
+    title: "Performance de Analistas",
+    description: "Métricas de produtividade e tempo de resolução por analista",
+    icon: TrendingUp,
     highlight: false,
   },
   {
@@ -29,26 +36,32 @@ const reportTypes = [
     highlight: false,
   },
   {
-    id: "performance" as const,
-    title: "Performance de Analistas",
-    description: "Métricas de produtividade e tempo de resolução por analista",
-    icon: TrendingUp,
-    highlight: false,
-  },
-  {
-    id: "history" as const,
-    title: "Histórico de Tickets",
-    description: "Listagem detalhada de tickets com filtros avançados",
-    icon: ListOrdered,
+    id: "comparison" as const,
+    title: "Comparativo de Períodos",
+    description: "Compare métricas entre dois períodos diferentes",
+    icon: GitCompare,
     highlight: false,
   },
 ];
 
 const Reports = () => {
   const [selectedReport, setSelectedReport] = useState<ReportType>(null);
+  const { data: sendHistory } = useReportSendHistory();
 
   if (selectedReport === "monthly") {
     return <MonthlyClientReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "performance") {
+    return <AnalystPerformanceReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "categories") {
+    return <CategoriesReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "comparison") {
+    return <PeriodComparisonReport onBack={() => setSelectedReport(null)} />;
   }
 
   return (
@@ -57,54 +70,61 @@ const Reports = () => {
         <div>
           <h1 className="text-2xl font-bold text-foreground">Relatórios</h1>
           <p className="text-muted-foreground">
-            Selecione o tipo de relatório que deseja gerar
+            Gere relatórios e acompanhe o histórico de envios
           </p>
         </div>
 
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {reportTypes.map((report) => {
-            const Icon = report.icon;
-            return (
-              <Card
-                key={report.id}
-                className={`cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 ${
-                  report.highlight ? "border-primary bg-primary/5" : ""
-                }`}
-                onClick={() => setSelectedReport(report.id)}
-              >
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2 text-base">
-                    <Icon className={`h-5 w-5 ${report.highlight ? "text-primary" : "text-muted-foreground"}`} />
-                    {report.title}
-                    {report.highlight && (
-                      <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
-                        Recomendado
-                      </span>
-                    )}
-                  </CardTitle>
-                  <CardDescription>{report.description}</CardDescription>
-                </CardHeader>
-              </Card>
-            );
-          })}
-        </div>
+        <Tabs defaultValue="types" className="space-y-4">
+          <TabsList>
+            <TabsTrigger value="types" className="flex items-center gap-2">
+              <FileBarChart className="h-4 w-4" />
+              Tipos de Relatório
+            </TabsTrigger>
+            <TabsTrigger value="history" className="flex items-center gap-2">
+              <History className="h-4 w-4" />
+              Histórico de Envios
+              {sendHistory && sendHistory.length > 0 && (
+                <Badge variant="secondary" className="ml-1">
+                  {sendHistory.length}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
 
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Calendar className="h-5 w-5 text-muted-foreground" />
-              Agendamento de Relatórios
-            </CardTitle>
-            <CardDescription>
-              Configure envio automático de relatórios mensais para clientes
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <p className="text-sm text-muted-foreground">
-              Funcionalidade em desenvolvimento. Em breve você poderá agendar o envio automático de relatórios.
-            </p>
-          </CardContent>
-        </Card>
+          <TabsContent value="types">
+            <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
+              {reportTypes.map((report) => {
+                const Icon = report.icon;
+                return (
+                  <Card
+                    key={report.id}
+                    className={`cursor-pointer transition-all hover:shadow-lg hover:border-primary/50 ${
+                      report.highlight ? "border-primary bg-primary/5" : ""
+                    }`}
+                    onClick={() => setSelectedReport(report.id)}
+                  >
+                    <CardHeader>
+                      <CardTitle className="flex items-center gap-2 text-base">
+                        <Icon className={`h-5 w-5 ${report.highlight ? "text-primary" : "text-muted-foreground"}`} />
+                        {report.title}
+                        {report.highlight && (
+                          <span className="ml-auto text-xs bg-primary text-primary-foreground px-2 py-0.5 rounded-full">
+                            Recomendado
+                          </span>
+                        )}
+                      </CardTitle>
+                      <CardDescription>{report.description}</CardDescription>
+                    </CardHeader>
+                  </Card>
+                );
+              })}
+            </div>
+          </TabsContent>
+
+          <TabsContent value="history">
+            <ReportSendHistory />
+          </TabsContent>
+        </Tabs>
       </div>
     </AppLayout>
   );
