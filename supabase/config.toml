@@ -23,3 +23,6 @@ verify_jwt = false
 
 [functions.send-monthly-report]
 verify_jwt = false
+
+[functions.send-resolution-notification]
+verify_jwt = false

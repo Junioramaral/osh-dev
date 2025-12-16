@@ -12,9 +12,20 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { calculateSLAStatus, formatDuration } from "@/lib/ticketUtils";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle } from "lucide-react";
+import { TicketResolveDialog } from "./TicketResolveDialog";
+import { useTicketActions } from "@/hooks/useTicketActions";
+import { useAuth } from "@/contexts/AuthContext";
+
 interface TicketSidebarProps {
   ticket: any;
 }
@@ -31,6 +42,10 @@ function InfoRow({ label, value }: { label: string; value: any }) {
 
 export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showFAQDialog, setShowFAQDialog] = useState(false);
+  const [showResolveDialog, setShowResolveDialog] = useState(false);
+  const { profile } = useAuth();
+  const { resolveTicketWithReason, updateTicketStatus } = useTicketActions();
+  
   const slaStatus = calculateSLAStatus(ticket);
   const now = new Date();
   
@@ -49,9 +64,94 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
       isOverdue: remaining < 0
     };
   })() : null;
+
+  const handleStatusChange = (newStatus: string) => {
+    if (newStatus === "resolvido") {
+      setShowResolveDialog(true);
+    } else {
+      updateTicketStatus.mutate({
+        ticketId: ticket.id,
+        status: newStatus as any,
+      });
+    }
+  };
+
+  const handleResolveConfirm = async (reason: string) => {
+    if (!profile?.id) return;
+    await resolveTicketWithReason.mutateAsync({
+      ticketId: ticket.id,
+      reason,
+      userId: profile.id,
+    });
+    setShowResolveDialog(false);
+  };
+
+  const isResolved = ticket.status === "resolvido" || ticket.status === "fechado";
   
   return (
     <div className="space-y-6">
+      {/* Ticket Actions Card */}
+      <Card className="border-primary/20">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm">Ações do Ticket</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {/* Current Status */}
+          <div className="flex items-center justify-between">
+            <Label className="text-xs text-muted-foreground">Status Atual</Label>
+            <Badge className={getStatusColor(ticket.status)}>
+              {getStatusLabel(ticket.status)}
+            </Badge>
+          </div>
+
+          {/* Status Dropdown - only show if not resolved */}
+          {!isResolved && (
+            <>
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Alterar Status</Label>
+                <Select
+                  value={ticket.status}
+                  onValueChange={handleStatusChange}
+                  disabled={updateTicketStatus.isPending}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="novo">Novo</SelectItem>
+                    <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
+                    <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Resolve Button */}
+              <Button
+                className="w-full bg-green-600 hover:bg-green-700"
+                onClick={() => setShowResolveDialog(true)}
+              >
+                <CheckCircle className="h-4 w-4 mr-2" />
+                Resolver Ticket
+              </Button>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Resolve Dialog */}
+      <TicketResolveDialog
+        open={showResolveDialog}
+        onOpenChange={setShowResolveDialog}
+        ticket={{
+          id: ticket.id,
+          ticket_number: ticket.ticket_number,
+          title: ticket.title,
+          contact_name: ticket.contact_name,
+        }}
+        onConfirm={handleResolveConfirm}
+        isLoading={resolveTicketWithReason.isPending}
+      />
+
       {/* FAQ Relacionada */}
       {ticket.faq_articles && (
         <Card className="border-primary/20 bg-primary/5">
