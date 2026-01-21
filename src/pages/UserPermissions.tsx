@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useUserPermissions, UserPermission } from "@/hooks/useUserPermissions";
+import { RoleCheckboxGroup, getRolesLabel } from "@/components/tenants/RoleCheckboxGroup";
 import AppLayout from "@/components/layout/AppLayout";
 import {
   Table,
@@ -20,15 +21,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import {
   Accordion,
   AccordionContent,
@@ -38,9 +37,10 @@ import {
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Shield, Search, Info, Building2, Users } from "lucide-react";
+import { Shield, Search, Info, Building2, Users, Edit2, AlertTriangle } from "lucide-react";
 
 // Helper para obter labels das roles
 const getRoleLabel = (role: string): string => {
@@ -69,17 +69,35 @@ const getRoleBadgeVariant = (role: string): "destructive" | "default" | "seconda
   }
 };
 
-// Helper para obter descrição da role
-const getRoleDescription = (role: string): string => {
-  const descriptions: Record<string, string> = {
-    super_admin: "Acesso completo ao sistema, gerencia todos os tenants e usuários",
-    tenant_admin: "Administra seu tenant, gerencia usuários e configurações",
-    analyst_db: "Analista de banco de dados, atende tickets de DB",
-    analyst_app: "Analista de aplicação, atende tickets de APP",
-    user: "Usuário padrão do tenant, pode criar e visualizar tickets"
-  };
-  return descriptions[role] || "";
+// Cores distintivas para cada role
+const getRoleBadgeColor = (role: string): string => {
+  switch (role) {
+    case "super_admin":
+      return "border-red-500/50 text-red-600 bg-red-500/10 dark:text-red-400 dark:bg-red-500/20";
+    case "tenant_admin":
+      return "border-orange-500/50 text-orange-600 bg-orange-500/10 dark:text-orange-400 dark:bg-orange-500/20";
+    case "analyst_db":
+      return "border-blue-500/50 text-blue-600 bg-blue-500/10 dark:text-blue-400 dark:bg-blue-500/20";
+    case "analyst_app":
+      return "border-green-500/50 text-green-600 bg-green-500/10 dark:text-green-400 dark:bg-green-500/20";
+    case "user":
+      return "border-muted-foreground/50 text-muted-foreground bg-muted/50";
+    default:
+      return "";
+  }
 };
+
+// Labels curtos para badges no accordion
+const roleShortLabels: Record<string, string> = {
+  super_admin: "Super Admin",
+  tenant_admin: "Admin",
+  analyst_db: "DB",
+  analyst_app: "APP",
+  user: "User"
+};
+
+// Ordem de exibição das roles
+const roleOrder = ["super_admin", "tenant_admin", "analyst_db", "analyst_app", "user"];
 
 const UserPermissions = () => {
   const { user: currentUser } = useAuth();
@@ -89,16 +107,17 @@ const UserPermissions = () => {
     status: "all",
     search: "",
   });
-  const [confirmDialog, setConfirmDialog] = useState<{
+  const [editDialog, setEditDialog] = useState<{
     open: boolean;
-    userId: string;
-    userName: string;
-    userEmail: string;
-    currentRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
-    newRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
-  } | null>(null);
+    user: UserPermission | null;
+    selectedRoles: string[];
+  }>({
+    open: false,
+    user: null,
+    selectedRoles: [],
+  });
 
-  const { users, isLoading, updateRole, isUpdating } = useUserPermissions(filters);
+  const { users, isLoading, updateRoles, isUpdating } = useUserPermissions(filters);
 
   // Buscar lista de tenants para o filtro
   const { data: tenants = [] } = useQuery({
@@ -132,77 +151,42 @@ const UserPermissions = () => {
     return grouped;
   };
 
-  // Contar roles por grupo de usuários
+  // Contar roles por grupo de usuários (um usuário pode ser contado em múltiplas roles)
   const countRolesByClient = (clientUsers: UserPermission[]): Record<string, number> => {
     const roleCounts: Record<string, number> = {};
     clientUsers.forEach((user) => {
-      if (!roleCounts[user.role]) {
-        roleCounts[user.role] = 0;
-      }
-      roleCounts[user.role]++;
+      user.roles.forEach(role => {
+        roleCounts[role] = (roleCounts[role] || 0) + 1;
+      });
     });
     return roleCounts;
   };
 
-  // Labels curtos para badges
-  const roleShortLabels: Record<string, string> = {
-    super_admin: "Super Admin",
-    tenant_admin: "Admin",
-    analyst_db: "DB",
-    analyst_app: "APP",
-    user: "User"
-  };
-
-  // Cores distintivas para cada role
-  const getRoleBadgeColor = (role: string): string => {
-    switch (role) {
-      case "super_admin":
-        return "border-red-500/50 text-red-600 bg-red-500/10 dark:text-red-400 dark:bg-red-500/20";
-      case "tenant_admin":
-        return "border-orange-500/50 text-orange-600 bg-orange-500/10 dark:text-orange-400 dark:bg-orange-500/20";
-      case "analyst_db":
-        return "border-blue-500/50 text-blue-600 bg-blue-500/10 dark:text-blue-400 dark:bg-blue-500/20";
-      case "analyst_app":
-        return "border-green-500/50 text-green-600 bg-green-500/10 dark:text-green-400 dark:bg-green-500/20";
-      case "user":
-        return "border-muted-foreground/50 text-muted-foreground bg-muted/50";
-      default:
-        return "";
-    }
-  };
-
-  // Ordem de exibição das roles
-  const roleOrder = ["super_admin", "tenant_admin", "analyst_db", "analyst_app", "user"];
-
   const groupedUsers = groupUsersByClient();
   const clientNames = Object.keys(groupedUsers).sort();
 
-  const handleRoleChange = (
-    userId: string,
-    userName: string,
-    userEmail: string,
-    currentRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user",
-    newRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user"
-  ) => {
-    setConfirmDialog({
+  const openEditDialog = (user: UserPermission) => {
+    setEditDialog({
       open: true,
-      userId,
-      userName,
-      userEmail,
-      currentRole,
-      newRole,
+      user,
+      selectedRoles: [...user.roles],
     });
   };
 
-  const confirmRoleChange = () => {
-    if (confirmDialog) {
-      updateRole({
-        userId: confirmDialog.userId,
-        newRole: confirmDialog.newRole,
+  const handleSaveRoles = () => {
+    if (editDialog.user && editDialog.selectedRoles.length > 0) {
+      updateRoles({
+        userId: editDialog.user.id,
+        newRoles: editDialog.selectedRoles,
       });
-      setConfirmDialog(null);
+      setEditDialog({ open: false, user: null, selectedRoles: [] });
     }
   };
+
+  const hasSuperAdminChange = editDialog.user && (
+    (editDialog.selectedRoles.includes("super_admin") && !editDialog.user.roles.includes("super_admin")) ||
+    (!editDialog.selectedRoles.includes("super_admin") && editDialog.user.roles.includes("super_admin"))
+  );
 
   return (
     <AppLayout>
@@ -252,10 +236,10 @@ const UserPermissions = () => {
             onValueChange={(value) => setFilters({ ...filters, role: value })}
           >
             <SelectTrigger>
-              <SelectValue placeholder="Todas as roles" />
+              <SelectValue placeholder="Todas as funções" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="all">Todas as roles</SelectItem>
+              <SelectItem value="all">Todas as funções</SelectItem>
               <SelectItem value="super_admin">Super Admin</SelectItem>
               <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
               <SelectItem value="analyst_db">Analista DB</SelectItem>
@@ -345,21 +329,21 @@ const UserPermissions = () => {
                             <TableHead>Email</TableHead>
                             <TableHead>
                               <div className="flex items-center gap-2">
-                                Role Atual
+                                Funções
                                 <TooltipProvider>
                                   <Tooltip>
                                     <TooltipTrigger>
                                       <Info className="h-4 w-4 text-muted-foreground" />
                                     </TooltipTrigger>
                                     <TooltipContent>
-                                      <p className="max-w-xs">Níveis de permissão do sistema</p>
+                                      <p className="max-w-xs">Usuários podem ter múltiplas funções</p>
                                     </TooltipContent>
                                   </Tooltip>
                                 </TooltipProvider>
                               </div>
                             </TableHead>
                             <TableHead>Status</TableHead>
-                            <TableHead className="text-right">Alterar Role</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
                           </TableRow>
                         </TableHeader>
                         <TableBody>
@@ -370,18 +354,25 @@ const UserPermissions = () => {
                                 <TableCell className="font-medium">{user.full_name}</TableCell>
                                 <TableCell className="text-muted-foreground">{user.email}</TableCell>
                                 <TableCell>
-                                  <TooltipProvider>
-                                    <Tooltip>
-                                      <TooltipTrigger>
-                                        <Badge variant={getRoleBadgeVariant(user.role)}>
-                                          {getRoleLabel(user.role)}
-                                        </Badge>
-                                      </TooltipTrigger>
-                                      <TooltipContent>
-                                        <p className="max-w-xs">{getRoleDescription(user.role)}</p>
-                                      </TooltipContent>
-                                    </Tooltip>
-                                  </TooltipProvider>
+                                  <div className="flex flex-wrap gap-1">
+                                    {user.roles.length === 0 ? (
+                                      <Badge variant="outline" className="text-muted-foreground">
+                                        Sem função
+                                      </Badge>
+                                    ) : (
+                                      user.roles
+                                        .sort((a, b) => roleOrder.indexOf(a) - roleOrder.indexOf(b))
+                                        .map((role) => (
+                                          <Badge 
+                                            key={role} 
+                                            variant={getRoleBadgeVariant(role)}
+                                            className="text-xs"
+                                          >
+                                            {getRoleLabel(role)}
+                                          </Badge>
+                                        ))
+                                    )}
+                                  </div>
                                 </TableCell>
                                 <TableCell>
                                   <Badge variant={user.is_active ? "default" : "outline"}>
@@ -389,30 +380,15 @@ const UserPermissions = () => {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Select
-                                    value={user.role}
-                                    onValueChange={(value: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user") =>
-                                      handleRoleChange(
-                                        user.id,
-                                        user.full_name,
-                                        user.email,
-                                        user.role,
-                                        value
-                                      )
-                                    }
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openEditDialog(user)}
                                     disabled={isCurrentUser || isUpdating}
                                   >
-                                    <SelectTrigger className="w-[150px]">
-                                      <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                      <SelectItem value="super_admin">Super Admin</SelectItem>
-                                      <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
-                                      <SelectItem value="analyst_db">Analista DB</SelectItem>
-                                      <SelectItem value="analyst_app">Analista APP</SelectItem>
-                                      <SelectItem value="user">Usuário</SelectItem>
-                                    </SelectContent>
-                                  </Select>
+                                    <Edit2 className="h-4 w-4 mr-1" />
+                                    Editar
+                                  </Button>
                                   {isCurrentUser && (
                                     <p className="text-xs text-muted-foreground mt-1">
                                       (Você)
@@ -433,57 +409,58 @@ const UserPermissions = () => {
         )}
       </div>
 
-      {/* Dialog de Confirmação */}
-      <AlertDialog
-        open={confirmDialog?.open || false}
-        onOpenChange={(open) => !open && setConfirmDialog(null)}
+      {/* Dialog de Edição de Permissões */}
+      <Dialog
+        open={editDialog.open}
+        onOpenChange={(open) => !open && setEditDialog({ open: false, user: null, selectedRoles: [] })}
       >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>Alterar Permissão</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-3">
-              <p>
-                Você está prestes a alterar a permissão de{" "}
-                <strong>{confirmDialog?.userName}</strong> ({confirmDialog?.userEmail})
-              </p>
-              <div className="bg-muted p-3 rounded-md">
-                <p className="text-sm">
-                  <span className="font-semibold">Role atual:</span>{" "}
-                  {confirmDialog?.currentRole && getRoleLabel(confirmDialog.currentRole)}
-                </p>
-                <p className="text-sm">
-                  <span className="font-semibold">Nova role:</span>{" "}
-                  {confirmDialog?.newRole && getRoleLabel(confirmDialog.newRole)}
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Editar Permissões</DialogTitle>
+            <DialogDescription>
+              <span className="font-semibold">{editDialog.user?.full_name}</span>
+              <br />
+              <span className="text-xs">{editDialog.user?.email}</span>
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="py-4">
+            <RoleCheckboxGroup
+              selectedRoles={editDialog.selectedRoles}
+              onRolesChange={(roles) => setEditDialog(prev => ({ ...prev, selectedRoles: roles }))}
+              disabled={isUpdating}
+            />
+          </div>
+
+          {hasSuperAdminChange && (
+            <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-md flex items-start gap-2">
+              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+              <div>
+                <p className="text-sm font-semibold text-destructive">Atenção</p>
+                <p className="text-sm text-destructive">
+                  Você está {editDialog.selectedRoles.includes("super_admin") ? "adicionando" : "removendo"} 
+                  {" "}a função de Super Admin. Super Admins têm acesso total ao sistema.
                 </p>
               </div>
-              {confirmDialog?.newRole && (
-                <div className="bg-muted/50 p-3 rounded-md">
-                  <p className="text-sm text-muted-foreground">
-                    {getRoleDescription(confirmDialog.newRole)}
-                  </p>
-                </div>
-              )}
-              {confirmDialog?.newRole === "super_admin" && (
-                <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-md">
-                  <p className="text-sm text-destructive font-semibold">
-                    ⚠️ Atenção
-                  </p>
-                  <p className="text-sm text-destructive">
-                    Super Admins têm acesso total ao sistema, incluindo gerenciamento
-                    de todos os tenants e usuários.
-                  </p>
-                </div>
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmRoleChange}>
-              Confirmar Alteração
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+            </div>
+          )}
+
+          <DialogFooter>
+            <Button
+              variant="outline"
+              onClick={() => setEditDialog({ open: false, user: null, selectedRoles: [] })}
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleSaveRoles}
+              disabled={isUpdating || editDialog.selectedRoles.length === 0}
+            >
+              {isUpdating ? "Salvando..." : "Salvar Alterações"}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </AppLayout>
   );
 };
