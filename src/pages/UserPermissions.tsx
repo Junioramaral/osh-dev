@@ -183,10 +183,16 @@ const UserPermissions = () => {
     }
   };
 
+  // Detectar se está adicionando ou removendo super_admin
   const hasSuperAdminChange = editDialog.user && (
     (editDialog.selectedRoles.includes("super_admin") && !editDialog.user.roles.includes("super_admin")) ||
     (!editDialog.selectedRoles.includes("super_admin") && editDialog.user.roles.includes("super_admin"))
   );
+
+  // Detectar se o usuário atual é Super Admin editando a si mesmo
+  const isEditingSelf = editDialog.user?.id === currentUser?.id;
+  const isSelfSuperAdmin = isEditingSelf && editDialog.user?.roles.includes("super_admin");
+  const disabledRolesForSelf = isSelfSuperAdmin ? ["super_admin"] : [];
 
   return (
     <AppLayout>
@@ -384,16 +390,11 @@ const UserPermissions = () => {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => openEditDialog(user)}
-                                    disabled={isCurrentUser || isUpdating}
+                                    disabled={isUpdating}
                                   >
                                     <Edit2 className="h-4 w-4 mr-1" />
-                                    Editar
+                                    {isCurrentUser ? "Editar (Você)" : "Editar"}
                                   </Button>
-                                  {isCurrentUser && (
-                                    <p className="text-xs text-muted-foreground mt-1">
-                                      (Você)
-                                    </p>
-                                  )}
                                 </TableCell>
                               </TableRow>
                             );
@@ -424,26 +425,40 @@ const UserPermissions = () => {
             </DialogDescription>
           </DialogHeader>
 
-          <div className="py-4">
+          <div className="py-4 space-y-4">
             <RoleCheckboxGroup
               selectedRoles={editDialog.selectedRoles}
               onRolesChange={(roles) => setEditDialog(prev => ({ ...prev, selectedRoles: roles }))}
               disabled={isUpdating}
+              disabledRoles={disabledRolesForSelf}
             />
-          </div>
 
-          {hasSuperAdminChange && (
-            <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-md flex items-start gap-2">
-              <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-semibold text-destructive">Atenção</p>
-                <p className="text-sm text-destructive">
-                  Você está {editDialog.selectedRoles.includes("super_admin") ? "adicionando" : "removendo"} 
-                  {" "}a função de Super Admin. Super Admins têm acesso total ao sistema.
-                </p>
+            {isSelfSuperAdmin && (
+              <div className="bg-blue-500/10 border border-blue-500/20 p-3 rounded-md flex items-start gap-2">
+                <Shield className="h-5 w-5 text-blue-500 shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-blue-600 dark:text-blue-400">Proteção Ativa</p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    Você não pode remover sua própria permissão de Super Admin. 
+                    Isso evita que você perca acesso administrativo ao sistema.
+                  </p>
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {hasSuperAdminChange && !isEditingSelf && (
+              <div className="bg-destructive/10 border border-destructive/20 p-3 rounded-md flex items-start gap-2">
+                <AlertTriangle className="h-5 w-5 text-destructive shrink-0 mt-0.5" />
+                <div>
+                  <p className="text-sm font-semibold text-destructive">Atenção</p>
+                  <p className="text-sm text-destructive">
+                    Você está {editDialog.selectedRoles.includes("super_admin") ? "adicionando" : "removendo"} 
+                    {" "}a função de Super Admin. Super Admins têm acesso total ao sistema.
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
 
           <DialogFooter>
             <Button
