@@ -65,10 +65,13 @@ export const useUserPermissions = (filters?: {
         throw authError;
       }
 
+      // Extrair lista de usuários da resposta (estrutura: authData.data.users)
+      const authUsers = authData?.data?.users || [];
+
       // Mapear dados
       const usersWithPermissions: UserPermission[] = profiles.map((profile: any) => {
         const userRole = roles?.find((r: any) => r.user_id === profile.id);
-        const authUser = authData?.users?.find((u: any) => u.id === profile.id);
+        const authUser = authUsers.find((u: any) => u.id === profile.id);
         const client = clients?.find((c: any) => c.id === profile.client_id);
 
         return {
