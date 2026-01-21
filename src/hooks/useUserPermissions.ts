@@ -8,7 +8,7 @@ export interface UserPermission {
   email: string;
   client_id: string | null;
   client_name: string | null;
-  role: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
+  roles: string[]; // Array de roles para suporte a múltiplas funções
   is_active: boolean;
 }
 
@@ -50,7 +50,7 @@ export const useUserPermissions = (filters?: {
         .from("clients")
         .select("id, name");
 
-      // Buscar roles
+      // Buscar todas as roles (pode ter múltiplas por usuário)
       const { data: roles } = await supabase
         .from("user_roles")
         .select("user_id, role");
@@ -70,7 +70,8 @@ export const useUserPermissions = (filters?: {
 
       // Mapear dados
       const usersWithPermissions: UserPermission[] = profiles.map((profile: any) => {
-        const userRole = roles?.find((r: any) => r.user_id === profile.id);
+        // Buscar TODAS as roles do usuário (não apenas a primeira)
+        const userRoles = roles?.filter((r: any) => r.user_id === profile.id) || [];
         const authUser = authUsers.find((u: any) => u.id === profile.id);
         const client = clients?.find((c: any) => c.id === profile.client_id);
 
@@ -80,15 +81,15 @@ export const useUserPermissions = (filters?: {
           email: authUser?.email || "",
           client_id: profile.client_id,
           client_name: client?.name || "Otimizzo",
-          role: (userRole?.role as "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user") || "user",
+          roles: userRoles.map((r: any) => r.role), // Array de roles
           is_active: profile.is_active || false,
         };
       });
 
-      // Aplicar filtro de role
+      // Aplicar filtro de role (verifica se o usuário possui a role)
       let filteredUsers = usersWithPermissions;
       if (filters?.role && filters.role !== "all") {
-        filteredUsers = filteredUsers.filter(u => u.role === filters.role);
+        filteredUsers = filteredUsers.filter(u => u.roles.includes(filters.role!));
       }
 
       // Aplicar busca por nome ou email
@@ -110,40 +111,70 @@ export const useUserPermissions = (filters?: {
     },
   });
 
-  // Mutation para alterar role
-  const updateRoleMutation = useMutation({
+  type AppRole = "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
+
+  // Mutation para alterar roles (suporta múltiplas)
+  const updateRolesMutation = useMutation({
     mutationFn: async ({
       userId,
-      newRole,
+      newRoles,
     }: {
       userId: string;
-      newRole: "super_admin" | "tenant_admin" | "analyst_db" | "analyst_app" | "user";
+      newRoles: string[];
     }) => {
-      const { error } = await supabase
+      // Buscar roles existentes do usuário
+      const { data: existingRoles, error: fetchError } = await supabase
         .from("user_roles")
-        .update({ role: newRole })
+        .select("id, role")
         .eq("user_id", userId);
 
-      if (error) throw error;
+      if (fetchError) throw fetchError;
+
+      const existingRoleNames: string[] = existingRoles?.map(r => r.role) || [];
+      
+      // Calcular diferenças
+      const rolesToAdd = newRoles.filter(r => !existingRoleNames.includes(r));
+      const rolesToRemove = existingRoleNames.filter(r => !newRoles.includes(r));
+
+      // Inserir novas roles primeiro (para nunca deixar usuário sem role)
+      if (rolesToAdd.length > 0) {
+        const { error: insertError } = await supabase
+          .from("user_roles")
+          .insert(rolesToAdd.map(role => ({ user_id: userId, role: role as AppRole })));
+        
+        if (insertError) throw insertError;
+      }
+
+      // Remover roles antigas depois
+      if (rolesToRemove.length > 0) {
+        const { error: deleteError } = await supabase
+          .from("user_roles")
+          .delete()
+          .eq("user_id", userId)
+          .in("role", rolesToRemove as AppRole[]);
+        
+        if (deleteError) throw deleteError;
+      }
     },
     onSuccess: (_, variables) => {
       const user = users.find(u => u.id === variables.userId);
-      const roleLabels = {
+      const roleLabels: Record<string, string> = {
         super_admin: "Super Admin",
         tenant_admin: "Tenant Admin",
         analyst_db: "Analista DB",
         analyst_app: "Analista APP",
         user: "Usuário"
       };
+      const rolesDisplay = variables.newRoles.map(r => roleLabels[r] || r).join(", ");
       toast({
-        title: "Permissão alterada com sucesso",
-        description: `${user?.full_name} agora é ${roleLabels[variables.newRole]}`,
+        title: "Permissões alteradas com sucesso",
+        description: `${user?.full_name} agora possui: ${rolesDisplay}`,
       });
       queryClient.invalidateQueries({ queryKey: ["user-permissions"] });
     },
     onError: (error: any) => {
       toast({
-        title: "Erro ao alterar permissão",
+        title: "Erro ao alterar permissões",
         description: error.message,
         variant: "destructive",
       });
@@ -153,7 +184,7 @@ export const useUserPermissions = (filters?: {
   return {
     users,
     isLoading,
-    updateRole: updateRoleMutation.mutate,
-    isUpdating: updateRoleMutation.isPending,
+    updateRoles: updateRolesMutation.mutate,
+    isUpdating: updateRolesMutation.isPending,
   };
 };
