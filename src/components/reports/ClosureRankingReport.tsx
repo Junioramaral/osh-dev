@@ -1,16 +1,17 @@
 import { useState } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, Star } from "lucide-react";
+import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, TrendingDown, Minus, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { useClosureRankingData } from "@/hooks/useClosureRankingData";
+import { useClosureRankingEvolution } from "@/hooks/useClosureRankingEvolution";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from "recharts";
+import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
 import ReportCover from "./ReportCover";
 import PrintPage from "./PrintPage";
 import ReportFooter from "./ReportFooter";
@@ -62,6 +63,25 @@ const CHART_COLORS = [
   "hsl(var(--primary) / 0.55)",
   "hsl(var(--primary) / 0.4)",
 ];
+
+const LINE_COLORS = [
+  "hsl(221, 83%, 53%)",    // Blue
+  "hsl(142, 71%, 45%)",    // Green
+  "hsl(262, 83%, 58%)",    // Purple
+  "hsl(25, 95%, 53%)",     // Orange
+  "hsl(346, 77%, 50%)",    // Red/Pink
+];
+
+const TrendIcon = ({ trend }: { trend: "improving" | "declining" | "stable" }) => {
+  switch (trend) {
+    case "improving":
+      return <TrendingUp className="h-4 w-4 text-green-500" />;
+    case "declining":
+      return <TrendingDown className="h-4 w-4 text-red-500" />;
+    default:
+      return <Minus className="h-4 w-4 text-muted-foreground" />;
+  }
+};
 
 const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
   const [period, setPeriod] = useState("current-month");
@@ -127,6 +147,17 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
     clientId: clientId !== "all" ? clientId : undefined,
   });
 
+  // Evolution data - only for multi-month periods
+  const showEvolution = period === "last-3-months" || period === "last-6-months";
+  
+  const { data: evolutionData } = useClosureRankingEvolution({
+    startDate: dateRange.start,
+    endDate: dateRange.end,
+    segment: segment !== "all" ? segment : undefined,
+    clientId: clientId !== "all" ? clientId : undefined,
+    enabled: showEvolution,
+  });
+
   const handlePrint = () => {
     const originalTitle = document.title;
     const periodLabel = sanitizeForFilename(dateRange.label);
@@ -174,6 +205,36 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
       ratings: analyst.csat_total_ratings,
       rank: index + 1,
     }));
+
+  // Prepare evolution chart data (top 5 analysts by volume)
+  const evolutionVolumeChartData = evolutionData?.monthLabels.map((monthLabel, monthIndex) => {
+    const month = evolutionData.months[monthIndex];
+    const dataPoint: Record<string, any> = { month: monthLabel };
+    
+    evolutionData.analysts.slice(0, 5).forEach(analyst => {
+      const monthData = analyst.monthly_data.find(m => m.month === month);
+      dataPoint[analyst.analyst_id] = monthData?.total_resolved || 0;
+    });
+    
+    return dataPoint;
+  }) || [];
+
+  const evolutionSpeedChartData = evolutionData?.monthLabels.map((monthLabel, monthIndex) => {
+    const month = evolutionData.months[monthIndex];
+    const dataPoint: Record<string, any> = { month: monthLabel };
+    
+    evolutionData.analysts.slice(0, 5).forEach(analyst => {
+      const monthData = analyst.monthly_data.find(m => m.month === month);
+      dataPoint[analyst.analyst_id] = monthData?.avg_resolution_minutes || 0;
+    });
+    
+    return dataPoint;
+  }) || [];
+
+  const topAnalystsForChart = evolutionData?.analysts.slice(0, 5) || [];
+
+  // Create trend map for ranking table
+  const trendMap = new Map(evolutionData?.analysts.map(a => [a.analyst_id, a.trends]) || []);
 
   return (
     <div className="print-container">
@@ -502,6 +563,136 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
             <ReportFooter />
           </PrintPage>
 
+          {/* Evolution Section - Only for multi-month periods */}
+          {showEvolution && evolutionData && evolutionData.months.length >= 2 && (
+            <PrintPage>
+              <div className="space-y-6">
+                <h2 className="text-xl font-semibold print:text-lg">Evolução Mensal</h2>
+                
+                {/* Evolution Highlights */}
+                <div className="grid gap-4 md:grid-cols-3">
+                  {evolutionData.highlights.top_volume_growth && (
+                    <Card className="border-green-500/50 bg-green-500/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <TrendingUp className="h-4 w-4 text-green-600" />
+                          Maior Crescimento
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-lg font-bold">{evolutionData.highlights.top_volume_growth.analyst_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          +{Math.round(evolutionData.highlights.top_volume_growth.growth.volume_change * 100)}% em volume
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {evolutionData.highlights.top_speed_improvement && (
+                    <Card className="border-blue-500/50 bg-blue-500/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Timer className="h-4 w-4 text-blue-600" />
+                          Mais Melhorou Velocidade
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-lg font-bold">{evolutionData.highlights.top_speed_improvement.analyst_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {Math.round(evolutionData.highlights.top_speed_improvement.growth.speed_change * 100)}% mais rápido
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                  
+                  {evolutionData.highlights.top_csat_improvement && (
+                    <Card className="border-yellow-500/50 bg-yellow-500/5">
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium flex items-center gap-2">
+                          <Star className="h-4 w-4 text-yellow-600" />
+                          Mais Melhorou CSAT
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <p className="text-lg font-bold">{evolutionData.highlights.top_csat_improvement.analyst_name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          +{Math.round(evolutionData.highlights.top_csat_improvement.growth.csat_change * 100)}% em satisfação
+                        </p>
+                      </CardContent>
+                    </Card>
+                  )}
+                </div>
+
+                {/* Volume Evolution Chart */}
+                {topAnalystsForChart.length > 0 && evolutionVolumeChartData.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Tickets Resolvidos por Mês (Top 5)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={evolutionVolumeChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" />
+                            <YAxis />
+                            <Tooltip />
+                            <Legend />
+                            {topAnalystsForChart.map((analyst, index) => (
+                              <Line
+                                key={analyst.analyst_id}
+                                type="monotone"
+                                dataKey={analyst.analyst_id}
+                                name={analyst.analyst_name.split(" ")[0]}
+                                stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+
+                {/* Speed Evolution Chart */}
+                {topAnalystsForChart.length > 0 && evolutionSpeedChartData.length > 0 && (
+                  <Card>
+                    <CardHeader>
+                      <CardTitle className="text-base">Tempo Médio de Resolução por Mês (Top 5)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <LineChart data={evolutionSpeedChartData}>
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="month" />
+                            <YAxis tickFormatter={(value) => formatMinutesToHuman(value)} />
+                            <Tooltip formatter={(value: number) => formatMinutesToHuman(value)} />
+                            <Legend />
+                            {topAnalystsForChart.map((analyst, index) => (
+                              <Line
+                                key={analyst.analyst_id}
+                                type="monotone"
+                                dataKey={analyst.analyst_id}
+                                name={analyst.analyst_name.split(" ")[0]}
+                                stroke={LINE_COLORS[index % LINE_COLORS.length]}
+                                strokeWidth={2}
+                                dot={{ r: 4 }}
+                              />
+                            ))}
+                          </LineChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+              </div>
+              <ReportFooter />
+            </PrintPage>
+          )}
+
           {/* Full Ranking Table */}
           <PrintPage pageBreakAfter={false}>
             <div className="space-y-4">
@@ -520,6 +711,7 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                         <TableHead className="text-center">R. Vol</TableHead>
                         <TableHead className="text-center">R. Tmp</TableHead>
                         <TableHead className="text-center">R. CSAT</TableHead>
+                        {showEvolution && <TableHead className="text-center">Tendência</TableHead>}
                         <TableHead className="text-center">Score</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -576,6 +768,18 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                               <span className="text-muted-foreground text-sm">-</span>
                             )}
                           </TableCell>
+                          {showEvolution && (
+                            <TableCell className="text-center">
+                              {trendMap.has(analyst.analyst_id) ? (
+                                <div className="flex items-center justify-center gap-1">
+                                  <TrendIcon trend={trendMap.get(analyst.analyst_id)!.volume} />
+                                  <TrendIcon trend={trendMap.get(analyst.analyst_id)!.speed} />
+                                </div>
+                              ) : (
+                                <span className="text-muted-foreground text-sm">-</span>
+                              )}
+                            </TableCell>
+                          )}
                           <TableCell className="text-center">
                             <Badge variant="outline" className="font-bold">
                               {analyst.combined_score}
