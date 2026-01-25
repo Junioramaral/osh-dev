@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, TrendingDown, Minus, Star } from "lucide-react";
+import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, TrendingDown, Minus, Star, ArrowLeftRight, UserMinus, UserPlus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { Badge } from "@/components/ui/badge";
 import { useClosureRankingData } from "@/hooks/useClosureRankingData";
 import { useClosureRankingEvolution } from "@/hooks/useClosureRankingEvolution";
+import { useClosureRankingComparison } from "@/hooks/useClosureRankingComparison";
 import { supabase } from "@/integrations/supabase/client";
 import { useQuery } from "@tanstack/react-query";
 import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, Legend } from "recharts";
@@ -83,10 +84,53 @@ const TrendIcon = ({ trend }: { trend: "improving" | "declining" | "stable" }) =
   }
 };
 
+const formatVariation = (value: number): string => {
+  const sign = value > 0 ? "+" : "";
+  return `${sign}${value.toFixed(0)}%`;
+};
+
+const getVariationColor = (value: number, invertColors: boolean = false): string => {
+  const isPositive = invertColors ? value < 0 : value > 0;
+  const isNegative = invertColors ? value > 0 : value < 0;
+  if (isPositive) return "text-green-600";
+  if (isNegative) return "text-red-600";
+  return "text-muted-foreground";
+};
+
+const MONTHS = [
+  { value: "1", label: "Janeiro" },
+  { value: "2", label: "Fevereiro" },
+  { value: "3", label: "Março" },
+  { value: "4", label: "Abril" },
+  { value: "5", label: "Maio" },
+  { value: "6", label: "Junho" },
+  { value: "7", label: "Julho" },
+  { value: "8", label: "Agosto" },
+  { value: "9", label: "Setembro" },
+  { value: "10", label: "Outubro" },
+  { value: "11", label: "Novembro" },
+  { value: "12", label: "Dezembro" },
+];
+
 const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
+  const [viewMode, setViewMode] = useState<"ranking" | "comparison">("ranking");
   const [period, setPeriod] = useState("current-month");
   const [segment, setSegment] = useState("all");
   const [clientId, setClientId] = useState("all");
+  
+  // Comparison mode state
+  const now = new Date();
+  const currentMonth = now.getMonth() + 1;
+  const currentYear = now.getFullYear();
+  const prevMonth = currentMonth > 1 ? currentMonth - 1 : 12;
+  const prevMonthYear = currentMonth > 1 ? currentYear : currentYear - 1;
+  
+  const [periodAMonth, setPeriodAMonth] = useState(currentMonth.toString());
+  const [periodAYear, setPeriodAYear] = useState(currentYear.toString());
+  const [periodBMonth, setPeriodBMonth] = useState(prevMonth.toString());
+  const [periodBYear, setPeriodBYear] = useState(prevMonthYear.toString());
+  
+  const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
 
   const getDateRange = () => {
     const now = new Date();
@@ -155,12 +199,25 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
     endDate: dateRange.end,
     segment: segment !== "all" ? segment : undefined,
     clientId: clientId !== "all" ? clientId : undefined,
-    enabled: showEvolution,
+    enabled: showEvolution && viewMode === "ranking",
+  });
+  
+  // Comparison data
+  const { data: comparisonData, isLoading: isComparisonLoading } = useClosureRankingComparison({
+    periodAMonth: parseInt(periodAMonth),
+    periodAYear: parseInt(periodAYear),
+    periodBMonth: parseInt(periodBMonth),
+    periodBYear: parseInt(periodBYear),
+    segment: segment !== "all" ? segment : undefined,
+    clientId: clientId !== "all" ? clientId : undefined,
+    enabled: viewMode === "comparison",
   });
 
   const handlePrint = () => {
     const originalTitle = document.title;
-    const periodLabel = sanitizeForFilename(dateRange.label);
+    const periodLabel = viewMode === "comparison"
+      ? `Comparativo_${sanitizeForFilename(comparisonData?.periodA.label || "")}_vs_${sanitizeForFilename(comparisonData?.periodB.label || "")}`
+      : sanitizeForFilename(dateRange.label);
     document.title = `Ranking_Encerramento_${periodLabel}`;
     
     const handleAfterPrint = () => {
@@ -171,6 +228,17 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
     
     window.print();
   };
+
+  // Prepare comparison chart data
+  const comparisonChartData = comparisonData?.analysts
+    .filter(a => a.periodA || a.periodB)
+    .slice(0, 10)
+    .map(analyst => ({
+      name: analyst.analyst_name.split(" ")[0],
+      fullName: analyst.analyst_name,
+      periodA: analyst.periodA?.total_resolved || 0,
+      periodB: analyst.periodB?.total_resolved || 0,
+    })) || [];
 
   // Prepare chart data
   const volumeChartData = (data?.rankings || [])
@@ -248,70 +316,205 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
           <div>
             <h1 className="text-2xl font-bold">Ranking de Encerramento</h1>
             <p className="text-muted-foreground">
-              Ranking de analistas por volume e tempo de resolução
+              {viewMode === "ranking" 
+                ? "Ranking de analistas por volume e tempo de resolução"
+                : "Comparativo de períodos lado a lado"
+              }
             </p>
           </div>
         </div>
-        <Button onClick={handlePrint} disabled={isLoading || !data}>
-          <FileDown className="h-4 w-4 mr-2" />
-          Exportar PDF
-        </Button>
-      </div>
-
-      {/* Filters */}
-      <div className="flex gap-4 mb-6 print:hidden">
-        <Select value={period} onValueChange={setPeriod}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Período" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="current-month">Mês atual</SelectItem>
-            <SelectItem value="last-month">Mês anterior</SelectItem>
-            <SelectItem value="last-3-months">Últimos 3 meses</SelectItem>
-            <SelectItem value="last-6-months">Últimos 6 meses</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={segment} onValueChange={setSegment}>
-          <SelectTrigger className="w-[140px]">
-            <SelectValue placeholder="Segmento" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos</SelectItem>
-            <SelectItem value="DB">Database</SelectItem>
-            <SelectItem value="APP">Aplicação</SelectItem>
-          </SelectContent>
-        </Select>
-
-        <Select value={clientId} onValueChange={setClientId}>
-          <SelectTrigger className="w-[200px]">
-            <SelectValue placeholder="Cliente" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todos os clientes</SelectItem>
-            {clients?.map((client) => (
-              <SelectItem key={client.id} value={client.id}>
-                {client.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      {isLoading ? (
-        <div className="flex items-center justify-center h-64">
-          <p className="text-muted-foreground">Carregando dados...</p>
+        <div className="flex items-center gap-2">
+          <div className="flex gap-1 bg-muted p-1 rounded-lg">
+            <Button
+              variant={viewMode === "ranking" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("ranking")}
+            >
+              <Trophy className="h-4 w-4 mr-1" />
+              Ranking
+            </Button>
+            <Button
+              variant={viewMode === "comparison" ? "default" : "ghost"}
+              size="sm"
+              onClick={() => setViewMode("comparison")}
+            >
+              <ArrowLeftRight className="h-4 w-4 mr-1" />
+              Comparativo
+            </Button>
+          </div>
+          <Button 
+            onClick={handlePrint} 
+            disabled={viewMode === "ranking" ? (isLoading || !data) : (isComparisonLoading || !comparisonData)}
+          >
+            <FileDown className="h-4 w-4 mr-2" />
+            Exportar PDF
+          </Button>
         </div>
-      ) : !data || data.rankings.length === 0 ? (
-        <Card>
-          <CardContent className="flex items-center justify-center h-64">
-            <p className="text-muted-foreground">
-              Nenhum ticket resolvido no período selecionado.
-            </p>
-          </CardContent>
-        </Card>
-      ) : (
-        <div className="space-y-6">
+      </div>
+
+      {/* Filters for Ranking mode */}
+      {viewMode === "ranking" && (
+        <div className="flex gap-4 mb-6 print:hidden">
+          <Select value={period} onValueChange={setPeriod}>
+            <SelectTrigger className="w-[180px]">
+              <SelectValue placeholder="Período" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="current-month">Mês atual</SelectItem>
+              <SelectItem value="last-month">Mês anterior</SelectItem>
+              <SelectItem value="last-3-months">Últimos 3 meses</SelectItem>
+              <SelectItem value="last-6-months">Últimos 6 meses</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={segment} onValueChange={setSegment}>
+            <SelectTrigger className="w-[140px]">
+              <SelectValue placeholder="Segmento" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos</SelectItem>
+              <SelectItem value="DB">Database</SelectItem>
+              <SelectItem value="APP">Aplicação</SelectItem>
+            </SelectContent>
+          </Select>
+
+          <Select value={clientId} onValueChange={setClientId}>
+            <SelectTrigger className="w-[200px]">
+              <SelectValue placeholder="Cliente" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os clientes</SelectItem>
+              {clients?.map((client) => (
+                <SelectItem key={client.id} value={client.id}>
+                  {client.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* Filters for Comparison mode */}
+      {viewMode === "comparison" && (
+        <div className="space-y-4 mb-6 print:hidden">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-primary" />
+                  Período A (Atual)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex gap-2">
+                <Select value={periodAMonth} onValueChange={setPeriodAMonth}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={periodAYear} onValueChange={setPeriodAYear}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm text-muted-foreground flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-muted-foreground/50" />
+                  Período B (Comparação)
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex gap-2">
+                <Select value={periodBMonth} onValueChange={setPeriodBMonth}>
+                  <SelectTrigger className="flex-1">
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {MONTHS.map((month) => (
+                      <SelectItem key={month.value} value={month.value}>
+                        {month.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <Select value={periodBYear} onValueChange={setPeriodBYear}>
+                  <SelectTrigger className="w-[100px]">
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {years.map((year) => (
+                      <SelectItem key={year} value={year}>
+                        {year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </CardContent>
+            </Card>
+          </div>
+          
+          <div className="flex gap-4">
+            <Select value={segment} onValueChange={setSegment}>
+              <SelectTrigger className="w-[140px]">
+                <SelectValue placeholder="Segmento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="DB">Database</SelectItem>
+                <SelectItem value="APP">Aplicação</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Select value={clientId} onValueChange={setClientId}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os clientes</SelectItem>
+                {clients?.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
+      )}
+
+      {/* RANKING MODE */}
+      {viewMode === "ranking" && (
+        <>
+          {isLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">Carregando dados...</p>
+            </div>
+          ) : !data || data.rankings.length === 0 ? (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <p className="text-muted-foreground">
+                  Nenhum ticket resolvido no período selecionado.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
           {/* Cover Page */}
           <PrintPage>
             <ReportCover
@@ -795,6 +998,313 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
             <ReportFooter />
           </PrintPage>
         </div>
+          )}
+        </>
+      )}
+
+      {/* COMPARISON MODE */}
+      {viewMode === "comparison" && (
+        <>
+          {isComparisonLoading ? (
+            <div className="flex items-center justify-center h-64">
+              <p className="text-muted-foreground">Carregando dados comparativos...</p>
+            </div>
+          ) : !comparisonData || comparisonData.analysts.length === 0 ? (
+            <Card>
+              <CardContent className="flex items-center justify-center h-64">
+                <p className="text-muted-foreground">
+                  Nenhum dado encontrado para os períodos selecionados.
+                </p>
+              </CardContent>
+            </Card>
+          ) : (
+            <div className="space-y-6">
+              {/* Cover Page */}
+              <PrintPage>
+                <ReportCover
+                  title="Comparativo de Ranking"
+                  subtitle={`${comparisonData.periodA.label} vs ${comparisonData.periodB.label}`}
+                  periodLabel="Análise comparativa"
+                />
+              </PrintPage>
+
+              {/* Overall Variation Cards */}
+              <PrintPage>
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold print:text-lg">Variação Entre Períodos</h2>
+                  
+                  <div className="grid gap-4 md:grid-cols-4">
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Volume Total</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-2xl font-bold">{comparisonData.periodA.overall.total_resolved}</p>
+                            <p className="text-xs text-muted-foreground">vs {comparisonData.periodB.overall.total_resolved}</p>
+                          </div>
+                          <div className={`text-lg font-semibold ${getVariationColor(comparisonData.overallVariation.volume)}`}>
+                            {formatVariation(comparisonData.overallVariation.volume)}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Tempo Médio</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-2xl font-bold">{formatMinutesToHuman(comparisonData.periodA.overall.avg_resolution_minutes)}</p>
+                            <p className="text-xs text-muted-foreground">vs {formatMinutesToHuman(comparisonData.periodB.overall.avg_resolution_minutes)}</p>
+                          </div>
+                          <div className={`text-lg font-semibold ${getVariationColor(comparisonData.overallVariation.speed, true)}`}>
+                            {formatVariation(comparisonData.overallVariation.speed)}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">CSAT Médio</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-2xl font-bold">{comparisonData.periodA.overall.avg_csat > 0 ? comparisonData.periodA.overall.avg_csat.toFixed(1) : "-"}</p>
+                            <p className="text-xs text-muted-foreground">vs {comparisonData.periodB.overall.avg_csat > 0 ? comparisonData.periodB.overall.avg_csat.toFixed(1) : "-"}</p>
+                          </div>
+                          <div className={`text-lg font-semibold ${getVariationColor(comparisonData.overallVariation.csat)}`}>
+                            {comparisonData.overallVariation.csat > 0 ? "+" : ""}{comparisonData.overallVariation.csat.toFixed(1)}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+
+                    <Card>
+                      <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Analistas Ativos</CardTitle>
+                      </CardHeader>
+                      <CardContent>
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-2xl font-bold">{comparisonData.periodA.overall.total_analysts}</p>
+                            <p className="text-xs text-muted-foreground">vs {comparisonData.periodB.overall.total_analysts}</p>
+                          </div>
+                          <div className={`text-lg font-semibold ${getVariationColor(comparisonData.overallVariation.analysts)}`}>
+                            {comparisonData.overallVariation.analysts > 0 ? "+" : ""}{comparisonData.overallVariation.analysts}
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+
+                  {/* Highlights Cards */}
+                  <div className="grid gap-4 md:grid-cols-3">
+                    {comparisonData.highlights.most_improved && (
+                      <Card className="border-green-500/50 bg-green-500/5">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <TrendingUp className="h-4 w-4 text-green-600" />
+                            Maior Melhoria
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-lg font-bold">{comparisonData.highlights.most_improved.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            +{comparisonData.highlights.most_improved.change.toFixed(0)}% em volume
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {comparisonData.highlights.fastest_improvement && (
+                      <Card className="border-blue-500/50 bg-blue-500/5">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <Timer className="h-4 w-4 text-blue-600" />
+                            Mais Rápido
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-lg font-bold">{comparisonData.highlights.fastest_improvement.name}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {comparisonData.highlights.fastest_improvement.change.toFixed(0)}% mais rápido
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {comparisonData.highlights.new_analysts.length > 0 && (
+                      <Card className="border-purple-500/50 bg-purple-500/5">
+                        <CardHeader className="pb-2">
+                          <CardTitle className="text-sm font-medium flex items-center gap-2">
+                            <UserPlus className="h-4 w-4 text-purple-600" />
+                            Novos Analistas
+                          </CardTitle>
+                        </CardHeader>
+                        <CardContent>
+                          <p className="text-lg font-bold">{comparisonData.highlights.new_analysts.length}</p>
+                          <p className="text-sm text-muted-foreground">
+                            entraram em {comparisonData.periodA.label}
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+
+                    {!comparisonData.highlights.most_improved && !comparisonData.highlights.fastest_improvement && comparisonData.highlights.new_analysts.length === 0 && (
+                      <Card className="md:col-span-3">
+                        <CardContent className="flex items-center justify-center py-8">
+                          <p className="text-muted-foreground">
+                            Não há destaques significativos entre os períodos.
+                          </p>
+                        </CardContent>
+                      </Card>
+                    )}
+                  </div>
+                </div>
+                <ReportFooter />
+              </PrintPage>
+
+              {/* Comparison Chart */}
+              <PrintPage>
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold print:text-lg">Comparativo de Volume por Analista</h2>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="h-[350px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={comparisonChartData} layout="vertical">
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis type="number" />
+                            <YAxis dataKey="name" type="category" width={80} />
+                            <Tooltip
+                              formatter={(value: number, name: string) => [
+                                `${value} tickets`,
+                                name === "periodA" ? comparisonData.periodA.label : comparisonData.periodB.label,
+                              ]}
+                              labelFormatter={(label) => {
+                                const analyst = comparisonChartData.find((a) => a.name === label);
+                                return analyst?.fullName || label;
+                              }}
+                            />
+                            <Legend
+                              formatter={(value) =>
+                                value === "periodA" ? comparisonData.periodA.label : comparisonData.periodB.label
+                              }
+                            />
+                            <Bar dataKey="periodA" name="periodA" fill="hsl(var(--primary))" />
+                            <Bar dataKey="periodB" name="periodB" fill="hsl(var(--muted-foreground) / 0.5)" />
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
+                <ReportFooter />
+              </PrintPage>
+
+              {/* Comparison Table */}
+              <PrintPage>
+                <div className="space-y-6">
+                  <h2 className="text-xl font-semibold print:text-lg">Tabela Comparativa Detalhada</h2>
+                  <Card>
+                    <CardContent className="pt-6 overflow-auto">
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead rowSpan={2} className="align-middle">Analista</TableHead>
+                            <TableHead colSpan={3} className="text-center bg-primary/10 border-x">
+                              {comparisonData.periodA.label}
+                            </TableHead>
+                            <TableHead colSpan={3} className="text-center bg-muted/50 border-x">
+                              {comparisonData.periodB.label}
+                            </TableHead>
+                            <TableHead colSpan={2} className="text-center">Variação</TableHead>
+                          </TableRow>
+                          <TableRow>
+                            <TableHead className="text-center bg-primary/10">Tickets</TableHead>
+                            <TableHead className="text-center bg-primary/10">Tempo</TableHead>
+                            <TableHead className="text-center bg-primary/10 border-r">CSAT</TableHead>
+                            <TableHead className="text-center bg-muted/50">Tickets</TableHead>
+                            <TableHead className="text-center bg-muted/50">Tempo</TableHead>
+                            <TableHead className="text-center bg-muted/50 border-r">CSAT</TableHead>
+                            <TableHead className="text-center">Volume</TableHead>
+                            <TableHead className="text-center">Rank</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {comparisonData.analysts.map((analyst) => (
+                            <TableRow key={analyst.analyst_id}>
+                              <TableCell className="font-medium">
+                                <div className="flex items-center gap-2">
+                                  {analyst.analyst_name}
+                                  {analyst.trend === "new" && (
+                                    <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">NOVO</Badge>
+                                  )}
+                                  {analyst.trend === "inactive" && (
+                                    <Badge variant="outline" className="text-xs bg-gray-100 text-gray-500 border-gray-300">INATIVO</Badge>
+                                  )}
+                                </div>
+                              </TableCell>
+                              
+                              {/* Period A */}
+                              <TableCell className="text-center bg-primary/5">
+                                {analyst.periodA?.total_resolved ?? "-"}
+                              </TableCell>
+                              <TableCell className="text-center bg-primary/5">
+                                {analyst.periodA ? formatMinutesToHuman(analyst.periodA.avg_resolution_minutes) : "-"}
+                              </TableCell>
+                              <TableCell className="text-center bg-primary/5 border-r">
+                                {analyst.periodA?.csat_avg_rating ? analyst.periodA.csat_avg_rating.toFixed(1) : "-"}
+                              </TableCell>
+                              
+                              {/* Period B */}
+                              <TableCell className="text-center bg-muted/30">
+                                {analyst.periodB?.total_resolved ?? "-"}
+                              </TableCell>
+                              <TableCell className="text-center bg-muted/30">
+                                {analyst.periodB ? formatMinutesToHuman(analyst.periodB.avg_resolution_minutes) : "-"}
+                              </TableCell>
+                              <TableCell className="text-center bg-muted/30 border-r">
+                                {analyst.periodB?.csat_avg_rating ? analyst.periodB.csat_avg_rating.toFixed(1) : "-"}
+                              </TableCell>
+                              
+                              {/* Variations */}
+                              <TableCell className="text-center">
+                                {analyst.trend === "new" || analyst.trend === "inactive" ? (
+                                  "-"
+                                ) : (
+                                  <span className={getVariationColor(analyst.variations.volume)}>
+                                    {formatVariation(analyst.variations.volume)}
+                                  </span>
+                                )}
+                              </TableCell>
+                              <TableCell className="text-center">
+                                {analyst.variations.rank !== 0 && analyst.periodA && analyst.periodB ? (
+                                  <span className={analyst.variations.rank > 0 ? "text-green-600" : "text-red-600"}>
+                                    {analyst.variations.rank > 0 ? "↑" : "↓"}{Math.abs(analyst.variations.rank)}
+                                  </span>
+                                ) : (
+                                  "-"
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </CardContent>
+                  </Card>
+                </div>
+                <ReportFooter />
+              </PrintPage>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
