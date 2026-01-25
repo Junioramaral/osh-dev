@@ -14,6 +14,7 @@ import { ptBR } from "date-fns/locale";
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Tooltip, Legend, LineChart, Line } from "recharts";
 import ReportCover from "./ReportCover";
 import { useReportData } from "@/hooks/useReportData";
+import { useMonthlyTicketVolumeForReport } from "@/hooks/useMonthlyTicketVolume";
 import { toast } from "sonner";
 
 interface MonthlyClientReportProps {
@@ -43,6 +44,13 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
 
   // Fetch report data
   const { data: reportData, isLoading } = useReportData(
+    selectedClient || null,
+    selectedMonth,
+    selectedYear
+  );
+
+  // Fetch monthly volume data for 6-month evolution chart
+  const { data: monthlyVolumeData } = useMonthlyTicketVolumeForReport(
     selectedClient || null,
     selectedMonth,
     selectedYear
@@ -527,7 +535,107 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
               )}
             </div>
 
-            {/* PAGE 5+: Tickets List */}
+            {/* PAGE 5: Evolução Mensal - Últimos 6 Meses */}
+            {monthlyVolumeData && monthlyVolumeData.length > 0 && (
+              <div className="print-section print-break-before space-y-6">
+                <h2 className="text-2xl font-bold text-center mb-8">Evolução Mensal - Últimos 6 Meses</h2>
+                
+                {/* Bar Chart - Abertos vs Fechados */}
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Tickets Abertos vs Fechados por Mês</CardTitle>
+                    <CardDescription>Comparativo de volume de tickets criados e resolvidos</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <div className="h-[300px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyVolumeData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="monthLabel" fontSize={12} />
+                          <YAxis fontSize={12} />
+                          <Tooltip />
+                          <Legend />
+                          <Bar 
+                            dataKey="abertos" 
+                            name="Tickets Abertos" 
+                            fill="#EAB308"
+                            radius={[4, 4, 0, 0]}
+                          />
+                          <Bar 
+                            dataKey="fechados" 
+                            name="Tickets Fechados" 
+                            fill="#22C55E"
+                            radius={[4, 4, 0, 0]}
+                          />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Summary Table */}
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Resumo Numérico</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Mês</TableHead>
+                          <TableHead className="text-center">Abertos</TableHead>
+                          <TableHead className="text-center">Fechados</TableHead>
+                          <TableHead className="text-center">Saldo</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {monthlyVolumeData.map((m) => {
+                          const saldo = m.fechados - m.abertos;
+                          return (
+                            <TableRow key={m.month}>
+                              <TableCell className="capitalize font-medium">{m.monthLabel}</TableCell>
+                              <TableCell className="text-center">
+                                <span className="text-yellow-600 font-semibold">{m.abertos}</span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className="text-green-600 font-semibold">{m.fechados}</span>
+                              </TableCell>
+                              <TableCell className="text-center">
+                                <span className={saldo >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+                                  {saldo > 0 ? "+" : ""}{saldo}
+                                </span>
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
+                        {/* Totals Row */}
+                        <TableRow className="font-bold border-t-2">
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-center text-yellow-600">
+                            {monthlyVolumeData.reduce((sum, m) => sum + m.abertos, 0)}
+                          </TableCell>
+                          <TableCell className="text-center text-green-600">
+                            {monthlyVolumeData.reduce((sum, m) => sum + m.fechados, 0)}
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {(() => {
+                              const totalSaldo = monthlyVolumeData.reduce((sum, m) => sum + (m.fechados - m.abertos), 0);
+                              return (
+                                <span className={totalSaldo >= 0 ? "text-green-600" : "text-red-600"}>
+                                  {totalSaldo > 0 ? "+" : ""}{totalSaldo}
+                                </span>
+                              );
+                            })()}
+                          </TableCell>
+                        </TableRow>
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+              </div>
+            )}
+
+            {/* PAGE 6+: Tickets List */}
             <div className="print-section print-break-before">
               <h2 className="text-2xl font-bold text-center mb-8">Listagem de Tickets</h2>
               <p className="text-center text-muted-foreground mb-6">{reportData.tickets.length} tickets no período</p>

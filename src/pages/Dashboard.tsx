@@ -30,6 +30,8 @@ import { ptBR } from "date-fns/locale";
 import {
   LineChart,
   Line,
+  BarChart,
+  Bar,
   XAxis,
   YAxis,
   CartesianGrid,
@@ -37,6 +39,9 @@ import {
   Legend,
   ResponsiveContainer,
 } from "recharts";
+import { useMonthlyTicketVolume } from "@/hooks/useMonthlyTicketVolume";
+
+const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 interface DashboardStats {
   totalTickets: number;
@@ -83,6 +88,21 @@ const Dashboard = () => {
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>(6);
+  const [barChartPeriod, setBarChartPeriod] = useState<TrendPeriod>(6);
+
+  // Determine if current user is a client user
+  const isClientUser = profile?.client_id && 
+    profile.client_id !== OTIMIZZO_TENANT_ID && 
+    !isSuperAdmin && 
+    !hasRole('analyst_db') && 
+    !hasRole('analyst_app') &&
+    !hasRole('tenant_admin');
+
+  // Fetch monthly volume data for bar chart (12 months stored, display configurable)
+  const { data: monthlyVolumeData } = useMonthlyTicketVolume(
+    isClientUser ? profile?.client_id : null,
+    12
+  );
 
   useEffect(() => {
     loadDashboardStats();
@@ -539,6 +559,72 @@ const Dashboard = () => {
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                Carregando dados...
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Gráfico de Barras - Volume Mensal de Tickets (Abertos vs Fechados) */}
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="flex items-center gap-2">
+              <Ticket className="w-5 h-5" />
+              Volume Mensal: Tickets Abertos vs Fechados
+            </CardTitle>
+            <Select 
+              value={barChartPeriod.toString()} 
+              onValueChange={(value) => setBarChartPeriod(Number(value) as TrendPeriod)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Últimos 3 meses</SelectItem>
+                <SelectItem value="6">Últimos 6 meses</SelectItem>
+                <SelectItem value="12">Últimos 12 meses</SelectItem>
+              </SelectContent>
+            </Select>
+          </CardHeader>
+          <CardContent>
+            {monthlyVolumeData && monthlyVolumeData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={monthlyVolumeData.slice(-barChartPeriod)}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis 
+                    dataKey="monthLabel" 
+                    className="text-xs fill-muted-foreground"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis 
+                    className="text-xs fill-muted-foreground"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Legend />
+                  <Bar 
+                    dataKey="abertos" 
+                    name="Abertos" 
+                    fill="hsl(48, 96%, 53%)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                  <Bar 
+                    dataKey="fechados" 
+                    name="Fechados" 
+                    fill="hsl(142, 71%, 45%)"
+                    radius={[4, 4, 0, 0]}
+                  />
+                </BarChart>
               </ResponsiveContainer>
             ) : (
               <div className="h-[300px] flex items-center justify-center text-muted-foreground">
