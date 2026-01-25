@@ -1,9 +1,18 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { Link } from "react-router-dom";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ExternalLink, Ticket, Search } from "lucide-react";
+import { cn } from "@/lib/utils";
+import {
+  Pagination,
+  PaginationContent,
+  PaginationItem,
+  PaginationLink,
+  PaginationNext,
+  PaginationPrevious,
+} from "@/components/ui/pagination";
 import {
   Table,
   TableBody,
@@ -22,6 +31,8 @@ interface FAQLinkedTicketsTabProps {
   articleId: string;
 }
 
+const ITEMS_PER_PAGE = 10;
+
 const statusConfig: Record<string, { label: string; className: string }> = {
   novo: { label: "Novo", className: "bg-blue-500/20 text-blue-700" },
   em_atendimento: { label: "Em Atendimento", className: "bg-yellow-500/20 text-yellow-700" },
@@ -32,6 +43,7 @@ const statusConfig: Record<string, { label: string; className: string }> = {
 
 export function FAQLinkedTicketsTab({ articleId }: FAQLinkedTicketsTabProps) {
   const [searchTerm, setSearchTerm] = useState("");
+  const [currentPage, setCurrentPage] = useState(1);
 
   const { data: tickets, isLoading } = useQuery({
     queryKey: ["faq-linked-tickets", articleId],
@@ -59,6 +71,18 @@ export function FAQLinkedTicketsTab({ articleId }: FAQLinkedTicketsTabProps) {
     );
   }) || [];
 
+  // Calculate pagination
+  const totalPages = Math.ceil(filteredTickets.length / ITEMS_PER_PAGE);
+  const paginatedTickets = filteredTickets.slice(
+    (currentPage - 1) * ITEMS_PER_PAGE,
+    currentPage * ITEMS_PER_PAGE
+  );
+
+  // Reset page when search changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchTerm]);
+
   if (isLoading) {
     return (
       <div className="space-y-3">
@@ -84,9 +108,12 @@ export function FAQLinkedTicketsTab({ articleId }: FAQLinkedTicketsTabProps) {
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <Ticket className="h-4 w-4" />
           <span>
-            {filteredTickets.length === tickets.length 
-              ? `${tickets.length} ticket(s) vinculado(s)`
-              : `${filteredTickets.length} de ${tickets.length} ticket(s)`
+            {filteredTickets.length === 0 
+              ? "0 ticket(s)"
+              : `${(currentPage - 1) * ITEMS_PER_PAGE + 1}-${Math.min(currentPage * ITEMS_PER_PAGE, filteredTickets.length)} de ${filteredTickets.length} ticket(s)`
+            }
+            {tickets && filteredTickets.length !== tickets.length && 
+              ` (filtrado de ${tickets.length})`
             }
           </span>
         </div>
@@ -108,52 +135,93 @@ export function FAQLinkedTicketsTab({ articleId }: FAQLinkedTicketsTabProps) {
           <p className="text-muted-foreground">Nenhum ticket encontrado para a busca.</p>
         </div>
       ) : (
-        <div className="rounded-md border">
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-[120px]">Número</TableHead>
-                <TableHead>Cliente</TableHead>
-                <TableHead className="hidden md:table-cell">Título</TableHead>
-                <TableHead className="w-[140px]">Status</TableHead>
-                <TableHead className="w-[120px] hidden sm:table-cell">Data</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredTickets.map((ticket) => {
-                const status = statusConfig[ticket.status || "novo"];
-                return (
-                  <TableRow key={ticket.id}>
-                    <TableCell>
-                      <Link
-                        to={`/tickets/${ticket.id}`}
-                        className="font-mono text-primary hover:underline inline-flex items-center gap-1"
-                        target="_blank"
-                      >
-                        <HighlightText text={ticket.ticket_number || ""} searchTerm={searchTerm} />
-                        <ExternalLink className="h-3 w-3" />
-                      </Link>
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <HighlightText text={ticket.clients?.name || "-"} searchTerm={searchTerm} />
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell max-w-[200px] truncate">
-                      <HighlightText text={ticket.title} searchTerm={searchTerm} />
-                    </TableCell>
-                    <TableCell>
-                      <Badge className={status.className}>{status.label}</Badge>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell text-muted-foreground">
-                      {format(new Date(ticket.created_at!), "dd/MM/yyyy", {
-                        locale: ptBR,
-                      })}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </div>
+        <>
+          <div className="rounded-md border">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-[120px]">Número</TableHead>
+                  <TableHead>Cliente</TableHead>
+                  <TableHead className="hidden md:table-cell">Título</TableHead>
+                  <TableHead className="w-[140px]">Status</TableHead>
+                  <TableHead className="w-[120px] hidden sm:table-cell">Data</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {paginatedTickets.map((ticket) => {
+                  const status = statusConfig[ticket.status || "novo"];
+                  return (
+                    <TableRow key={ticket.id}>
+                      <TableCell>
+                        <Link
+                          to={`/tickets/${ticket.id}`}
+                          className="font-mono text-primary hover:underline inline-flex items-center gap-1"
+                          target="_blank"
+                        >
+                          <HighlightText text={ticket.ticket_number || ""} searchTerm={searchTerm} />
+                          <ExternalLink className="h-3 w-3" />
+                        </Link>
+                      </TableCell>
+                      <TableCell className="font-medium">
+                        <HighlightText text={ticket.clients?.name || "-"} searchTerm={searchTerm} />
+                      </TableCell>
+                      <TableCell className="hidden md:table-cell max-w-[200px] truncate">
+                        <HighlightText text={ticket.title} searchTerm={searchTerm} />
+                      </TableCell>
+                      <TableCell>
+                        <Badge className={status.className}>{status.label}</Badge>
+                      </TableCell>
+                      <TableCell className="hidden sm:table-cell text-muted-foreground">
+                        {format(new Date(ticket.created_at!), "dd/MM/yyyy", {
+                          locale: ptBR,
+                        })}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <Pagination>
+              <PaginationContent>
+                <PaginationItem>
+                  <PaginationPrevious
+                    onClick={() => setCurrentPage(prev => Math.max(1, prev - 1))}
+                    className={cn(
+                      "cursor-pointer",
+                      currentPage === 1 && "pointer-events-none opacity-50"
+                    )}
+                  />
+                </PaginationItem>
+
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
+                  <PaginationItem key={page}>
+                    <PaginationLink
+                      onClick={() => setCurrentPage(page)}
+                      isActive={currentPage === page}
+                      className="cursor-pointer"
+                    >
+                      {page}
+                    </PaginationLink>
+                  </PaginationItem>
+                ))}
+
+                <PaginationItem>
+                  <PaginationNext
+                    onClick={() => setCurrentPage(prev => Math.min(totalPages, prev + 1))}
+                    className={cn(
+                      "cursor-pointer",
+                      currentPage === totalPages && "pointer-events-none opacity-50"
+                    )}
+                  />
+                </PaginationItem>
+              </PaginationContent>
+            </Pagination>
+          )}
+        </>
       )}
     </div>
   );
