@@ -24,6 +24,7 @@ interface FAQArticleRowProps {
   onView: (article: FAQArticle) => void;
   onEdit: (article: FAQArticle) => void;
   onDelete: (article: FAQArticle) => void;
+  canManage?: boolean;
 }
 
 export default function FAQArticleRow({
@@ -31,6 +32,7 @@ export default function FAQArticleRow({
   onView,
   onEdit,
   onDelete,
+  canManage = false,
 }: FAQArticleRowProps) {
   const getVisibilityBadge = () => {
     const visibility = article.visibility || "private";
@@ -78,7 +80,7 @@ export default function FAQArticleRow({
   };
 
   return (
-    <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => onEdit(article)}>
+    <TableRow className="hover:bg-muted/50 cursor-pointer" onClick={() => canManage ? onEdit(article) : onView(article)}>
       {/* FAQ Number */}
       <TableCell>
         <Badge variant="outline" className="font-mono text-xs">
@@ -168,13 +170,15 @@ export default function FAQArticleRow({
               <Eye className="h-4 w-4 mr-2" />
               Visualizar
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => onDelete(article)}
-              className="text-destructive focus:text-destructive"
-            >
-              <Trash2 className="h-4 w-4 mr-2" />
-              Excluir
-            </DropdownMenuItem>
+            {canManage && (
+              <DropdownMenuItem
+                onClick={() => onDelete(article)}
+                className="text-destructive focus:text-destructive"
+              >
+                <Trash2 className="h-4 w-4 mr-2" />
+                Excluir
+              </DropdownMenuItem>
+            )}
           </DropdownMenuContent>
         </DropdownMenu>
       </TableCell>

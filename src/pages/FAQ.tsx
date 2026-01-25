@@ -330,6 +330,7 @@ export default function FAQ() {
                       onView={handleView}
                       onEdit={handleEdit}
                       onDelete={handleDelete}
+                      canManage={canManageArticles}
                     />
                   ))}
                 </TableBody>
