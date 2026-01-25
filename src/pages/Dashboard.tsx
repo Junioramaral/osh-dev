@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   Select,
   SelectContent,
@@ -340,9 +341,17 @@ const Dashboard = () => {
         {/* Hero Section - Bem-vindo */}
         <Card className="bg-gradient-to-r from-primary/5 via-background to-accent/5 border-primary/20">
           <CardHeader className="pb-2">
-            <CardTitle className="text-2xl md:text-3xl font-bold text-foreground">
-              Bem-vindo, {profile?.full_name}!
-            </CardTitle>
+            <div className="flex items-center gap-4">
+              <Avatar className="h-14 w-14">
+                <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name} />
+                <AvatarFallback className="text-lg bg-primary/10 text-primary">
+                  {profile?.full_name?.charAt(0)?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <CardTitle className="text-2xl md:text-3xl font-bold text-foreground">
+                Bem-vindo, {profile?.full_name}!
+              </CardTitle>
+            </div>
           </CardHeader>
           <CardContent className="space-y-3">
             <div className="flex items-center gap-2">

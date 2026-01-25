@@ -1,10 +1,12 @@
-import { ReactNode } from "react";
+import { ReactNode, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { usePendingTicketsCount } from "@/hooks/usePendingTicketsCount";
 import { useMyTicketsCount } from "@/hooks/useMyTicketsCount";
 import { TicketCountBadge } from "@/components/layout/TicketCountBadge";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import {
   LayoutDashboard,
   Users,
@@ -24,7 +26,6 @@ import {
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
-import { useState } from "react";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -33,6 +34,7 @@ interface AppLayoutProps {
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, profile, isSuperAdmin, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   
   // Hooks must be called before any conditional returns
   const { data: pendingCount = 0 } = usePendingTicketsCount();
@@ -137,12 +139,24 @@ const AppLayout = ({ children }: AppLayoutProps) => {
       </nav>
 
       <div className="p-4 border-t border-sidebar-border shrink-0">
-        <div className="mb-3 px-3">
-          <p className="text-sm font-medium text-sidebar-foreground">{profile?.full_name}</p>
-          <p className="text-xs text-sidebar-foreground/60">{user?.email}</p>
-          <p className="text-xs text-sidebar-foreground/70 capitalize mt-1">
-            {isSuperAdmin ? 'Super Admin' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
-          </p>
+        <div 
+          className="mb-3 px-3 flex items-center gap-3 cursor-pointer rounded-lg hover:bg-sidebar-accent py-2 transition-colors"
+          onClick={() => setProfileDialogOpen(true)}
+          title="Editar perfil"
+        >
+          <Avatar className="h-10 w-10">
+            <AvatarImage src={profile?.avatar_url || undefined} alt={profile?.full_name} />
+            <AvatarFallback className="bg-primary/10 text-primary">
+              {profile?.full_name?.charAt(0)?.toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.full_name}</p>
+            <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</p>
+            <p className="text-xs text-sidebar-foreground/70 capitalize mt-0.5">
+              {isSuperAdmin ? 'Super Admin' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
+            </p>
+          </div>
         </div>
         {isSuperAdmin && (
           <NavLink
@@ -202,6 +216,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           {children}
         </div>
       </main>
+
+      {/* Profile Edit Dialog */}
+      <ProfileEditDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
     </div>
   );
 };
