@@ -337,10 +337,37 @@ const Dashboard = () => {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div>
-          <h1 className="text-3xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground mt-1">Visão geral do Service Desk</p>
-        </div>
+        {/* Hero Section - Bem-vindo */}
+        <Card className="bg-gradient-to-r from-primary/5 via-background to-accent/5 border-primary/20">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-2xl md:text-3xl font-bold text-foreground">
+              Bem-vindo, {profile?.full_name}!
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">Tipo de usuário:</span>
+              <Badge variant="secondary" className="capitalize font-medium">
+                {isSuperAdmin 
+                  ? 'Super Admin' 
+                  : hasRole('tenant_admin') 
+                    ? 'Tenant Admin' 
+                    : hasRole('analyst_db') 
+                      ? 'Analista DB' 
+                      : hasRole('analyst_app') 
+                        ? 'Analista APP' 
+                        : 'Usuário'}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground max-w-2xl">
+              {isSuperAdmin && "Como super administrador, você tem acesso total ao sistema e pode gerenciar todos os tenants."}
+              {!isSuperAdmin && hasRole('tenant_admin') && "Como administrador do tenant, você pode gerenciar usuários e recursos do seu tenant."}
+              {hasRole('analyst_db') && "Como analista de banco de dados, você pode gerenciar tickets DB."}
+              {hasRole('analyst_app') && "Como analista de aplicativos, você pode gerenciar tickets APP."}
+              {!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app') && "Você pode criar e acompanhar seus tickets."}
+            </p>
+          </CardContent>
+        </Card>
 
         {loading ? (
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
@@ -512,26 +539,6 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
-        <Card>
-          <CardHeader>
-            <CardTitle>Bem-vindo, {profile?.full_name}!</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-muted-foreground">Tipo de usuário:</span>
-              <Badge variant="outline" className="capitalize">
-                {isSuperAdmin ? 'Super Admin' : hasRole('tenant_admin') ? 'Tenant Admin' : hasRole('analyst_db') ? 'Analista DB' : hasRole('analyst_app') ? 'Analista APP' : 'Usuário'}
-              </Badge>
-            </div>
-            <p className="text-sm text-muted-foreground">
-              {isSuperAdmin && "Como super administrador, você tem acesso total ao sistema e pode gerenciar todos os tenants."}
-              {!isSuperAdmin && hasRole('tenant_admin') && "Como administrador do tenant, você pode gerenciar usuários e recursos do seu tenant."}
-              {hasRole('analyst_db') && "Como analista de banco de dados, você pode gerenciar tickets DB."}
-              {hasRole('analyst_app') && "Como analista de aplicativos, você pode gerenciar tickets APP."}
-              {!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app') && "Você pode criar e acompanhar seus tickets."}
-            </p>
-          </CardContent>
-        </Card>
       </div>
     </AppLayout>
   );
