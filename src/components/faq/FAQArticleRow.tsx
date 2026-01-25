@@ -1,6 +1,6 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { MoreHorizontal, Trash2, Lock, Building2, Globe, Eye } from "lucide-react";
+import { MoreHorizontal, Trash2, Lock, Building2, Globe, Eye, Ticket } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -25,6 +25,7 @@ interface FAQArticleRowProps {
   onEdit: (article: FAQArticle) => void;
   onDelete: (article: FAQArticle) => void;
   canManage?: boolean;
+  linkedTicketsCount?: number;
 }
 
 export default function FAQArticleRow({
@@ -33,6 +34,7 @@ export default function FAQArticleRow({
   onEdit,
   onDelete,
   canManage = false,
+  linkedTicketsCount = 0,
 }: FAQArticleRowProps) {
   const getVisibilityBadge = () => {
     const visibility = article.visibility || "private";
@@ -147,6 +149,14 @@ export default function FAQArticleRow({
         <div className="flex items-center gap-1 text-muted-foreground">
           <Eye className="h-3.5 w-3.5" />
           <span>{article.view_count || 0}</span>
+        </div>
+      </TableCell>
+
+      {/* Linked Tickets */}
+      <TableCell>
+        <div className={`flex items-center gap-1 ${linkedTicketsCount > 0 ? "text-primary font-medium" : "text-muted-foreground"}`}>
+          <Ticket className="h-3.5 w-3.5" />
+          <span>{linkedTicketsCount}</span>
         </div>
       </TableCell>
 

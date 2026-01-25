@@ -82,6 +82,27 @@ export default function FAQ() {
     },
   });
 
+  // Load ticket counts per FAQ article
+  const { data: ticketCounts } = useQuery({
+    queryKey: ["faq-ticket-counts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("tickets")
+        .select("faq_article_id")
+        .not("faq_article_id", "is", null);
+
+      if (error) throw error;
+      
+      // Group count by article_id
+      const counts: Record<string, number> = {};
+      data?.forEach((ticket) => {
+        const id = ticket.faq_article_id as string;
+        counts[id] = (counts[id] || 0) + 1;
+      });
+      return counts;
+    },
+  });
+
   // Load clients for filter
   const { data: clients } = useQuery({
     queryKey: ["clients-for-faq-filter"],
@@ -318,6 +339,7 @@ export default function FAQ() {
                     <TableHead className="w-[100px]">Status</TableHead>
                     <TableHead className="w-[150px]">Autor</TableHead>
                     <TableHead className="w-[80px]">Views</TableHead>
+                    <TableHead className="w-[80px]">Tickets</TableHead>
                     <TableHead className="w-[120px]">Atualizado</TableHead>
                     <TableHead className="w-[60px]">Ações</TableHead>
                   </TableRow>
@@ -331,6 +353,7 @@ export default function FAQ() {
                       onEdit={handleEdit}
                       onDelete={handleDelete}
                       canManage={canManageArticles}
+                      linkedTicketsCount={ticketCounts?.[article.id] || 0}
                     />
                   ))}
                 </TableBody>
