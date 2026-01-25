@@ -21,9 +21,10 @@ import {
   AppWindow,
   TrendingUp,
   Target,
+  Timer,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
-import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   LineChart,
@@ -49,6 +50,7 @@ interface DashboardStats {
   taxaSLA: number;
   ticketsResolvidosDentroSLA: number;
   ticketsResolvidosForaSLA: number;
+  tempoMedioResolucaoMinutos: number;
 }
 
 interface MonthlyTrendData {
@@ -75,6 +77,7 @@ const Dashboard = () => {
     taxaSLA: 0,
     ticketsResolvidosDentroSLA: 0,
     ticketsResolvidosForaSLA: 0,
+    tempoMedioResolucaoMinutos: 0,
   });
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
@@ -159,6 +162,25 @@ const Dashboard = () => {
         ? Math.round(((dentroSLACount || 0) / totalResolvidos) * 100) 
         : 0;
 
+      // Buscar tickets resolvidos para calcular tempo médio
+      const { data: ticketsResolvidos } = await supabase
+        .from('tickets')
+        .select('created_at, resolved_at')
+        .not('resolved_at', 'is', null);
+
+      // Calcular tempo médio de resolução em minutos
+      let tempoMedioResolucaoMinutos = 0;
+      if (ticketsResolvidos && ticketsResolvidos.length > 0) {
+        const totalMinutos = ticketsResolvidos.reduce((acc, ticket) => {
+          const minutos = differenceInMinutes(
+            new Date(ticket.resolved_at!),
+            new Date(ticket.created_at!)
+          );
+          return acc + Math.max(0, minutos);
+        }, 0);
+        tempoMedioResolucaoMinutos = Math.round(totalMinutos / ticketsResolvidos.length);
+      }
+
       // Total clients (if admin or analyst)
       let clientsCount = 0;
       if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
@@ -181,6 +203,7 @@ const Dashboard = () => {
         taxaSLA: taxaSLA,
         ticketsResolvidosDentroSLA: dentroSLACount || 0,
         ticketsResolvidosForaSLA: foraSLAResolvidosCount || 0,
+        tempoMedioResolucaoMinutos: tempoMedioResolucaoMinutos,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
@@ -224,6 +247,21 @@ const Dashboard = () => {
       setTrendData(months);
     } catch (error) {
       console.error('Error loading monthly trend:', error);
+    }
+  };
+
+  // Função para formatar minutos em formato legível
+  const formatarTempoResolucao = (minutos: number): string => {
+    if (minutos < 60) {
+      return `${minutos} min`;
+    } else if (minutos < 1440) { // menos de 24 horas
+      const horas = Math.floor(minutos / 60);
+      const mins = minutos % 60;
+      return mins > 0 ? `${horas}h ${mins}m` : `${horas}h`;
+    } else {
+      const dias = Math.floor(minutos / 1440);
+      const horasRestantes = Math.floor((minutos % 1440) / 60);
+      return horasRestantes > 0 ? `${dias}d ${horasRestantes}h` : `${dias}d`;
     }
   };
 
@@ -341,6 +379,26 @@ const Dashboard = () => {
                 </div>
                 <p className="text-xs text-muted-foreground mt-1">
                   {stats.ticketsResolvidosDentroSLA} de {stats.ticketsResolvidosDentroSLA + stats.ticketsResolvidosForaSLA} no prazo
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Card de Tempo Médio de Resolução */}
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Tempo Médio de Resolução
+                </CardTitle>
+                <div className="p-2 rounded-lg bg-blue-100">
+                  <Timer className="w-4 h-4 text-blue-600" />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-blue-600">
+                  {formatarTempoResolucao(stats.tempoMedioResolucaoMinutos)}
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  baseado em {stats.ticketsFechados} tickets resolvidos
                 </p>
               </CardContent>
             </Card>
