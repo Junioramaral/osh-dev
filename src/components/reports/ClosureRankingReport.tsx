@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, FileDown, Trophy, Timer, Users, Medal, TrendingUp } from "lucide-react";
+import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, Star } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -162,6 +162,19 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
       rank: index + 1,
     }));
 
+  const csatChartData = (data?.rankings || [])
+    .filter(a => a.csat_total_ratings > 0)
+    .sort((a, b) => b.csat_avg_rating - a.csat_avg_rating)
+    .slice(0, 10)
+    .map((analyst, index) => ({
+      name: analyst.analyst_name.split(" ")[0],
+      fullName: analyst.analyst_name,
+      value: analyst.csat_avg_rating,
+      valueFormatted: analyst.csat_avg_rating.toFixed(1),
+      ratings: analyst.csat_total_ratings,
+      rank: index + 1,
+    }));
+
   return (
     <div className="print-container">
       {/* Screen Header */}
@@ -253,7 +266,7 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
               <h2 className="text-xl font-semibold print:text-lg">Destaques do Período</h2>
               
               {/* Champions */}
-              <div className="grid gap-4 md:grid-cols-2">
+              <div className="grid gap-4 md:grid-cols-3">
                 {data.top_volume && (
                   <Card className="border-primary/50 bg-primary/5">
                     <CardHeader className="pb-2">
@@ -297,10 +310,32 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                     </CardContent>
                   </Card>
                 )}
+
+                {data.top_csat && data.top_csat.csat_total_ratings > 0 && (
+                  <Card className="border-green-500/50 bg-green-500/5">
+                    <CardHeader className="pb-2">
+                      <CardTitle className="text-sm font-medium flex items-center gap-2">
+                        <Star className="h-4 w-4 text-green-600" />
+                        Melhor Avaliado
+                      </CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="flex items-center gap-3">
+                        <span className="text-3xl">⭐</span>
+                        <div>
+                          <p className="text-xl font-bold">{data.top_csat.analyst_name}</p>
+                          <p className="text-muted-foreground">
+                            {data.top_csat.csat_avg_rating.toFixed(1)} estrelas ({data.top_csat.csat_total_ratings} aval.)
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
 
               {/* Overall Stats */}
-              <div className="grid gap-4 md:grid-cols-3">
+              <div className="grid gap-4 md:grid-cols-4">
                 <Card>
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
@@ -339,6 +374,23 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                   <CardContent>
                     <p className="text-3xl font-bold">{data.overall.total_analysts}</p>
                     <p className="text-sm text-muted-foreground">com tickets resolvidos</p>
+                  </CardContent>
+                </Card>
+
+                <Card>
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-sm font-medium flex items-center gap-2">
+                      <Star className="h-4 w-4 text-muted-foreground" />
+                      CSAT Médio
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-3xl font-bold">
+                      {data.overall.avg_csat > 0 ? data.overall.avg_csat.toFixed(1) : "-"}
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      {data.overall.total_csat_responses} avaliações
+                    </p>
                   </CardContent>
                 </Card>
               </div>
@@ -409,6 +461,43 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                   </div>
                 </CardContent>
               </Card>
+
+              {csatChartData.length > 0 && (
+                <>
+                  <h2 className="text-xl font-semibold print:text-lg">Top 10 por Satisfação (CSAT)</h2>
+                  <Card>
+                    <CardContent className="pt-6">
+                      <div className="h-[300px]">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart data={csatChartData} layout="vertical" margin={{ left: 20, right: 30 }}>
+                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                            <XAxis 
+                              type="number" 
+                              domain={[0, 5]}
+                              tickFormatter={(value) => value.toFixed(1)}
+                            />
+                            <YAxis dataKey="name" type="category" width={80} />
+                            <Tooltip
+                              formatter={(value: number, name: string, props: any) => [
+                                `${props.payload.valueFormatted} ⭐ (${props.payload.ratings} aval.)`,
+                                props.payload.fullName,
+                              ]}
+                            />
+                            <Bar dataKey="value" radius={[0, 4, 4, 0]} fill="hsl(142, 71%, 45%)">
+                              {csatChartData.map((entry, index) => (
+                                <Cell 
+                                  key={`cell-${index}`} 
+                                  fill={`hsl(142, 71%, ${45 - index * 3}%)`}
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </>
+              )}
             </div>
             <ReportFooter />
           </PrintPage>
@@ -422,13 +511,15 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                   <Table>
                     <TableHeader>
                       <TableRow>
-                        <TableHead className="w-[60px]">#</TableHead>
+                        <TableHead className="w-[50px]">#</TableHead>
                         <TableHead>Analista</TableHead>
                         <TableHead className="text-center">Tickets</TableHead>
                         <TableHead className="text-center">Tempo Médio</TableHead>
-                        <TableHead className="text-center">Mais Rápido</TableHead>
-                        <TableHead className="text-center">Rank Volume</TableHead>
-                        <TableHead className="text-center">Rank Tempo</TableHead>
+                        <TableHead className="text-center">CSAT</TableHead>
+                        <TableHead className="text-center">Aval.</TableHead>
+                        <TableHead className="text-center">R. Vol</TableHead>
+                        <TableHead className="text-center">R. Tmp</TableHead>
+                        <TableHead className="text-center">R. CSAT</TableHead>
                         <TableHead className="text-center">Score</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -436,11 +527,11 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                       {data.rankings.map((analyst, index) => (
                         <TableRow key={analyst.analyst_id}>
                           <TableCell className="font-medium">
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center gap-1">
                               {index < 3 ? (
-                                <span className="text-xl">{getMedalEmoji(index + 1)}</span>
+                                <span className="text-lg">{getMedalEmoji(index + 1)}</span>
                               ) : (
-                                <span className="text-muted-foreground w-6 text-center">
+                                <span className="text-muted-foreground w-5 text-center text-sm">
                                   {index + 1}
                                 </span>
                               )}
@@ -450,21 +541,40 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                           <TableCell className="text-center">
                             <Badge variant="secondary">{analyst.total_resolved}</Badge>
                           </TableCell>
-                          <TableCell className="text-center">
+                          <TableCell className="text-center text-sm">
                             {formatMinutesToHuman(analyst.avg_resolution_minutes)}
                           </TableCell>
-                          <TableCell className="text-center text-muted-foreground">
-                            {formatMinutesToHuman(analyst.min_resolution_minutes)}
+                          <TableCell className="text-center">
+                            {analyst.csat_total_ratings > 0 ? (
+                              <div className="flex items-center justify-center gap-1">
+                                <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />
+                                <span className="text-sm">{analyst.csat_avg_rating.toFixed(1)}</span>
+                              </div>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
+                          </TableCell>
+                          <TableCell className="text-center text-muted-foreground text-sm">
+                            {analyst.csat_total_ratings || "-"}
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge className={getMedalColor(analyst.volume_rank)}>
+                            <Badge className={getMedalColor(analyst.volume_rank)} variant="outline">
                               {analyst.volume_rank}º
                             </Badge>
                           </TableCell>
                           <TableCell className="text-center">
-                            <Badge className={getMedalColor(analyst.speed_rank)}>
+                            <Badge className={getMedalColor(analyst.speed_rank)} variant="outline">
                               {analyst.speed_rank}º
                             </Badge>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            {analyst.csat_rank > 0 ? (
+                              <Badge className={getMedalColor(analyst.csat_rank)} variant="outline">
+                                {analyst.csat_rank}º
+                              </Badge>
+                            ) : (
+                              <span className="text-muted-foreground text-sm">-</span>
+                            )}
                           </TableCell>
                           <TableCell className="text-center">
                             <Badge variant="outline" className="font-bold">
