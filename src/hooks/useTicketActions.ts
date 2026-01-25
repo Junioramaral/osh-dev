@@ -46,6 +46,7 @@ export function useTicketActions() {
         .update({
           status: "resolvido" as TicketStatus,
           resolved_at: resolvedAt,
+          resolved_by: authorName,
         })
         .eq("id", ticketId);
 
