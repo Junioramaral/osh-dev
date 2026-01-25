@@ -1,11 +1,23 @@
 import { TableCell, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useNavigate } from "react-router-dom";
 import { useTicketAge } from "@/hooks/useTicketAge";
 import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
 import { cn } from "@/lib/utils";
 import { User, Lock, Users, ListOrdered } from "lucide-react";
+
+const formatBrazilDateTime = (isoString: string): string => {
+  return new Date(isoString).toLocaleString('pt-BR', {
+    timeZone: 'America/Sao_Paulo',
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  }).replace(',', ' às');
+};
 
 interface TicketRowProps {
   ticket: any;
@@ -109,9 +121,29 @@ export function TicketRow({ ticket, isSelected, onToggleSelect, showClientColumn
         </Badge>
       </TableCell>
       <TableCell>
-        <Badge className={getStatusColor(ticket.status)}>
-          {ticket.status}
-        </Badge>
+        <div className="flex flex-col gap-1">
+          <Badge className={getStatusColor(ticket.status)}>
+            {ticket.status}
+          </Badge>
+          
+          {isClosedTicket && ticket.resolved_at && (
+            <div className="text-xs text-muted-foreground space-y-0.5">
+              <div>{formatBrazilDateTime(ticket.resolved_at)}</div>
+              {ticket.resolved_by && (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="truncate max-w-[120px]">
+                      Por: {ticket.resolved_by}
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    <p>{ticket.resolved_by}</p>
+                  </TooltipContent>
+                </Tooltip>
+              )}
+            </div>
+          )}
+        </div>
       </TableCell>
       <TableCell>
         {slaStatus.type !== 'not-applicable' && (
