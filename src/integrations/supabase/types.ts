@@ -1012,6 +1012,7 @@ export type Database = {
           queue_id: string | null
           reproduction_steps: string | null
           resolved_at: string | null
+          resolved_by: string | null
           segment: Database["public"]["Enums"]["ticket_segment"]
           sla_first_response_deadline: string | null
           sla_first_response_met: boolean | null
@@ -1071,6 +1072,7 @@ export type Database = {
           queue_id?: string | null
           reproduction_steps?: string | null
           resolved_at?: string | null
+          resolved_by?: string | null
           segment: Database["public"]["Enums"]["ticket_segment"]
           sla_first_response_deadline?: string | null
           sla_first_response_met?: boolean | null
@@ -1130,6 +1132,7 @@ export type Database = {
           queue_id?: string | null
           reproduction_steps?: string | null
           resolved_at?: string | null
+          resolved_by?: string | null
           segment?: Database["public"]["Enums"]["ticket_segment"]
           sla_first_response_deadline?: string | null
           sla_first_response_met?: boolean | null

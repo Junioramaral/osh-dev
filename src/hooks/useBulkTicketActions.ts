@@ -127,6 +127,7 @@ export function useBulkTicketActions() {
       
       if (status === "resolvido") {
         updates.resolved_at = new Date().toISOString();
+        updates.resolved_by = authorName;
       }
 
       // 3. Atualizar status dos tickets

@@ -105,6 +105,31 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             </Badge>
           </div>
 
+          {/* Closure Info - only show if resolved/closed */}
+          {isResolved && ticket.resolved_at && (
+            <div className="space-y-2 pt-2 border-t border-muted">
+              <div className="flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Encerrado em:</span>
+                <span className="font-medium">
+                  {new Date(ticket.resolved_at).toLocaleString('pt-BR', {
+                    timeZone: 'America/Sao_Paulo',
+                    day: '2-digit',
+                    month: '2-digit',
+                    year: 'numeric',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }).replace(',', ' às')}
+                </span>
+              </div>
+              {ticket.resolved_by && (
+                <div className="flex items-center justify-between text-sm">
+                  <span className="text-muted-foreground">Por:</span>
+                  <span className="font-medium">{ticket.resolved_by}</span>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Status Dropdown - only show if not resolved */}
           {!isResolved && (
             <>
