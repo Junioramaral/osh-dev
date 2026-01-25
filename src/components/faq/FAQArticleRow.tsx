@@ -1,6 +1,7 @@
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { MoreHorizontal, Trash2, Lock, Building2, Globe, Eye, Ticket } from "lucide-react";
+import { HighlightText } from "@/lib/highlightText";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -26,6 +27,7 @@ interface FAQArticleRowProps {
   onDelete: (article: FAQArticle) => void;
   canManage?: boolean;
   linkedTicketsCount?: number;
+  searchTerm?: string;
 }
 
 export default function FAQArticleRow({
@@ -35,6 +37,7 @@ export default function FAQArticleRow({
   onDelete,
   canManage = false,
   linkedTicketsCount = 0,
+  searchTerm = "",
 }: FAQArticleRowProps) {
   const getVisibilityBadge = () => {
     const visibility = article.visibility || "private";
@@ -98,7 +101,7 @@ export default function FAQArticleRow({
       {/* Title */}
       <TableCell className="font-medium max-w-[300px]">
         <div className="truncate" title={article.title}>
-          {article.title}
+          <HighlightText text={article.title} searchTerm={searchTerm} />
         </div>
         {article.keywords && article.keywords.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-1">
@@ -108,7 +111,7 @@ export default function FAQArticleRow({
                 variant="outline"
                 className="text-xs px-1.5 py-0"
               >
-                {keyword}
+                <HighlightText text={keyword} searchTerm={searchTerm} />
               </Badge>
             ))}
             {article.keywords.length > 3 && (
