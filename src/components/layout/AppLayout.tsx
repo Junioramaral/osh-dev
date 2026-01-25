@@ -86,7 +86,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         </div>
       </div>
 
-      <nav className="flex-1 p-4 space-y-4">
+      <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
         {/* Seção Operacional */}
         <div className="space-y-1">
           <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
@@ -136,7 +136,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         )}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border">
+      <div className="p-4 border-t border-sidebar-border shrink-0">
         <div className="mb-3 px-3">
           <p className="text-sm font-medium text-sidebar-foreground">{profile?.full_name}</p>
           <p className="text-xs text-sidebar-foreground/60">{user?.email}</p>
@@ -170,7 +170,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <div className="flex h-screen bg-background print:block print:h-auto print:overflow-visible">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:flex-col w-64 bg-sidebar text-sidebar-foreground print:hidden">
+      <aside className="hidden md:flex md:flex-col w-64 h-screen bg-sidebar text-sidebar-foreground print:hidden">
         <SidebarContent />
       </aside>
 
