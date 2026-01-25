@@ -18,6 +18,7 @@ import AppLayout from "@/components/layout/AppLayout";
 
 interface DashboardStats {
   totalTickets: number;
+  ticketsFechados: number;
   ticketsAbertosHoje: number;
   ticketsEmAtendimento: number;
   ticketsAguardando: number;
@@ -31,6 +32,7 @@ const Dashboard = () => {
   const { user, profile, roles, isSuperAdmin, hasRole } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
     totalTickets: 0,
+    ticketsFechados: 0,
     ticketsAbertosHoje: 0,
     ticketsEmAtendimento: 0,
     ticketsAguardando: 0,
@@ -71,6 +73,12 @@ const Dashboard = () => {
         .select('*', { count: 'exact', head: true })
         .eq('status', 'aguardando_cliente');
 
+      // Tickets fechados (resolvido ou fechado)
+      const { count: fechadosCount } = await supabase
+        .from('tickets')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['resolvido', 'fechado']);
+
       // Tickets fora do SLA (resolution deadline passed and not resolved)
       const now = new Date().toISOString();
       const { count: foraSLACount } = await supabase
@@ -101,6 +109,7 @@ const Dashboard = () => {
 
       setStats({
         totalTickets: totalCount || 0,
+        ticketsFechados: fechadosCount || 0,
         ticketsAbertosHoje: todayCount || 0,
         ticketsEmAtendimento: emAtendimentoCount || 0,
         ticketsAguardando: aguardandoCount || 0,
@@ -123,6 +132,13 @@ const Dashboard = () => {
       icon: Ticket,
       color: "text-primary",
       bgColor: "bg-primary/10",
+    },
+    {
+      title: "Tickets Fechados",
+      value: stats.ticketsFechados,
+      icon: CheckCircle,
+      color: "text-green-600",
+      bgColor: "bg-green-100",
     },
     {
       title: "Abertos Hoje",
