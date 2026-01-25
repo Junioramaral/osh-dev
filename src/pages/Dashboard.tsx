@@ -20,6 +20,7 @@ import {
   Database,
   AppWindow,
   TrendingUp,
+  Target,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
@@ -45,6 +46,9 @@ interface DashboardStats {
   ticketsDB: number;
   ticketsApp: number;
   totalClientes: number;
+  taxaSLA: number;
+  ticketsResolvidosDentroSLA: number;
+  ticketsResolvidosForaSLA: number;
 }
 
 interface MonthlyTrendData {
@@ -68,6 +72,9 @@ const Dashboard = () => {
     ticketsDB: 0,
     ticketsApp: 0,
     totalClientes: 0,
+    taxaSLA: 0,
+    ticketsResolvidosDentroSLA: 0,
+    ticketsResolvidosForaSLA: 0,
   });
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
@@ -132,6 +139,26 @@ const Dashboard = () => {
         .select('*', { count: 'exact', head: true })
         .eq('segment', 'APP');
 
+      // Tickets resolvidos DENTRO do SLA
+      const { count: dentroSLACount } = await supabase
+        .from('tickets')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['resolvido', 'fechado'])
+        .eq('sla_resolution_met', true);
+
+      // Tickets resolvidos FORA do SLA
+      const { count: foraSLAResolvidosCount } = await supabase
+        .from('tickets')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['resolvido', 'fechado'])
+        .eq('sla_resolution_met', false);
+
+      // Calcular taxa de SLA
+      const totalResolvidos = (dentroSLACount || 0) + (foraSLAResolvidosCount || 0);
+      const taxaSLA = totalResolvidos > 0 
+        ? Math.round(((dentroSLACount || 0) / totalResolvidos) * 100) 
+        : 0;
+
       // Total clients (if admin or analyst)
       let clientsCount = 0;
       if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
@@ -151,6 +178,9 @@ const Dashboard = () => {
         ticketsDB: dbCount || 0,
         ticketsApp: appCount || 0,
         totalClientes: clientsCount,
+        taxaSLA: taxaSLA,
+        ticketsResolvidosDentroSLA: dentroSLACount || 0,
+        ticketsResolvidosForaSLA: foraSLAResolvidosCount || 0,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
@@ -275,8 +305,8 @@ const Dashboard = () => {
         </div>
 
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
-            {[...Array(8)].map((_, i) => (
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {[...Array(10)].map((_, i) => (
               <Card key={i} className="animate-pulse">
                 <CardHeader className="space-y-2">
                   <div className="h-4 bg-muted rounded w-2/3" />
@@ -288,7 +318,33 @@ const Dashboard = () => {
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
+            {/* Card especial de Taxa SLA */}
+            <Card className="hover:shadow-md transition-shadow">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-muted-foreground">
+                  Taxa de Resolução SLA
+                </CardTitle>
+                <div className={`p-2 rounded-lg ${
+                  stats.taxaSLA >= 90 ? "bg-green-100" : stats.taxaSLA >= 70 ? "bg-yellow-100" : "bg-red-100"
+                }`}>
+                  <Target className={`w-4 h-4 ${
+                    stats.taxaSLA >= 90 ? "text-green-600" : stats.taxaSLA >= 70 ? "text-yellow-600" : "text-red-600"
+                  }`} />
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className={`text-2xl font-bold ${
+                  stats.taxaSLA >= 90 ? "text-green-600" : stats.taxaSLA >= 70 ? "text-yellow-600" : "text-red-600"
+                }`}>
+                  {stats.taxaSLA}%
+                </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  {stats.ticketsResolvidosDentroSLA} de {stats.ticketsResolvidosDentroSLA + stats.ticketsResolvidosForaSLA} no prazo
+                </p>
+              </CardContent>
+            </Card>
+            
             {statCards.map((stat) => {
               const Icon = stat.icon;
               return (
