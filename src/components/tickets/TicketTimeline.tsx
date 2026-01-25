@@ -1,11 +1,9 @@
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity } from "lucide-react";
-import { format, formatDistanceToNow } from "date-fns";
-import { ptBR } from "date-fns/locale";
 import { useTicketHistory, useTicketComments, useTicketTimeLogs } from "@/hooks/useTicketDetail";
 import { useMemo } from "react";
-
+import { formatSmartDate } from "@/lib/dateUtils";
 interface TimelineItemProps {
   event: any;
 }
@@ -53,7 +51,7 @@ function TimelineItem({ event }: TimelineItemProps) {
         <div className="flex items-center justify-between">
           <p className="font-medium text-sm">{getLabel()}</p>
           <span className="text-xs text-muted-foreground">
-            {formatDistanceToNow(new Date(event.created_at || event.logged_at), { addSuffix: true, locale: ptBR })}
+            {formatSmartDate(event.created_at || event.logged_at)}
           </span>
         </div>
         <p className="text-sm text-muted-foreground mt-1">
