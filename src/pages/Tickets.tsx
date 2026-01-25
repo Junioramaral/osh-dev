@@ -13,7 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { Plus, Search, AlertCircle, ListOrdered } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import { TicketRow } from "@/components/tickets/TicketRow";
-import { calculateSLAStatus } from "@/lib/ticketUtils";
+
 import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
 import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystDialog";
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
@@ -391,11 +391,27 @@ export default function Tickets() {
       ticket.queue_id === queueFilter;
     return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue;
   }).sort((a, b) => {
-    // Ordenar por urgência de SLA
-    const slaA = calculateSLAStatus(a);
-    const slaB = calculateSLAStatus(b);
-    const priority = { overdue: 0, warning: 1, 'on-time': 2, met: 3, 'not-applicable': 4 };
-    return priority[slaA.type] - priority[slaB.type];
+    // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
+    const statusPriority: Record<string, number> = {
+      'novo': 0,
+      'em_atendimento': 1,
+      'aguardando_cliente': 2,
+      'resolvido': 3,
+      'fechado': 4,
+    };
+    
+    // Nível 1: Ordenar por grupo de status
+    const statusA = statusPriority[a.status] ?? 5;
+    const statusB = statusPriority[b.status] ?? 5;
+    
+    if (statusA !== statusB) {
+      return statusA - statusB;
+    }
+    
+    // Nível 2: Dentro do mesmo grupo, ordenar por ticket_number decrescente
+    const numA = parseInt(a.ticket_number, 10) || 0;
+    const numB = parseInt(b.ticket_number, 10) || 0;
+    return numB - numA; // Decrescente: mais novo primeiro
   });
 
   return (

@@ -19,6 +19,9 @@ export function TicketRow({ ticket, isSelected, onToggleSelect, showClientColumn
   const age = useTicketAge(ticket.created_at, ticket.resolved_at);
   const slaStatus = calculateSLAStatus(ticket);
   
+  // Verificar se o ticket está resolvido ou fechado para aplicar estilo diferenciado
+  const isClosedTicket = ticket.status === 'resolvido' || ticket.status === 'fechado';
+  
   const handleRowClick = (e: React.MouseEvent) => {
     // Não navegar se clicar no checkbox
     if ((e.target as HTMLElement).closest('button')) return;
@@ -29,7 +32,8 @@ export function TicketRow({ ticket, isSelected, onToggleSelect, showClientColumn
     <TableRow 
       className={cn(
         "cursor-pointer hover:bg-muted/50",
-        isSelected && "bg-primary/5 border-l-4 border-l-primary"
+        isSelected && "bg-primary/5 border-l-4 border-l-primary",
+        isClosedTicket && "opacity-60 bg-muted/30"
       )}
       onClick={handleRowClick}
     >
