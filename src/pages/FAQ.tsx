@@ -354,6 +354,7 @@ export default function FAQ() {
                       onDelete={handleDelete}
                       canManage={canManageArticles}
                       linkedTicketsCount={ticketCounts?.[article.id] || 0}
+                      searchTerm={searchTerm}
                     />
                   ))}
                 </TableBody>
