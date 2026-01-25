@@ -2,6 +2,13 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -47,6 +54,8 @@ interface MonthlyTrendData {
   fechados: number;
 }
 
+type TrendPeriod = 3 | 6 | 12;
+
 const Dashboard = () => {
   const { user, profile, roles, isSuperAdmin, hasRole } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -62,11 +71,15 @@ const Dashboard = () => {
   });
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
+  const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>(6);
 
   useEffect(() => {
     loadDashboardStats();
-    loadMonthlyTrend();
   }, [profile]);
+
+  useEffect(() => {
+    loadMonthlyTrend(trendPeriod);
+  }, [profile, trendPeriod]);
 
   const loadDashboardStats = async () => {
     try {
@@ -146,11 +159,11 @@ const Dashboard = () => {
     }
   };
 
-  const loadMonthlyTrend = async () => {
+  const loadMonthlyTrend = async (periodMonths: number = 6) => {
     try {
       const months: MonthlyTrendData[] = [];
       
-      for (let i = 5; i >= 0; i--) {
+      for (let i = periodMonths - 1; i >= 0; i--) {
         const monthDate = subMonths(new Date(), i);
         const start = startOfMonth(monthDate);
         const end = endOfMonth(monthDate);
@@ -315,11 +328,24 @@ const Dashboard = () => {
 
         {/* Gráfico de Tendência Mensal */}
         <Card>
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
             <CardTitle className="flex items-center gap-2">
               <TrendingUp className="w-5 h-5" />
               Tendência Mensal: Tickets Abertos vs Fechados
             </CardTitle>
+            <Select 
+              value={trendPeriod.toString()} 
+              onValueChange={(value) => setTrendPeriod(Number(value) as TrendPeriod)}
+            >
+              <SelectTrigger className="w-[150px]">
+                <SelectValue placeholder="Período" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="3">Últimos 3 meses</SelectItem>
+                <SelectItem value="6">Últimos 6 meses</SelectItem>
+                <SelectItem value="12">Últimos 12 meses</SelectItem>
+              </SelectContent>
+            </Select>
           </CardHeader>
           <CardContent>
             {trendData.length > 0 ? (
