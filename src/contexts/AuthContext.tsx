@@ -8,6 +8,8 @@ interface Profile {
   full_name: string;
   client_id: string | null;
   team_id: string | null;
+  phone: string | null;
+  avatar_url: string | null;
 }
 
 export type UserRoleType = 'super_admin' | 'tenant_admin' | 'analyst_db' | 'analyst_app' | 'user';
