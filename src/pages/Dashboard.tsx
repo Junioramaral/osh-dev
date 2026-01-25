@@ -15,6 +15,18 @@ import {
   TrendingUp,
 } from "lucide-react";
 import AppLayout from "@/components/layout/AppLayout";
+import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
+import { ptBR } from "date-fns/locale";
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from "recharts";
 
 interface DashboardStats {
   totalTickets: number;
@@ -26,6 +38,13 @@ interface DashboardStats {
   ticketsDB: number;
   ticketsApp: number;
   totalClientes: number;
+}
+
+interface MonthlyTrendData {
+  month: string;
+  monthLabel: string;
+  abertos: number;
+  fechados: number;
 }
 
 const Dashboard = () => {
@@ -42,9 +61,11 @@ const Dashboard = () => {
     totalClientes: 0,
   });
   const [loading, setLoading] = useState(true);
+  const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
 
   useEffect(() => {
     loadDashboardStats();
+    loadMonthlyTrend();
   }, [profile]);
 
   const loadDashboardStats = async () => {
@@ -122,6 +143,44 @@ const Dashboard = () => {
       console.error('Error loading dashboard stats:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadMonthlyTrend = async () => {
+    try {
+      const months: MonthlyTrendData[] = [];
+      
+      for (let i = 5; i >= 0; i--) {
+        const monthDate = subMonths(new Date(), i);
+        const start = startOfMonth(monthDate);
+        const end = endOfMonth(monthDate);
+        
+        // Tickets abertos no mês (criados)
+        const { count: abertosCount } = await supabase
+          .from('tickets')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', start.toISOString())
+          .lte('created_at', end.toISOString());
+        
+        // Tickets fechados no mês (resolvidos)
+        const { count: fechadosCount } = await supabase
+          .from('tickets')
+          .select('*', { count: 'exact', head: true })
+          .gte('resolved_at', start.toISOString())
+          .lte('resolved_at', end.toISOString())
+          .in('status', ['resolvido', 'fechado']);
+        
+        months.push({
+          month: format(monthDate, 'yyyy-MM'),
+          monthLabel: format(monthDate, 'MMM/yy', { locale: ptBR }),
+          abertos: abertosCount || 0,
+          fechados: fechadosCount || 0,
+        });
+      }
+      
+      setTrendData(months);
+    } catch (error) {
+      console.error('Error loading monthly trend:', error);
     }
   };
 
@@ -253,6 +312,65 @@ const Dashboard = () => {
             </CardContent>
           </Card>
         )}
+
+        {/* Gráfico de Tendência Mensal */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" />
+              Tendência Mensal: Tickets Abertos vs Fechados
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {trendData.length > 0 ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={trendData}>
+                  <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
+                  <XAxis 
+                    dataKey="monthLabel" 
+                    className="text-xs fill-muted-foreground"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <YAxis 
+                    className="text-xs fill-muted-foreground"
+                    tick={{ fill: 'hsl(var(--muted-foreground))' }}
+                  />
+                  <Tooltip 
+                    contentStyle={{
+                      backgroundColor: 'hsl(var(--background))',
+                      border: '1px solid hsl(var(--border))',
+                      borderRadius: '8px',
+                    }}
+                    labelStyle={{ color: 'hsl(var(--foreground))' }}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="abertos" 
+                    name="Abertos" 
+                    stroke="hsl(215, 65%, 55%)" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(215, 65%, 55%)', strokeWidth: 2 }}
+                    activeDot={{ r: 6 }}
+                  />
+                  <Line 
+                    type="monotone" 
+                    dataKey="fechados" 
+                    name="Fechados" 
+                    stroke="hsl(142, 71%, 45%)" 
+                    strokeWidth={2}
+                    dot={{ fill: 'hsl(142, 71%, 45%)', strokeWidth: 2 }}
+                    activeDot={{ r: 6 }}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                Carregando dados...
+              </div>
+            )}
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>
