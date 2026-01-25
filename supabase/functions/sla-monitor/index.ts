@@ -349,7 +349,7 @@ serve(async (req) => {
     // ========== ENVIAR EMAIL ==========
 
     const { data: emailResult, error: emailError } = await resend.emails.send({
-      from: "Otimizzo SLA Monitor <onboarding@resend.dev>",
+      from: "Otimizzo SLA Monitor <noreply@otimizzo.com>",
       to: otimizzoEmails,
       subject: `🚨 Alerta de SLA: ${overdueAlerts.length} vencidos, ${warningAlerts.length} em risco`,
       html: emailHtml,
