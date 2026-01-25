@@ -45,6 +45,7 @@ serve(async (req) => {
 
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const appUrl = Deno.env.get("APP_URL") || "https://osh.tec.br";
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const now = new Date();
@@ -326,7 +327,7 @@ serve(async (req) => {
               ` : ''}
               
               <div style="margin-top: 30px; text-align: center;">
-                <a href="https://ukrgzsntvddzwtmccwbf.supabase.co/tickets" 
+                <a href="${appUrl}/tickets" 
                    style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; font-weight: bold;">
                   Ver Todos os Tickets
                 </a>
