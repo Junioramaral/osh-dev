@@ -1,5 +1,6 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
+import { FileText, Server, AlertCircle, Search } from "lucide-react";
 
 interface TicketDetailsProps {
   ticket: any;
@@ -8,30 +9,40 @@ interface TicketDetailsProps {
 function InfoRow({ label, value }: { label: string; value: any }) {
   if (!value) return null;
   return (
-    <div className="flex justify-between py-2 border-b">
+    <div className="flex justify-between py-2 border-b last:border-b-0">
       <span className="text-sm text-muted-foreground">{label}</span>
       <span className="text-sm font-medium">{value}</span>
     </div>
   );
 }
 
-function Section({ title, children }: { title: string; children: React.ReactNode }) {
-  return (
-    <div className="space-y-2">
-      <h3 className="font-semibold text-lg">{title}</h3>
-      {children}
-    </div>
-  );
-}
-
 export default function TicketDetails({ ticket }: TicketDetailsProps) {
   return (
-    <div className="space-y-6 p-6">
-        <Section title="Descrição do Problema">
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.description}</p>
-        </Section>
-        
-        <Section title="Informações Técnicas">
+    <div className="space-y-6">
+      {/* Card 1: Descrição do Problema */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <FileText className="h-5 w-5 text-muted-foreground" />
+            Descrição do Problema
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+            {ticket.description || "Sem descrição"}
+          </p>
+        </CardContent>
+      </Card>
+
+      {/* Card 2: Informações Técnicas */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Server className="h-5 w-5 text-muted-foreground" />
+            Informações Técnicas
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-0">
             <InfoRow label="Segmento" value={ticket.segment} />
             {ticket.segment === 'DB' && (
@@ -52,9 +63,18 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
               </>
             )}
           </div>
-        </Section>
-        
-        <Section title="Detalhes do Incidente">
+        </CardContent>
+      </Card>
+
+      {/* Card 3: Detalhes do Incidente */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-muted-foreground" />
+            Detalhes do Incidente
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
           <div className="space-y-0">
             <InfoRow label="Tipo" value={ticket.ticket_type} />
             <InfoRow label="Categoria" value={ticket.category} />
@@ -63,40 +83,48 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
             <InfoRow label="Impacto no Negócio" value={ticket.business_impact} />
             <InfoRow label="Iniciado em" value={format(new Date(ticket.started_at), 'dd/MM/yyyy HH:mm')} />
           </div>
-        </Section>
-        
-        <Section title="Análise">
-          <div className="space-y-4">
-            <div>
-              <h4 className="font-medium mb-2 text-sm">Motivo da Abertura</h4>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.opening_reason}</p>
-            </div>
-            <div>
-              <h4 className="font-medium mb-2 text-sm">Problema Enfrentado</h4>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.problem_faced}</p>
-            </div>
-            {ticket.error_displayed && (
-              <div>
-                <h4 className="font-medium mb-2 text-sm">Erro Exibido</h4>
-                <pre className="bg-muted p-3 rounded-md overflow-x-auto text-xs">
-                  <code>{ticket.error_displayed}</code>
-                </pre>
-              </div>
-            )}
-            {ticket.reproduction_steps && (
-              <div>
-                <h4 className="font-medium mb-2 text-sm">Passos para Reprodução</h4>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.reproduction_steps}</p>
-              </div>
-            )}
-            {ticket.workaround && (
-              <div>
-                <h4 className="font-medium mb-2 text-sm">Workaround Aplicado</h4>
-                <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.workaround}</p>
-              </div>
-            )}
+        </CardContent>
+      </Card>
+
+      {/* Card 4: Análise */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-lg flex items-center gap-2">
+            <Search className="h-5 w-5 text-muted-foreground" />
+            Análise
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div>
+            <h4 className="font-medium mb-2 text-sm">Motivo da Abertura</h4>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.opening_reason}</p>
           </div>
-        </Section>
-      </div>
+          <div>
+            <h4 className="font-medium mb-2 text-sm">Problema Enfrentado</h4>
+            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.problem_faced}</p>
+          </div>
+          {ticket.error_displayed && (
+            <div>
+              <h4 className="font-medium mb-2 text-sm">Erro Exibido</h4>
+              <pre className="bg-muted p-3 rounded-md overflow-x-auto text-xs">
+                <code>{ticket.error_displayed}</code>
+              </pre>
+            </div>
+          )}
+          {ticket.reproduction_steps && (
+            <div>
+              <h4 className="font-medium mb-2 text-sm">Passos para Reprodução</h4>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.reproduction_steps}</p>
+            </div>
+          )}
+          {ticket.workaround && (
+            <div>
+              <h4 className="font-medium mb-2 text-sm">Workaround Aplicado</h4>
+              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.workaround}</p>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
   );
 }
