@@ -3,16 +3,17 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileBarChart, TrendingUp, PieChart, GitCompare, Clock, History, Timer } from "lucide-react";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, Clock, History, Timer, Trophy } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
 import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
 import CategoriesReport from "@/components/reports/CategoriesReport";
 import PeriodComparisonReport from "@/components/reports/PeriodComparisonReport";
 import ResolutionTimeReport from "@/components/reports/ResolutionTimeReport";
+import ClosureRankingReport from "@/components/reports/ClosureRankingReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
 
-type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | null;
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | null;
 
 const reportTypes = [
   {
@@ -50,6 +51,13 @@ const reportTypes = [
     icon: Timer,
     highlight: false,
   },
+  {
+    id: "closure-ranking" as const,
+    title: "Ranking de Encerramento",
+    description: "Ranking de analistas por volume e tempo de resolução de tickets",
+    icon: Trophy,
+    highlight: false,
+  },
 ];
 
 const Reports = () => {
@@ -74,6 +82,10 @@ const Reports = () => {
 
   if (selectedReport === "resolution-time") {
     return <ResolutionTimeReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "closure-ranking") {
+    return <ClosureRankingReport onBack={() => setSelectedReport(null)} />;
   }
 
   return (
