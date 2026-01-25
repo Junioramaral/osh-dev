@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink, CheckCircle, Star } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useAuth } from "@/contexts/AuthContext";
@@ -107,26 +107,40 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
 
           {/* Closure Info - only show if resolved/closed */}
           {isResolved && ticket.resolved_at && (
-            <div className="space-y-2 pt-2 border-t border-muted">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-muted-foreground">Encerrado em:</span>
-                <span className="font-medium">
-                  {new Date(ticket.resolved_at).toLocaleString('pt-BR', {
-                    timeZone: 'America/Sao_Paulo',
-                    day: '2-digit',
-                    month: '2-digit',
-                    year: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  }).replace(',', ' às')}
+            <div className="mt-3 p-3 rounded-lg bg-green-50 dark:bg-green-950/30 border border-green-200 dark:border-green-800">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle className="h-4 w-4 text-green-600" />
+                <span className="text-sm font-semibold text-green-700 dark:text-green-400">
+                  Ticket Resolvido
                 </span>
               </div>
-              {ticket.resolved_by && (
-                <div className="flex items-center justify-between text-sm">
+              
+              <div className="space-y-1.5 text-sm">
+                {/* Quem encerrou - DESTACADO */}
+                <div className="flex items-center gap-2">
+                  <User className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-muted-foreground">Por:</span>
-                  <span className="font-medium">{ticket.resolved_by}</span>
+                  <span className="font-semibold text-foreground">
+                    {ticket.resolved_by || "Não registrado"}
+                  </span>
                 </div>
-              )}
+                
+                {/* Data/hora */}
+                <div className="flex items-center gap-2">
+                  <Clock className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-muted-foreground">Em:</span>
+                  <span className="font-medium text-foreground">
+                    {new Date(ticket.resolved_at).toLocaleString('pt-BR', {
+                      timeZone: 'America/Sao_Paulo',
+                      day: '2-digit',
+                      month: '2-digit',
+                      year: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    }).replace(',', ' às')}
+                  </span>
+                </div>
+              </div>
             </div>
           )}
 
