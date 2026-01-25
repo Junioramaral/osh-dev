@@ -1,5 +1,5 @@
 import { useFAQHistory } from "@/hooks/useFAQHistory";
-import { format, formatDistanceToNow } from "date-fns";
+import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   Plus,
@@ -13,6 +13,7 @@ import {
   History,
 } from "lucide-react";
 import { ScrollArea } from "@/components/ui/scroll-area";
+import { formatSmartDate } from "@/lib/dateUtils";
 
 interface FAQHistoryTabProps {
   articleId: string;
@@ -176,10 +177,7 @@ export function FAQHistoryTab({ articleId }: FAQHistoryTabProps) {
                   </span>
                   {" • "}
                   <span title={format(new Date(entry.created_at), "dd/MM/yyyy HH:mm:ss", { locale: ptBR })}>
-                    {formatDistanceToNow(new Date(entry.created_at), {
-                      addSuffix: true,
-                      locale: ptBR,
-                    })}
+                    {formatSmartDate(entry.created_at)}
                   </span>
                 </p>
               </div>
