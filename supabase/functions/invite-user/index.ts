@@ -292,6 +292,9 @@ serve(async (req) => {
       user: "Usuário",
     };
     const rolesDisplay = validatedRoles.map(r => roleLabels[r] || r).join(", ");
+    
+    // Get APP_URL for email links
+    const appUrl = Deno.env.get("APP_URL") || "https://osh.tec.br";
 
     // Send custom email in Portuguese via Resend
     try {
@@ -344,7 +347,7 @@ serve(async (req) => {
                 </div>
                 
                 <div style="text-align: center;">
-                  <a href="https://ottimizzo-nexus.lovable.app/auth" class="button">
+                  <a href="${appUrl}/auth" class="button">
                     Acessar Plataforma
                   </a>
                 </div>
