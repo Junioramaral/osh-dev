@@ -3,17 +3,21 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileBarChart, TrendingUp, PieChart, GitCompare, Clock, History, Timer, Trophy } from "lucide-react";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
 import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
 import CategoriesReport from "@/components/reports/CategoriesReport";
 import PeriodComparisonReport from "@/components/reports/PeriodComparisonReport";
 import ResolutionTimeReport from "@/components/reports/ResolutionTimeReport";
 import ClosureRankingReport from "@/components/reports/ClosureRankingReport";
+import QueueWorkloadReport from "@/components/reports/QueueWorkloadReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
+import { useAuth } from "@/contexts/AuthContext";
 
-type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | null;
+const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | null;
 
 const reportTypes = [
   {
@@ -58,11 +62,33 @@ const reportTypes = [
     icon: Trophy,
     highlight: false,
   },
+  {
+    id: "queue-workload" as const,
+    title: "Distribuição por Filas",
+    description: "Análise de carga de trabalho por fila de atendimento",
+    icon: ListOrdered,
+    highlight: false,
+    internalOnly: true,
+  },
 ];
 
 const Reports = () => {
   const [selectedReport, setSelectedReport] = useState<ReportType>(null);
   const { data: sendHistory } = useReportSendHistory();
+  const { isSuperAdmin, isOtimizzoUser, isViewer, profile, tenantId } = useAuth();
+
+  // Check if user is a client (not internal)
+  const isClient = profile?.client_id !== null && 
+                   profile?.client_id !== OTIMIZZO_TENANT_ID &&
+                   tenantId !== OTIMIZZO_TENANT_ID;
+
+  // Filter reports based on user type
+  const visibleReports = reportTypes.filter(report => {
+    if ('internalOnly' in report && report.internalOnly) {
+      return !isClient && (isSuperAdmin || isOtimizzoUser || isViewer);
+    }
+    return true;
+  });
 
   if (selectedReport === "monthly") {
     return <MonthlyClientReport onBack={() => setSelectedReport(null)} />;
@@ -86,6 +112,10 @@ const Reports = () => {
 
   if (selectedReport === "closure-ranking") {
     return <ClosureRankingReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "queue-workload") {
+    return <QueueWorkloadReport onBack={() => setSelectedReport(null)} />;
   }
 
   return (
@@ -117,7 +147,7 @@ const Reports = () => {
 
           <TabsContent value="types">
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-2">
-              {reportTypes.map((report) => {
+              {visibleReports.map((report) => {
                 const Icon = report.icon;
                 return (
                   <Card
