@@ -1340,6 +1340,7 @@ export type Database = {
         | "tenant_admin"
         | "analyst_db"
         | "analyst_app"
+        | "viewer"
       business_impact: "nenhum" | "baixo" | "medio" | "alto" | "critico"
       comment_source: "portal" | "email"
       criticality_level: "baixa" | "media" | "alta" | "critica"
@@ -1493,6 +1494,7 @@ export const Constants = {
         "tenant_admin",
         "analyst_db",
         "analyst_app",
+        "viewer",
       ],
       business_impact: ["nenhum", "baixo", "medio", "alto", "critico"],
       comment_source: ["portal", "email"],
