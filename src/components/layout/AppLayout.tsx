@@ -142,7 +142,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
         )}
       </nav>
 
-      <div className="p-4 border-t border-sidebar-border shrink-0">
+      <div className="p-4 shrink-0">
+        <GradientSeparator variant="sidebar" className="mx-3 mb-3" />
         <div 
           className="mb-3 px-3 flex items-center gap-3 cursor-pointer rounded-lg hover:bg-sidebar-accent py-2 transition-colors"
           onClick={() => setProfileDialogOpen(true)}
@@ -162,7 +163,6 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             </p>
           </div>
         </div>
-        <GradientSeparator variant="sidebar" className="mx-3" />
         {isSuperAdmin && (
           <NavLink
             to="/system-settings"
