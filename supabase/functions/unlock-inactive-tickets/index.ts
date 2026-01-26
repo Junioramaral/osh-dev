@@ -32,9 +32,19 @@ serve(async (req) => {
 
     console.log("Iniciando verificação de tickets inativos...");
 
-    // Buscar tickets inativos (sem atualização há mais de 7 dias)
-    const sevenDaysAgo = new Date();
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+    // Buscar configuração de dias de inatividade
+    const { data: configData } = await supabase
+      .from("system_configs")
+      .select("value")
+      .eq("key", "ticket_inactivity_days")
+      .maybeSingle();
+
+    const inactivityDays = configData?.value ? Number(configData.value) : 7;
+    console.log(`Configuração: ${inactivityDays} dias de inatividade`);
+
+    // Buscar tickets inativos
+    const cutoffDate = new Date();
+    cutoffDate.setDate(cutoffDate.getDate() - inactivityDays);
 
     const { data: inactiveTickets, error: fetchError } = await supabase
       .from("tickets")
@@ -48,7 +58,7 @@ serve(async (req) => {
       `)
       .not("analyst_id", "is", null)
       .not("status", "in", '("resolvido","fechado")')
-      .lt("updated_at", sevenDaysAgo.toISOString());
+      .lt("updated_at", cutoffDate.toISOString());
 
     if (fetchError) {
       console.error("Erro ao buscar tickets inativos:", fetchError);
@@ -163,7 +173,7 @@ serve(async (req) => {
             <!-- Content -->
             <div style="padding: 30px;">
               <p style="color: #4b5563; line-height: 1.6; margin-bottom: 20px;">
-                Os seguintes tickets não tiveram atualizações nos últimos <strong>7 dias</strong> e foram automaticamente 
+                Os seguintes tickets não tiveram atualizações nos últimos <strong>${inactivityDays} dias</strong> e foram automaticamente 
                 removidos da responsabilidade do analista, retornando para a fila geral.
               </p>
               

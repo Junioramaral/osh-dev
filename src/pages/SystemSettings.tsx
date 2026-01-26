@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -6,7 +6,10 @@ import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Tag, Settings2, Layers } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Database, Package, Plus, Trash2, ToggleLeft, ToggleRight, MoreHorizontal, ListOrdered, Users, Tag, Settings2, Layers, Clock, Save, Loader2 } from "lucide-react";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -80,6 +83,65 @@ export default function SystemSettings() {
   const [teamQueuesDialogOpen, setTeamQueuesDialogOpen] = useState(false);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
   const [selectedCategoryForSubcategories, setSelectedCategoryForSubcategories] = useState<{ id: string; name: string } | null>(null);
+  const [inactivityDays, setInactivityDays] = useState<number>(7);
+  const [inactivityDaysInput, setInactivityDaysInput] = useState<string>("7");
+
+  // Fetch system configs
+  const { data: systemConfigs, isLoading: configsLoading } = useQuery({
+    queryKey: ["system_configs"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("system_configs")
+        .select("*");
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // Set initial inactivity days from config
+  useEffect(() => {
+    if (systemConfigs) {
+      const inactivityConfig = systemConfigs.find((c: any) => c.key === 'ticket_inactivity_days');
+      if (inactivityConfig) {
+        const value = typeof inactivityConfig.value === 'string' 
+          ? Number(inactivityConfig.value) 
+          : Number(inactivityConfig.value);
+        setInactivityDays(value);
+        setInactivityDaysInput(String(value));
+      }
+    }
+  }, [systemConfigs]);
+
+  // Save inactivity days config
+  const saveInactivityMutation = useMutation({
+    mutationFn: async (days: number) => {
+      const { error } = await supabase
+        .from("system_configs")
+        .upsert({ 
+          key: 'ticket_inactivity_days', 
+          value: String(days),
+          updated_at: new Date().toISOString() 
+        }, { onConflict: 'key' });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system_configs"] });
+      toast.success("Configuração salva com sucesso");
+    },
+    onError: (error) => {
+      toast.error("Erro ao salvar: " + error.message);
+    },
+  });
+
+  const handleSaveInactivityDays = () => {
+    const days = Number(inactivityDaysInput);
+    if (isNaN(days) || days < 1 || days > 30) {
+      toast.error("O valor deve ser entre 1 e 30 dias");
+      return;
+    }
+    setInactivityDays(days);
+    saveInactivityMutation.mutate(days);
+  };
 
   // Fetch database engines
   const { data: engines, isLoading: enginesLoading } = useQuery({
@@ -343,8 +405,12 @@ export default function SystemSettings() {
           <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação, filas, categorias e times</p>
         </div>
 
-        <Tabs defaultValue="engines" className="w-full">
-          <TabsList className="grid w-full max-w-4xl grid-cols-5">
+        <Tabs defaultValue="general" className="w-full">
+          <TabsList className="grid w-full max-w-5xl grid-cols-6">
+            <TabsTrigger value="general" className="gap-2">
+              <Settings2 className="h-4 w-4" />
+              Geral
+            </TabsTrigger>
             <TabsTrigger value="engines" className="gap-2">
               <Database className="h-4 w-4" />
               Engines
@@ -366,6 +432,54 @@ export default function SystemSettings() {
               Times
             </TabsTrigger>
           </TabsList>
+
+          {/* General Settings Tab */}
+          <TabsContent value="general" className="mt-6">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Automação de Tickets Inativos
+                </CardTitle>
+                <CardDescription>
+                  Configure após quantos dias um ticket sem atualizações será 
+                  automaticamente desbloqueado e retornará à fila geral.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-4">
+                  <Label htmlFor="inactivity-days">Dias de inatividade:</Label>
+                  <div className="flex items-center gap-2">
+                    <Input 
+                      id="inactivity-days"
+                      type="number" 
+                      min={1} 
+                      max={30}
+                      value={inactivityDaysInput}
+                      onChange={(e) => setInactivityDaysInput(e.target.value)}
+                      className="w-20"
+                    />
+                    <span className="text-muted-foreground">dias</span>
+                  </div>
+                  <Button 
+                    onClick={handleSaveInactivityDays}
+                    disabled={saveInactivityMutation.isPending}
+                  >
+                    {saveInactivityMutation.isPending ? (
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                    ) : (
+                      <Save className="h-4 w-4 mr-2" />
+                    )}
+                    Salvar
+                  </Button>
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  Valor atual: <strong>{inactivityDays} dias</strong>. Tickets sem atualização por este 
+                  período terão o analista removido automaticamente.
+                </p>
+              </CardContent>
+            </Card>
+          </TabsContent>
 
           {/* Database Engines Tab */}
           <TabsContent value="engines" className="mt-6">
