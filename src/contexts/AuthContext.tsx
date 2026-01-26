@@ -29,6 +29,7 @@ interface AuthContextType {
   hasRole: (role: string) => boolean;
   isSuperAdmin: boolean;
   isViewer: boolean;
+  isAnalyst: boolean;
   isOtimizzoUser: boolean;
   tenantId: string | null;
   signIn: (email: string, password: string) => Promise<{ error: any }>;
@@ -138,6 +139,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const hasRole = (role: string) => roles.some(r => r.role === role);
   const isSuperAdmin = hasRole('super_admin');
   const isViewer = hasRole('viewer');
+  const isAnalyst = hasRole('analyst_db') || hasRole('analyst_app');
   const isOtimizzoUser = roles.some(r => r.tenant_id === '00000000-0000-0000-0000-000000000001');
   const tenantId = roles.find(r => r.tenant_id)?.tenant_id || null;
 
@@ -228,6 +230,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       hasRole,
       isSuperAdmin,
       isViewer,
+      isAnalyst,
       isOtimizzoUser,
       tenantId,
       signIn, 
