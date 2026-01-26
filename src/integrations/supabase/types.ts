@@ -779,21 +779,21 @@ export type Database = {
           created_at: string | null
           id: string
           name: string
-          segment: Database["public"]["Enums"]["ticket_segment"]
+          segment: string
           specialization: string | null
         }
         Insert: {
           created_at?: string | null
           id?: string
           name: string
-          segment: Database["public"]["Enums"]["ticket_segment"]
+          segment: string
           specialization?: string | null
         }
         Update: {
           created_at?: string | null
           id?: string
           name?: string
-          segment?: Database["public"]["Enums"]["ticket_segment"]
+          segment?: string
           specialization?: string | null
         }
         Relationships: []

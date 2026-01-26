@@ -18,7 +18,7 @@ import { Badge } from "@/components/ui/badge";
 interface Team {
   id: string;
   name: string;
-  segment: "DB" | "APP";
+  segment: string;
 }
 
 interface Queue {

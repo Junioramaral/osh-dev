@@ -42,7 +42,7 @@ type TeamFormData = z.infer<typeof teamSchema>;
 export interface Team {
   id: string;
   name: string;
-  segment: "DB" | "APP";
+  segment: string;
   specialization: string | null;
 }
 
@@ -86,7 +86,7 @@ export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps
     mutationFn: async (data: TeamFormData) => {
       const { error } = await supabase.from("teams").insert({
         name: data.name,
-        segment: data.segment as "DB" | "APP",
+        segment: data.segment,
         specialization: data.specialization || null,
       });
       if (error) throw error;
@@ -110,7 +110,7 @@ export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps
         .from("teams")
         .update({
           name: data.name,
-          segment: data.segment as "DB" | "APP",
+          segment: data.segment,
           specialization: data.specialization || null,
         })
         .eq("id", team.id);
