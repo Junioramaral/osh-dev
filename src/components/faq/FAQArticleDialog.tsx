@@ -6,6 +6,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "sonner";
+import { useActiveSegments } from "@/hooks/useSegments";
 import {
   Dialog,
   DialogContent,
@@ -143,7 +144,7 @@ const articleSchema = z.object({
   title: z.string().min(5, "Título deve ter pelo menos 5 caracteres").max(200),
   visibility: z.enum(["private", "client_specific", "global"]),
   client_id: z.string().uuid().optional().nullable(),
-  segment: z.enum(["DB", "APP"]),
+  segment: z.string().min(1, "Selecione um segmento"),
   db_engines: z.array(z.string()).default([]),
   app_product_ids: z.array(z.string()).default([]),
   symptoms: z.string().min(10, "Sintomas deve ter pelo menos 10 caracteres"),
@@ -197,6 +198,9 @@ export default function FAQArticleDialog({
 
   const visibility = form.watch("visibility");
   const segment = form.watch("segment");
+
+  // Fetch active segments from database
+  const { data: allSegments } = useActiveSegments();
 
   const { data: clients } = useQuery({
     queryKey: ["clients-for-faq"],
@@ -326,7 +330,7 @@ export default function FAQArticleDialog({
           title: data.title,
           visibility: data.visibility,
           client_id: data.visibility !== "global" ? data.client_id : null,
-          segment: data.segment,
+          segment: data.segment as any, // Cast needed until DB migration to TEXT
           db_engines: data.segment === "DB" ? data.db_engines as DatabaseType["public"]["Enums"]["db_engine"][] : [],
           app_product_ids: data.segment === "APP" ? data.app_product_ids : [],
           symptoms: data.symptoms,
@@ -381,7 +385,7 @@ export default function FAQArticleDialog({
           title: data.title,
           visibility: data.visibility,
           client_id: data.visibility !== "global" ? data.client_id : null,
-          segment: data.segment,
+          segment: data.segment as any, // Cast needed until DB migration to TEXT
           db_engines: data.segment === "DB" ? data.db_engines as DatabaseType["public"]["Enums"]["db_engine"][] : [],
           app_product_ids: data.segment === "APP" ? data.app_product_ids : [],
           symptoms: data.symptoms,
@@ -574,12 +578,15 @@ export default function FAQArticleDialog({
                     >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue placeholder="Selecione o segmento" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="DB">Banco de Dados</SelectItem>
-                        <SelectItem value="APP">Aplicação</SelectItem>
+                        {allSegments?.map((seg) => (
+                          <SelectItem key={seg.id} value={seg.code}>
+                            {seg.display_name}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                     <FormMessage />

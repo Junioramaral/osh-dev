@@ -3,6 +3,7 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { useActiveSegments } from "@/hooks/useSegments";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -30,7 +31,7 @@ import { Loader2, AlertCircle, Database, Package, ListOrdered } from "lucide-rea
 import { format } from "date-fns";
 
 const ticketSchema = z.object({
-  segment: z.enum(["DB", "APP"]),
+  segment: z.string().min(1, "Selecione um segmento"),
   client_id: z.string().uuid("Selecione um cliente"),
   title: z.string().min(1, "Título é obrigatório").max(100, "Máximo 100 caracteres"),
   queue_id: z.string().uuid().optional().nullable(),
@@ -85,7 +86,7 @@ interface NewTicketDialogProps {
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
   const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
   const queryClient = useQueryClient();
-  const [segment, setSegment] = useState<"DB" | "APP" | null>(null);
+  const [segment, setSegment] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<any>(null);
   const [uploadFiles, setUploadFiles] = useState<FileWithPreview[]>([]);
@@ -148,18 +149,24 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!selectedClientId && isOtimizzoTenant,
   });
 
+  // Fetch active segments from database
+  const { data: allSegments } = useActiveSegments();
+
   // Determine available data based on context:
   // - If Otimizzo user selected another client: use selected client's data
   // - If direct client user: use currentTenant data
   const effectiveClientData = isOtimizzoTenant ? selectedClientData : currentTenant;
-  const availableSegments = effectiveClientData?.segments || currentTenant?.segments || [];
+  
+  // Filter segments available for the client
+  const clientSegmentCodes = effectiveClientData?.segments || currentTenant?.segments || [];
+  const availableSegments = allSegments?.filter(s => clientSegmentCodes.includes(s.code)) || [];
   const hasOnlyOneSegment = availableSegments.length === 1;
   const availableDbEngines = effectiveClientData?.db_engines || [];
 
   // Initialize segment when tenant loads
   useEffect(() => {
     if (currentTenant && availableSegments.length > 0 && segment === null) {
-      const initialSegment = availableSegments[0] as "DB" | "APP";
+      const initialSegment = availableSegments[0].code;
       setSegment(initialSegment);
       
       // Reset form with correct initial values
@@ -558,7 +565,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     return evidences;
   }
 
-  const handleSegmentChange = (value: "DB" | "APP") => {
+  const handleSegmentChange = (value: string) => {
     setSegment(value);
     setValue("segment", value);
     setValue("category", ""); // Clear category when segment changes
@@ -585,7 +592,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <Label>Segmento *</Label>
               <div className="flex items-center gap-2">
                 <Input 
-                  value={segment === "DB" ? "Banco de Dados" : "Aplicação"}
+                  value={availableSegments[0]?.display_name || ""}
                   disabled
                   className="bg-muted cursor-not-allowed"
                 />
@@ -597,17 +604,16 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           ) : (
             <div className="space-y-2">
               <Label>Segmento *</Label>
-              <Select value={segment} onValueChange={handleSegmentChange}>
+              <Select value={segment || ""} onValueChange={handleSegmentChange}>
                 <SelectTrigger>
-                  <SelectValue />
+                  <SelectValue placeholder="Selecione o segmento" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableSegments.includes("DB") && (
-                    <SelectItem value="DB">Banco de Dados</SelectItem>
-                  )}
-                  {availableSegments.includes("APP") && (
-                    <SelectItem value="APP">Aplicação</SelectItem>
-                  )}
+                  {availableSegments.map((seg) => (
+                    <SelectItem key={seg.id} value={seg.code}>
+                      {seg.display_name}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </div>
