@@ -35,15 +35,10 @@ import DatabaseEngineDialog from "@/components/settings/DatabaseEngineDialog";
 import AppProductDialog from "@/components/settings/AppProductDialog";
 import QueueDialog, { Queue } from "@/components/settings/QueueDialog";
 import TeamQueuesDialog from "@/components/settings/TeamQueuesDialog";
+import TeamDialog, { Team } from "@/components/settings/TeamDialog";
 import CategoryDialog, { TicketCategory } from "@/components/settings/CategoryDialog";
 import SubcategoryDialog from "@/components/settings/SubcategoryDialog";
 
-interface Team {
-  id: string;
-  name: string;
-  segment: "DB" | "APP";
-  specialization: string | null;
-}
 
 interface DatabaseEngine {
   id: string;
@@ -80,7 +75,9 @@ export default function SystemSettings() {
   const [deleteQueueId, setDeleteQueueId] = useState<string | null>(null);
   const [deleteCategoryId, setDeleteCategoryId] = useState<string | null>(null);
   const [selectedTeam, setSelectedTeam] = useState<Team | null>(null);
+  const [teamDialogOpen, setTeamDialogOpen] = useState(false);
   const [teamQueuesDialogOpen, setTeamQueuesDialogOpen] = useState(false);
+  const [deleteTeamId, setDeleteTeamId] = useState<string | null>(null);
   const [subcategoryDialogOpen, setSubcategoryDialogOpen] = useState(false);
   const [selectedCategoryForSubcategories, setSelectedCategoryForSubcategories] = useState<{ id: string; name: string } | null>(null);
   const [inactivityDays, setInactivityDays] = useState<number>(7);
@@ -379,6 +376,26 @@ export default function SystemSettings() {
       queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
       toast.success("Categoria removida");
       setDeleteCategoryId(null);
+    },
+    onError: (error) => {
+      toast.error("Erro ao remover: " + error.message);
+    },
+  });
+
+  // Delete team
+  const deleteTeamMutation = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase
+        .from("teams")
+        .delete()
+        .eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["teams-with-queues"] });
+      queryClient.invalidateQueries({ queryKey: ["teams"] });
+      toast.success("Time removido");
+      setDeleteTeamId(null);
     },
     onError: (error) => {
       toast.error("Erro ao remover: " + error.message);
@@ -957,9 +974,20 @@ export default function SystemSettings() {
               <div>
                 <h2 className="text-lg font-semibold">Times</h2>
                 <p className="text-sm text-muted-foreground">
-                  Clique em um time para configurar quais filas ele atende
+                  Gerencie times e suas filas de atendimento
                 </p>
               </div>
+              {!isReadOnly && (
+                <Button
+                  onClick={() => {
+                    setSelectedTeam(null);
+                    setTeamDialogOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Time
+                </Button>
+              )}
             </div>
 
             <div className="border rounded-lg">
@@ -994,10 +1022,12 @@ export default function SystemSettings() {
                     teams?.map((team) => (
                       <TableRow 
                         key={team.id}
-                        className="cursor-pointer hover:bg-muted/50"
+                        className={`hover:bg-muted/50 ${!isReadOnly ? 'cursor-pointer' : ''}`}
                         onClick={() => {
-                          setSelectedTeam(team);
-                          setTeamQueuesDialogOpen(true);
+                          if (!isReadOnly) {
+                            setSelectedTeam(team);
+                            setTeamDialogOpen(true);
+                          }
                         }}
                       >
                         <TableCell className="font-medium">{team.name}</TableCell>
@@ -1015,18 +1045,40 @@ export default function SystemSettings() {
                           </Badge>
                         </TableCell>
                         <TableCell>
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              setSelectedTeam(team);
-                              setTeamQueuesDialogOpen(true);
-                            }}
-                          >
-                            <Settings2 className="h-4 w-4 mr-2" />
-                            Filas
-                          </Button>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="h-4 w-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedTeam(team);
+                                  setTeamQueuesDialogOpen(true);
+                                }}
+                              >
+                                <ListOrdered className="h-4 w-4 mr-2" />
+                                Gerenciar Filas
+                              </DropdownMenuItem>
+                              {!isReadOnly && (
+                                <>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteTeamId(team.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remover
+                                  </DropdownMenuItem>
+                                </>
+                              )}
+                            </DropdownMenuContent>
+                          </DropdownMenu>
                         </TableCell>
                       </TableRow>
                     ))
@@ -1077,6 +1129,13 @@ export default function SystemSettings() {
         }}
         categoryId={selectedCategoryForSubcategories?.id || null}
         categoryName={selectedCategoryForSubcategories?.name || null}
+      />
+
+      {/* Team Dialog */}
+      <TeamDialog
+        open={teamDialogOpen}
+        onOpenChange={setTeamDialogOpen}
+        team={selectedTeam}
       />
 
       {/* Team Queues Dialog */}
@@ -1167,6 +1226,28 @@ export default function SystemSettings() {
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
             <AlertDialogAction
               onClick={() => deleteCategoryId && deleteCategoryMutation.mutate(deleteCategoryId)}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Remover
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Delete Team Confirmation */}
+      <AlertDialog open={!!deleteTeamId} onOpenChange={() => setDeleteTeamId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Remover Time</AlertDialogTitle>
+            <AlertDialogDescription>
+              Tem certeza que deseja remover este time? Esta ação não pode ser desfeita.
+              As associações com filas também serão removidas.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteTeamId && deleteTeamMutation.mutate(deleteTeamId)}
               className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
             >
               Remover
