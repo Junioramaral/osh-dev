@@ -11,7 +11,7 @@ import { cn } from "@/lib/utils";
 
 interface FAQSelectorProps {
   clientId: string | null;
-  segment: "DB" | "APP" | null;
+  segment: string | null;
   selectedFAQId: string | null | undefined;
   onSelectFAQ: (faqId: string | null) => void;
 }
