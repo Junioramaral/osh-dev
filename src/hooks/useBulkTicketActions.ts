@@ -15,7 +15,7 @@ export function useBulkTicketActions() {
     }) => {
       const { error } = await supabase
         .from("tickets")
-        .update({ analyst_id: analystId })
+        .update({ analyst_id: analystId, unlocked_at: null })
         .in("id", ticketIds);
 
       if (error) throw error;
@@ -256,6 +256,7 @@ export function useBulkTicketActions() {
           lock_owner_id: userId,
           lock_at: new Date().toISOString(),
           analyst_id: userId,
+          unlocked_at: null,
         })
         .in("id", ticketIds);
 
@@ -302,6 +303,7 @@ export function useBulkTicketActions() {
           lock_owner_id: userId,
           lock_at: new Date().toISOString(),
           analyst_id: userId,
+          unlocked_at: null,
         })
         .in("id", ticketIds);
 
@@ -377,6 +379,7 @@ export function useBulkTicketActions() {
           lock_status: "locked",
           lock_owner_id: analystId,
           lock_at: new Date().toISOString(),
+          unlocked_at: null,
         })
         .in("id", ticketIds);
 

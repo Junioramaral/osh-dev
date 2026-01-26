@@ -1025,6 +1025,7 @@ export type Database = {
           ticket_number: string
           ticket_type: Database["public"]["Enums"]["ticket_type"]
           title: string
+          unlocked_at: string | null
           updated_at: string | null
           version: number | null
           workaround: string | null
@@ -1085,6 +1086,7 @@ export type Database = {
           ticket_number: string
           ticket_type: Database["public"]["Enums"]["ticket_type"]
           title: string
+          unlocked_at?: string | null
           updated_at?: string | null
           version?: number | null
           workaround?: string | null
@@ -1145,6 +1147,7 @@ export type Database = {
           ticket_number?: string
           ticket_type?: Database["public"]["Enums"]["ticket_type"]
           title?: string
+          unlocked_at?: string | null
           updated_at?: string | null
           version?: number | null
           workaround?: string | null

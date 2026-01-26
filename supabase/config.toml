@@ -29,3 +29,6 @@ verify_jwt = false
 
 [functions.submit-feedback]
 verify_jwt = false
+
+[functions.unlock-inactive-tickets]
+verify_jwt = false
