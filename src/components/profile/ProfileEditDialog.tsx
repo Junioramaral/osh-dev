@@ -15,6 +15,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { GradientSeparator } from "@/components/ui/gradient-separator";
 import { Camera, Loader2, User } from "lucide-react";
 
 interface ProfileEditDialogProps {
@@ -177,6 +178,8 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
               Clique no ícone para alterar a foto
             </p>
           </div>
+
+          <GradientSeparator variant="subtle" />
 
           {/* Form Fields */}
           <div className="space-y-4">
