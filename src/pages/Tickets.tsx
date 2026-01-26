@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAnalystQueues } from "@/hooks/useAnalystQueues";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Search, AlertCircle, ListOrdered } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Plus, Search, AlertCircle, ListOrdered, AlertTriangle } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import { TicketRow } from "@/components/tickets/TicketRow";
 
@@ -25,7 +27,8 @@ import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 import { cn } from "@/lib/utils";
 
 export default function Tickets() {
-  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser } = useAuth();
+  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst } = useAuth();
+  const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasTeam, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
@@ -337,7 +340,7 @@ export default function Tickets() {
   });
 
   const { data: tickets, isLoading } = useQuery({
-    queryKey: ["tickets", profile?.id],
+    queryKey: ["tickets", profile?.id, shouldRestrictView, analystQueueIds],
     queryFn: async () => {
       let query = supabase
         .from("tickets")
@@ -357,21 +360,22 @@ export default function Tickets() {
         `)
         .order("created_at", { ascending: false });
 
-      // RBAC: Filter by tenant_id (RLS handles this automatically now)
-      // But we can still apply filters for specific roles
-      
-      // Analysts see only their segment
-      if (hasRole('analyst_db')) {
-        query = query.eq("segment", "DB");
-      }
-      if (hasRole('analyst_app')) {
-        query = query.eq("segment", "APP");
+      // RBAC: Filter by analyst's team queues (not segment anymore)
+      if (shouldRestrictView) {
+        // If analyst has queues, filter by those queues OR tickets without queue
+        if (analystQueueIds.length > 0) {
+          query = query.or(`queue_id.in.(${analystQueueIds.join(',')}),queue_id.is.null`);
+        } else {
+          // If analyst has no queues assigned, only show tickets without queue
+          query = query.is("queue_id", null);
+        }
       }
 
       const { data, error } = await query;
       if (error) throw error;
       return data;
     },
+    enabled: !shouldRestrictView || analystQueueIds !== undefined,
   });
 
   const filteredTickets = tickets?.filter((ticket) => {
@@ -417,6 +421,30 @@ export default function Tickets() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Warning for analysts without team or queues */}
+        {shouldRestrictView && (!hasTeam || !hasQueues) && (
+          <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {!hasTeam 
+                ? "Você não está associado a nenhum time. Contate um administrador para configurar seu time."
+                : "Seu time não possui filas atribuídas. Contate um administrador para configurar as filas do seu time."
+              }
+              {" "}Enquanto isso, você verá apenas tickets sem fila atribuída.
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Queue info for analysts */}
+        {shouldRestrictView && hasQueues && (
+          <Alert className="border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100">
+            <ListOrdered className="h-4 w-4" />
+            <AlertDescription>
+              Exibindo tickets das suas filas: <strong>{analystQueues.map(q => q.name).join(', ')}</strong> + tickets sem fila
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <h1 className="text-3xl font-bold text-foreground">Tickets</h1>

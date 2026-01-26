@@ -1303,12 +1303,17 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      can_analyst_view_ticket: {
+        Args: { _ticket_queue_id: string; _user_id: string }
+        Returns: boolean
+      }
       create_machine_secret: {
         Args: { secret_name: string; secret_value: string }
         Returns: string
       }
       decrypt_machine_secret: { Args: { secret_id: string }; Returns: string }
       extract_domain_from_email: { Args: { _email: string }; Returns: string }
+      get_analyst_queue_ids: { Args: { _user_id: string }; Returns: string[] }
       get_tenant_by_domain: { Args: { _email: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
@@ -1322,6 +1327,7 @@ export type Database = {
         Args: { article_id: string }
         Returns: undefined
       }
+      is_analyst: { Args: { _user_id: string }; Returns: boolean }
       is_otimizzo_user: { Args: { _user_id: string }; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
       is_viewer: { Args: { _user_id: string }; Returns: boolean }

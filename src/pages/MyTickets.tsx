@@ -2,13 +2,15 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useAnalystQueues } from "@/hooks/useAnalystQueues";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Search, AlertCircle, UserCheck } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, AlertCircle, UserCheck, AlertTriangle, ListOrdered } from "lucide-react";
 import { TicketRow } from "@/components/tickets/TicketRow";
 
 import { BulkActionsBar } from "@/components/tickets/BulkActionsBar";
@@ -22,6 +24,7 @@ import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
   const { profile, isSuperAdmin, isOtimizzoUser } = useAuth();
+  const { queues: analystQueues, shouldRestrictView, hasTeam, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
@@ -344,6 +347,29 @@ export default function MyTickets() {
   return (
     <AppLayout>
       <div className="space-y-6">
+        {/* Warning for analysts without team or queues */}
+        {shouldRestrictView && (!hasTeam || !hasQueues) && (
+          <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertDescription>
+              {!hasTeam 
+                ? "Você não está associado a nenhum time. Contate um administrador para configurar seu time."
+                : "Seu time não possui filas atribuídas. Contate um administrador para configurar as filas do seu time."
+              }
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Queue info for analysts */}
+        {shouldRestrictView && hasQueues && (
+          <Alert className="border-blue-500 bg-blue-50 text-blue-900 dark:bg-blue-950 dark:text-blue-100">
+            <ListOrdered className="h-4 w-4" />
+            <AlertDescription>
+              Suas filas: <strong>{analystQueues.map(q => q.name).join(', ')}</strong>
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="flex items-center justify-between">
           <div>
             <div className="flex items-center gap-2">
