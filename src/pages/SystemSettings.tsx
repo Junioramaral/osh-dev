@@ -230,7 +230,10 @@ export default function SystemSettings() {
             .select("*", { count: "exact", head: true })
             .eq("team_id", team.id);
           return {
-            ...team,
+            id: team.id,
+            name: team.name,
+            segment: team.segment as string, // Cast to string as column is now TEXT
+            specialization: team.specialization,
             queueCount: count || 0,
           };
         })
