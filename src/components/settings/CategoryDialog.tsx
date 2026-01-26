@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveSegments } from "@/hooks/useSegments";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -44,7 +45,7 @@ export interface TicketCategory {
 
 const categorySchema = z.object({
   name: z.string().min(1, "Nome é obrigatório"),
-  segment: z.enum(["DB", "APP", "both"]),
+  segment: z.string(),
   is_active: z.boolean(),
   sort_order: z.number(),
 });
@@ -64,6 +65,7 @@ export default function CategoryDialog({
 }: CategoryDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!category;
+  const { data: segments, isLoading: segmentsLoading } = useActiveSegments();
 
   const form = useForm<CategoryFormData>({
     resolver: zodResolver(categorySchema),
@@ -95,9 +97,10 @@ export default function CategoryDialog({
 
   const createMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
+      const segmentValue = data.segment === "both" ? null : data.segment as "DB" | "APP";
       const { error } = await supabase.from("ticket_categories").insert({
         name: data.name,
-        segment: data.segment === "both" ? null : data.segment,
+        segment: segmentValue,
         is_active: data.is_active,
         sort_order: data.sort_order,
       });
@@ -116,11 +119,12 @@ export default function CategoryDialog({
   const updateMutation = useMutation({
     mutationFn: async (data: CategoryFormData) => {
       if (!category) return;
+      const segmentValue = data.segment === "both" ? null : data.segment as "DB" | "APP";
       const { error } = await supabase
         .from("ticket_categories")
         .update({
           name: data.name,
-          segment: data.segment === "both" ? null : data.segment,
+          segment: segmentValue,
           is_active: data.is_active,
           sort_order: data.sort_order,
         })
@@ -185,9 +189,14 @@ export default function CategoryDialog({
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="both">Ambos (DB e APP)</SelectItem>
-                      <SelectItem value="DB">Banco de Dados</SelectItem>
-                      <SelectItem value="APP">Aplicação</SelectItem>
+                      <SelectItem value="both">Ambos (todos os segmentos)</SelectItem>
+                      {segmentsLoading ? (
+                        <SelectItem value="" disabled>Carregando...</SelectItem>
+                      ) : segments?.map((segment) => (
+                        <SelectItem key={segment.id} value={segment.code}>
+                          {segment.display_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
