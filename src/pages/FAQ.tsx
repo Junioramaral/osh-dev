@@ -45,7 +45,7 @@ type FAQArticle = Database["public"]["Tables"]["faq_articles"]["Row"] & {
 };
 
 export default function FAQ() {
-  const { isSuperAdmin, hasRole, isOtimizzoUser } = useAuth();
+  const { isSuperAdmin, hasRole, isOtimizzoUser, isViewer } = useAuth();
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -61,8 +61,8 @@ export default function FAQ() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingArticle, setViewingArticle] = useState<FAQArticle | null>(null);
 
-  const canManageArticles = isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app');
-  const canSeeAllFilters = isSuperAdmin || isOtimizzoUser;
+  const canManageArticles = !isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app'));
+  const canSeeAllFilters = isSuperAdmin || isOtimizzoUser || isViewer;
 
   // Load articles with relations
   const { data: articles, isLoading } = useQuery({

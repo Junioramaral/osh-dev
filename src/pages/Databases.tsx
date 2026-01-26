@@ -77,7 +77,7 @@ const ENVIRONMENT_CONFIG = {
 };
 
 export default function Databases() {
-  const { profile, isSuperAdmin, hasRole } = useAuth();
+  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
   const [engineFilter, setEngineFilter] = useState<string>("all");
   const [environmentFilter, setEnvironmentFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -319,7 +319,7 @@ export default function Databases() {
             <h1 className="text-3xl font-bold text-foreground">Bancos de Dados</h1>
             <p className="text-muted-foreground">Catálogo de instâncias de banco de dados</p>
           </div>
-          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
+          {!isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
             <Button onClick={handleNewDatabase}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Instância

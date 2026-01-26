@@ -3,6 +3,7 @@ import { Label } from "@/components/ui/label";
 
 const ALL_ROLES = [
   { value: "user", label: "Usuário", description: "Acesso básico para abrir e acompanhar tickets" },
+  { value: "viewer", label: "Auditor", description: "Visualiza tudo, mas não pode editar (somente leitura)" },
   { value: "analyst_db", label: "Analista DB", description: "Atende tickets de banco de dados" },
   { value: "analyst_app", label: "Analista APP", description: "Atende tickets de aplicação" },
   { value: "tenant_admin", label: "Tenant Admin", description: "Administrador do tenant" },
@@ -73,6 +74,7 @@ export function getRolesLabel(roles: string[]): string {
   const roleLabels: Record<string, string> = {
     super_admin: "Super Admin",
     tenant_admin: "Tenant Admin",
+    viewer: "Auditor",
     analyst_db: "Analista DB",
     analyst_app: "Analista APP",
     user: "Usuário",

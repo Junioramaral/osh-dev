@@ -79,7 +79,7 @@ const ENVIRONMENT_CONFIG = {
 };
 
 export default function Machines() {
-  const { profile, isSuperAdmin, hasRole } = useAuth();
+  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -310,7 +310,7 @@ export default function Machines() {
             <h1 className="text-3xl font-bold text-foreground">Máquinas</h1>
             <p className="text-muted-foreground">Catálogo de ativos de infraestrutura</p>
           </div>
-          {isSuperAdmin && (
+          {isSuperAdmin && !isViewer && (
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Máquina

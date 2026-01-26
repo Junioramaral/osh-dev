@@ -64,7 +64,7 @@ interface AppProduct {
 }
 
 export default function SystemSettings() {
-  const { isSuperAdmin, loading } = useAuth();
+  const { isSuperAdmin, isViewer, loading } = useAuth();
   const queryClient = useQueryClient();
 
   const [engineDialogOpen, setEngineDialogOpen] = useState(false);
@@ -393,9 +393,11 @@ export default function SystemSettings() {
     );
   }
 
-  if (!isSuperAdmin) {
+  if (!isSuperAdmin && !isViewer) {
     return <Navigate to="/dashboard" replace />;
   }
+
+  const isReadOnly = isViewer;
 
   return (
     <AppLayout>
@@ -458,24 +460,28 @@ export default function SystemSettings() {
                       value={inactivityDaysInput}
                       onChange={(e) => setInactivityDaysInput(e.target.value)}
                       className="w-20"
+                      disabled={isReadOnly}
                     />
                     <span className="text-muted-foreground">dias</span>
                   </div>
-                  <Button 
-                    onClick={handleSaveInactivityDays}
-                    disabled={saveInactivityMutation.isPending}
-                  >
-                    {saveInactivityMutation.isPending ? (
-                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                    ) : (
-                      <Save className="h-4 w-4 mr-2" />
-                    )}
-                    Salvar
-                  </Button>
+                  {!isReadOnly && (
+                    <Button 
+                      onClick={handleSaveInactivityDays}
+                      disabled={saveInactivityMutation.isPending}
+                    >
+                      {saveInactivityMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Salvar
+                    </Button>
+                  )}
                 </div>
                 <p className="text-sm text-muted-foreground">
                   Valor atual: <strong>{inactivityDays} dias</strong>. Tickets sem atualização por este 
                   período terão o analista removido automaticamente.
+                  {isReadOnly && <span className="ml-2 text-purple-600">(Somente leitura)</span>}
                 </p>
               </CardContent>
             </Card>
@@ -485,15 +491,17 @@ export default function SystemSettings() {
           <TabsContent value="engines" className="mt-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Engines de Banco de Dados</h2>
-              <Button
-                onClick={() => {
-                  setSelectedEngine(null);
-                  setEngineDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Engine
-              </Button>
+              {!isReadOnly && (
+                <Button
+                  onClick={() => {
+                    setSelectedEngine(null);
+                    setEngineDialogOpen(true);
+                  }}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Novo Engine
+                </Button>
+              )}
             </div>
 
             <div className="border rounded-lg">
