@@ -7,6 +7,7 @@ import { useMyTicketsCount } from "@/hooks/useMyTicketsCount";
 import { TicketCountBadge } from "@/components/layout/TicketCountBadge";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
+import { GradientSeparator } from "@/components/ui/gradient-separator";
 import {
   LayoutDashboard,
   Users,
@@ -115,7 +116,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
         {/* Seção Administrativa */}
         {adminNav.length > 0 && (
-          <div className="space-y-1">
+          <>
+            <GradientSeparator variant="sidebar" className="mx-3 my-2 opacity-50" />
+            <div className="space-y-1">
             <p className="px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2">
               Administrativo
             </p>
@@ -134,7 +137,8 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                 </NavLink>
               );
             })}
-          </div>
+            </div>
+          </>
         )}
       </nav>
 
@@ -158,6 +162,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             </p>
           </div>
         </div>
+        <GradientSeparator variant="sidebar" className="mx-3" />
         {isSuperAdmin && (
           <NavLink
             to="/system-settings"
