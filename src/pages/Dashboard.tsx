@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -23,7 +24,11 @@ import {
   TrendingUp,
   Target,
   Timer,
+  Plus,
+  UserCheck,
+  FileText,
 } from "lucide-react";
+import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import AppLayout from "@/components/layout/AppLayout";
 import { format, subMonths, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -89,6 +94,8 @@ const Dashboard = () => {
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>(6);
   const [barChartPeriod, setBarChartPeriod] = useState<TrendPeriod>(6);
+  const [newTicketOpen, setNewTicketOpen] = useState(false);
+  const navigate = useNavigate();
 
   // Determine if current user is a client user
   const isClientUser = profile?.client_id && 
@@ -395,6 +402,37 @@ const Dashboard = () => {
               {hasRole('analyst_app') && "Como analista de aplicativos, você pode gerenciar tickets APP."}
               {!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app') && "Você pode criar e acompanhar seus tickets."}
             </p>
+            
+            {/* Atalhos Rápidos */}
+            <div className="flex flex-wrap gap-3 pt-2">
+              <Button 
+                onClick={() => setNewTicketOpen(true)}
+                className="gap-2"
+              >
+                <Plus className="w-4 h-4" />
+                Novo Ticket
+              </Button>
+              
+              {(isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app')) && (
+                <Button 
+                  variant="outline"
+                  onClick={() => navigate('/my-tickets')}
+                  className="gap-2"
+                >
+                  <UserCheck className="w-4 h-4" />
+                  Meus Tickets
+                </Button>
+              )}
+              
+              <Button 
+                variant="outline"
+                onClick={() => navigate('/faq')}
+                className="gap-2"
+              >
+                <FileText className="w-4 h-4" />
+                FAQ
+              </Button>
+            </div>
           </CardContent>
         </Card>
 
@@ -635,6 +673,11 @@ const Dashboard = () => {
         </Card>
 
       </div>
+      
+      <NewTicketDialog 
+        open={newTicketOpen} 
+        onOpenChange={setNewTicketOpen} 
+      />
     </AppLayout>
   );
 };
