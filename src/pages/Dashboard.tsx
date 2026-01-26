@@ -64,6 +64,7 @@ interface DashboardStats {
   ticketsResolvidosForaSLA: number;
   tempoMedioResolucaoMinutos: number;
   ticketsRetornadosInatividade: number;
+  inactivityDays: number;
 }
 
 interface MonthlyTrendData {
@@ -92,6 +93,7 @@ const Dashboard = () => {
     ticketsResolvidosForaSLA: 0,
     tempoMedioResolucaoMinutos: 0,
     ticketsRetornadosInatividade: 0,
+    inactivityDays: 7,
   });
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
@@ -221,14 +223,24 @@ const Dashboard = () => {
         clientsCount = count || 0;
       }
 
-      // Tickets retornados à fila por inatividade nos últimos 7 dias (apenas para admins)
+      // Tickets retornados à fila por inatividade (apenas para admins)
       let retornadosCount = 0;
+      let inactivityDaysValue = 7;
       if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
-        const sevenDaysAgo = subDays(new Date(), 7).toISOString();
+        // Buscar configuração de dias de inatividade
+        const { data: configData } = await supabase
+          .from('system_configs')
+          .select('value')
+          .eq('key', 'ticket_inactivity_days')
+          .maybeSingle();
+        
+        inactivityDaysValue = configData?.value ? Number(configData.value) : 7;
+        const cutoffDate = subDays(new Date(), inactivityDaysValue).toISOString();
+        
         const { count: unlockedCount } = await supabase
           .from('tickets')
           .select('*', { count: 'exact', head: true })
-          .gte('unlocked_at', sevenDaysAgo)
+          .gte('unlocked_at', cutoffDate)
           .not('unlocked_at', 'is', null);
         retornadosCount = unlockedCount || 0;
       }
@@ -248,6 +260,7 @@ const Dashboard = () => {
         ticketsResolvidosForaSLA: foraSLAResolvidosCount || 0,
         tempoMedioResolucaoMinutos: tempoMedioResolucaoMinutos,
         ticketsRetornadosInatividade: retornadosCount,
+        inactivityDays: inactivityDaysValue,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
@@ -518,7 +531,7 @@ const Dashboard = () => {
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Retornados à Fila (7d)
+                    Retornados à Fila ({stats.inactivityDays}d)
                   </CardTitle>
                   <div className="p-2 rounded-lg bg-warning/20">
                     <Undo2 className="w-4 h-4 text-warning" />
