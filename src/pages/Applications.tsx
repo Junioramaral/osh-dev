@@ -77,7 +77,7 @@ const ENVIRONMENT_CONFIG = {
 };
 
 export default function Applications() {
-  const { profile, isSuperAdmin, hasRole } = useAuth();
+  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
   const queryClient = useQueryClient();
   const [environmentPages, setEnvironmentPages] = useState<Record<string, number>>({});
   const [environmentSorts, setEnvironmentSorts] = useState<Record<string, SortConfig>>({});
@@ -313,7 +313,7 @@ export default function Applications() {
             <h1 className="text-3xl font-bold text-foreground">Aplicativos</h1>
             <p className="text-muted-foreground">Catálogo de produtos e implantações</p>
           </div>
-          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
+          {!isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
             <Button onClick={() => {
               setSelectedInstance(null);
               setDialogOpen(true);

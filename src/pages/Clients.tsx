@@ -15,7 +15,7 @@ import type { Tables } from "@/integrations/supabase/types";
 type Client = Tables<"clients">;
 
 export default function Clients() {
-  const { profile, isSuperAdmin, hasRole } = useAuth();
+  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -31,7 +31,7 @@ export default function Clients() {
       if (error) throw error;
       return data;
     },
-    enabled: isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app'),
+    enabled: isSuperAdmin || isViewer || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app'),
   });
 
   const { data: appProducts } = useQuery({
@@ -46,8 +46,8 @@ export default function Clients() {
     },
   });
 
-  // Only admins and analysts can access this page
-  if (!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app')) {
+  // Only admins, analysts and viewers can access this page
+  if (!isSuperAdmin && !isViewer && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app')) {
     return (
       <AppLayout>
         <Card>
@@ -69,7 +69,7 @@ export default function Clients() {
             <h1 className="text-3xl font-bold text-foreground">Clientes</h1>
             <p className="text-muted-foreground">Gerencie os clientes cadastrados</p>
           </div>
-          {isSuperAdmin && (
+          {isSuperAdmin && !isViewer && (
             <Button
               onClick={() => {
                 setDialogMode("create");

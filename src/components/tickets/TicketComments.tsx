@@ -97,7 +97,7 @@ interface TicketCommentsProps {
 const OTIMIZZO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
 export default function TicketComments({ ticketId, ticket }: TicketCommentsProps) {
-  const { user, profile, isOtimizzoUser, isSuperAdmin, hasRole, tenantId } = useAuth();
+  const { user, profile, isOtimizzoUser, isSuperAdmin, isViewer, hasRole, tenantId } = useAuth();
   const queryClient = useQueryClient();
   const { data: comments, isLoading } = useTicketComments(ticketId);
   const [newComment, setNewComment] = useState('');
@@ -302,87 +302,99 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
         )}
       </ScrollArea>
       
-      <Card className="p-4">
-        <div className="space-y-2">
-          <Textarea
-            value={newComment}
-            onChange={(e) => setNewComment(e.target.value)}
-            placeholder="Adicionar comentário..."
-            className="min-h-[100px]"
-            maxLength={10000}
-          />
-          <p className="text-xs text-muted-foreground text-right">
-            {newComment.length} / 10.000 caracteres
-          </p>
-        </div>
-        
-        {/* CC Field - Collapsible */}
-        {!isInternal && (
-          <Collapsible open={showCcField} onOpenChange={setShowCcField} className="mb-3">
-            <CollapsibleTrigger asChild>
-              <Button variant="ghost" size="sm" className="text-muted-foreground h-8 px-2">
-                {showCcField ? <ChevronDown className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
-                {showCcField ? 'Ocultar CC' : 'Adicionar emails em cópia (CC)'}
-              </Button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="pt-2">
-              <div className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <Users className="h-4 w-4 text-muted-foreground" />
-                  <Input
-                    value={ccEmails}
-                    onChange={(e) => setCcEmails(e.target.value)}
-                    placeholder="email1@exemplo.com, email2@exemplo.com"
-                    className="text-sm"
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground ml-6">
-                  Separe múltiplos emails por vírgula. Eles receberão uma cópia da notificação.
-                </p>
-              </div>
-            </CollapsibleContent>
-          </Collapsible>
-        )}
-        
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="flex items-center gap-2">
-              <Switch checked={isInternal} onCheckedChange={setIsInternal} id="internal" />
-              <Label htmlFor="internal" className="text-sm cursor-pointer">Comentário interno</Label>
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger>
-                    <Info className="h-4 w-4 text-muted-foreground" />
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p className="max-w-xs text-xs">
-                      {isInternal 
-                        ? "🔒 O cliente NÃO receberá este comentário" 
-                        : "📧 O cliente receberá este comentário por email"}
-                    </p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
+      {/* Comment Form - Hidden for viewers */}
+      {!isViewer && (
+        <Card className="p-4">
+          <div className="space-y-2">
+            <Textarea
+              value={newComment}
+              onChange={(e) => setNewComment(e.target.value)}
+              placeholder="Adicionar comentário..."
+              className="min-h-[100px]"
+              maxLength={10000}
+            />
+            <p className="text-xs text-muted-foreground text-right">
+              {newComment.length} / 10.000 caracteres
+            </p>
           </div>
           
-          <div className="flex items-center gap-2">
-            {!isInternal && (
-              <span className="text-xs text-muted-foreground flex items-center gap-1">
-                <Mail className="h-3 w-3" />
-                {ccEmails.trim() ? `Cliente + ${validateEmails(ccEmails).length} CC` : 'Cliente será notificado'}
-              </span>
-            )}
-            <Button 
-              onClick={handleSubmit} 
-              disabled={!newComment.trim() || addCommentMutation.isPending}
-            >
-              <Send className="h-4 w-4 mr-2" />
-              Enviar
-            </Button>
+          {/* CC Field - Collapsible */}
+          {!isInternal && (
+            <Collapsible open={showCcField} onOpenChange={setShowCcField} className="mb-3">
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="text-muted-foreground h-8 px-2">
+                  {showCcField ? <ChevronDown className="h-4 w-4 mr-1" /> : <Plus className="h-4 w-4 mr-1" />}
+                  {showCcField ? 'Ocultar CC' : 'Adicionar emails em cópia (CC)'}
+                </Button>
+              </CollapsibleTrigger>
+              <CollapsibleContent className="pt-2">
+                <div className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <Users className="h-4 w-4 text-muted-foreground" />
+                    <Input
+                      value={ccEmails}
+                      onChange={(e) => setCcEmails(e.target.value)}
+                      placeholder="email1@exemplo.com, email2@exemplo.com"
+                      className="text-sm"
+                    />
+                  </div>
+                  <p className="text-xs text-muted-foreground ml-6">
+                    Separe múltiplos emails por vírgula. Eles receberão uma cópia da notificação.
+                  </p>
+                </div>
+              </CollapsibleContent>
+            </Collapsible>
+          )}
+          
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Switch checked={isInternal} onCheckedChange={setIsInternal} id="internal" />
+                <Label htmlFor="internal" className="text-sm cursor-pointer">Comentário interno</Label>
+                <TooltipProvider>
+                  <Tooltip>
+                    <TooltipTrigger>
+                      <Info className="h-4 w-4 text-muted-foreground" />
+                    </TooltipTrigger>
+                    <TooltipContent>
+                      <p className="max-w-xs text-xs">
+                        {isInternal 
+                          ? "🔒 O cliente NÃO receberá este comentário" 
+                          : "📧 O cliente receberá este comentário por email"}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              </div>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              {!isInternal && (
+                <span className="text-xs text-muted-foreground flex items-center gap-1">
+                  <Mail className="h-3 w-3" />
+                  {ccEmails.trim() ? `Cliente + ${validateEmails(ccEmails).length} CC` : 'Cliente será notificado'}
+                </span>
+              )}
+              <Button 
+                onClick={handleSubmit} 
+                disabled={!newComment.trim() || addCommentMutation.isPending}
+              >
+                <Send className="h-4 w-4 mr-2" />
+                Enviar
+              </Button>
+            </div>
           </div>
-        </div>
-      </Card>
+        </Card>
+      )}
+
+      {/* Viewer read-only message */}
+      {isViewer && (
+        <Card className="p-4 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30">
+          <p className="text-sm text-purple-600 dark:text-purple-400 text-center">
+            Modo somente leitura (Auditor) - Você não pode adicionar comentários
+          </p>
+        </Card>
+      )}
     </div>
   );
 }

@@ -47,6 +47,7 @@ const getRoleLabel = (role: string): string => {
   const labels: Record<string, string> = {
     super_admin: "Super Admin",
     tenant_admin: "Tenant Admin",
+    viewer: "Auditor",
     analyst_db: "Analista DB",
     analyst_app: "Analista APP",
     user: "Usuário"
@@ -61,6 +62,8 @@ const getRoleBadgeVariant = (role: string): "destructive" | "default" | "seconda
       return "destructive";
     case "tenant_admin":
       return "default";
+    case "viewer":
+      return "default";
     case "analyst_db":
     case "analyst_app":
       return "outline";
@@ -74,6 +77,8 @@ const getRoleBadgeColor = (role: string): string => {
   switch (role) {
     case "super_admin":
       return "border-red-500/50 text-red-600 bg-red-500/10 dark:text-red-400 dark:bg-red-500/20";
+    case "viewer":
+      return "border-purple-500/50 text-purple-600 bg-purple-500/10 dark:text-purple-400 dark:bg-purple-500/20";
     case "tenant_admin":
       return "border-orange-500/50 text-orange-600 bg-orange-500/10 dark:text-orange-400 dark:bg-orange-500/20";
     case "analyst_db":
@@ -90,6 +95,7 @@ const getRoleBadgeColor = (role: string): string => {
 // Labels curtos para badges no accordion
 const roleShortLabels: Record<string, string> = {
   super_admin: "Super Admin",
+  viewer: "Auditor",
   tenant_admin: "Admin",
   analyst_db: "DB",
   analyst_app: "APP",
@@ -97,10 +103,10 @@ const roleShortLabels: Record<string, string> = {
 };
 
 // Ordem de exibição das roles
-const roleOrder = ["super_admin", "tenant_admin", "analyst_db", "analyst_app", "user"];
+const roleOrder = ["super_admin", "viewer", "tenant_admin", "analyst_db", "analyst_app", "user"];
 
 const UserPermissions = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, isViewer } = useAuth();
   const [filters, setFilters] = useState({
     tenantId: "all",
     role: "all",
@@ -247,6 +253,7 @@ const UserPermissions = () => {
             <SelectContent>
               <SelectItem value="all">Todas as funções</SelectItem>
               <SelectItem value="super_admin">Super Admin</SelectItem>
+              <SelectItem value="viewer">Auditor</SelectItem>
               <SelectItem value="tenant_admin">Tenant Admin</SelectItem>
               <SelectItem value="analyst_db">Analista DB</SelectItem>
               <SelectItem value="analyst_app">Analista APP</SelectItem>
@@ -386,15 +393,17 @@ const UserPermissions = () => {
                                   </Badge>
                                 </TableCell>
                                 <TableCell className="text-right">
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => openEditDialog(user)}
-                                    disabled={isUpdating}
-                                  >
-                                    <Edit2 className="h-4 w-4 mr-1" />
-                                    {isCurrentUser ? "Editar (Você)" : "Editar"}
-                                  </Button>
+                                  {!isViewer && (
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => openEditDialog(user)}
+                                      disabled={isUpdating}
+                                    >
+                                      <Edit2 className="h-4 w-4 mr-1" />
+                                      {isCurrentUser ? "Editar (Você)" : "Editar"}
+                                    </Button>
+                                  )}
                                 </TableCell>
                               </TableRow>
                             );

@@ -44,7 +44,7 @@ function InfoRow({ label, value }: { label: string; value: any }) {
 export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showFAQDialog, setShowFAQDialog] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
-  const { profile } = useAuth();
+  const { profile, isViewer } = useAuth();
   const { resolveTicketWithReason, updateTicketStatus } = useTicketActions();
   
   const slaStatus = calculateSLAStatus(ticket);
@@ -144,8 +144,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             </div>
           )}
 
-          {/* Status Dropdown - only show if not resolved */}
-          {!isResolved && (
+          {/* Status Dropdown - only show if not resolved and not viewer */}
+          {!isResolved && !isViewer && (
             <>
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Alterar Status</Label>
@@ -174,6 +174,13 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                 Resolver Ticket
               </Button>
             </>
+          )}
+
+          {/* Viewer read-only message */}
+          {isViewer && !isResolved && (
+            <p className="text-xs text-purple-600 dark:text-purple-400 text-center">
+              Modo somente leitura (Auditor)
+            </p>
           )}
         </CardContent>
       </Card>

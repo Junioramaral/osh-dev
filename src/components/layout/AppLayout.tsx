@@ -33,7 +33,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, isSuperAdmin, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
+  const { user, profile, isSuperAdmin, isViewer, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   
@@ -61,20 +61,20 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const operationalNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
-    { name: "Meus Tickets", href: "/my-tickets", icon: UserCheck, show: isOtimizzoUser || isSuperAdmin },
-    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser },
-    { name: "Satisfação (CSAT)", href: "/csat", icon: Star, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Meus Tickets", href: "/my-tickets", icon: UserCheck, show: isOtimizzoUser || isSuperAdmin || isViewer },
+    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser || isViewer },
+    { name: "Satisfação (CSAT)", href: "/csat", icon: Star, show: isSuperAdmin || isOtimizzoUser || isViewer },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
-    { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isSuperAdmin || isOtimizzoUser || isViewer },
   ].filter(item => item.show);
 
   const adminNav = [
-    { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin },
-    { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || isOtimizzoUser },
-    { name: "Permissões", href: "/admin/permissions", icon: Shield, show: isSuperAdmin },
-    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || isOtimizzoUser },
-    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || isOtimizzoUser },
-    { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser },
+    { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin || isViewer },
+    { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || isOtimizzoUser || isViewer },
+    { name: "Permissões", href: "/admin/permissions", icon: Shield, show: isSuperAdmin || isViewer },
+    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || isOtimizzoUser || isViewer },
+    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || isOtimizzoUser || isViewer },
+    { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser || isViewer },
   ].filter(item => item.show);
 
   const SidebarContent = () => (
@@ -159,11 +159,11 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.full_name}</p>
             <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</p>
             <p className="text-xs text-sidebar-foreground/70 capitalize mt-0.5">
-              {isSuperAdmin ? 'Super Admin' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
+              {isSuperAdmin ? 'Super Admin' : isViewer ? 'Auditor' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
             </p>
           </div>
         </div>
-        {isSuperAdmin && (
+        {(isSuperAdmin || isViewer) && (
           <NavLink
             to="/system-settings"
             className="flex items-center gap-3 px-3 py-2 text-sm rounded-lg transition-colors hover:bg-sidebar-accent mb-2"
