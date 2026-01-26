@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useActiveSegments } from "@/hooks/useSegments";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -32,7 +33,7 @@ import { Loader2 } from "lucide-react";
 
 const teamSchema = z.object({
   name: z.string().min(1, "Nome é obrigatório").max(100, "Nome muito longo"),
-  segment: z.enum(["DB", "APP"], { required_error: "Segmento é obrigatório" }),
+  segment: z.string().min(1, "Segmento é obrigatório"),
   specialization: z.string().max(200, "Especialização muito longa").optional(),
 });
 
@@ -54,12 +55,13 @@ interface TeamDialogProps {
 export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!team;
+  const { data: segments, isLoading: segmentsLoading } = useActiveSegments();
 
   const form = useForm<TeamFormData>({
     resolver: zodResolver(teamSchema),
     defaultValues: {
       name: "",
-      segment: undefined,
+      segment: "",
       specialization: "",
     },
   });
@@ -74,7 +76,7 @@ export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps
     } else {
       form.reset({
         name: "",
-        segment: undefined,
+        segment: "",
         specialization: "",
       });
     }
@@ -84,7 +86,7 @@ export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps
     mutationFn: async (data: TeamFormData) => {
       const { error } = await supabase.from("teams").insert({
         name: data.name,
-        segment: data.segment,
+        segment: data.segment as "DB" | "APP",
         specialization: data.specialization || null,
       });
       if (error) throw error;
@@ -108,7 +110,7 @@ export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps
         .from("teams")
         .update({
           name: data.name,
-          segment: data.segment,
+          segment: data.segment as "DB" | "APP",
           specialization: data.specialization || null,
         })
         .eq("id", team.id);
@@ -173,8 +175,13 @@ export default function TeamDialog({ open, onOpenChange, team }: TeamDialogProps
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="DB">DB - Banco de Dados</SelectItem>
-                      <SelectItem value="APP">APP - Aplicação</SelectItem>
+                      {segmentsLoading ? (
+                        <SelectItem value="" disabled>Carregando...</SelectItem>
+                      ) : segments?.map((segment) => (
+                        <SelectItem key={segment.id} value={segment.code}>
+                          {segment.code} - {segment.display_name}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                   </Select>
                   <FormMessage />
