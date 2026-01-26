@@ -27,10 +27,11 @@ import {
   Plus,
   UserCheck,
   FileText,
+  Undo2,
 } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import AppLayout from "@/components/layout/AppLayout";
-import { format, subMonths, startOfMonth, endOfMonth, differenceInMinutes } from "date-fns";
+import { format, subMonths, startOfMonth, endOfMonth, differenceInMinutes, subDays } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import {
   LineChart,
@@ -62,6 +63,7 @@ interface DashboardStats {
   ticketsResolvidosDentroSLA: number;
   ticketsResolvidosForaSLA: number;
   tempoMedioResolucaoMinutos: number;
+  ticketsRetornadosInatividade: number;
 }
 
 interface MonthlyTrendData {
@@ -89,6 +91,7 @@ const Dashboard = () => {
     ticketsResolvidosDentroSLA: 0,
     ticketsResolvidosForaSLA: 0,
     tempoMedioResolucaoMinutos: 0,
+    ticketsRetornadosInatividade: 0,
   });
   const [loading, setLoading] = useState(true);
   const [trendData, setTrendData] = useState<MonthlyTrendData[]>([]);
@@ -218,6 +221,18 @@ const Dashboard = () => {
         clientsCount = count || 0;
       }
 
+      // Tickets retornados à fila por inatividade nos últimos 7 dias (apenas para admins)
+      let retornadosCount = 0;
+      if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
+        const sevenDaysAgo = subDays(new Date(), 7).toISOString();
+        const { count: unlockedCount } = await supabase
+          .from('tickets')
+          .select('*', { count: 'exact', head: true })
+          .gte('unlocked_at', sevenDaysAgo)
+          .not('unlocked_at', 'is', null);
+        retornadosCount = unlockedCount || 0;
+      }
+
       setStats({
         totalTickets: totalCount || 0,
         ticketsFechados: fechadosCount || 0,
@@ -232,6 +247,7 @@ const Dashboard = () => {
         ticketsResolvidosDentroSLA: dentroSLACount || 0,
         ticketsResolvidosForaSLA: foraSLAResolvidosCount || 0,
         tempoMedioResolucaoMinutos: tempoMedioResolucaoMinutos,
+        ticketsRetornadosInatividade: retornadosCount,
       });
     } catch (error) {
       console.error('Error loading dashboard stats:', error);
@@ -496,6 +512,30 @@ const Dashboard = () => {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Card de Tickets Retornados por Inatividade - Apenas Admin */}
+            {(isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app') || hasRole('tenant_admin')) && (
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Retornados à Fila (7d)
+                  </CardTitle>
+                  <div className="p-2 rounded-lg bg-warning/20">
+                    <Undo2 className="w-4 h-4 text-warning" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className={`text-2xl font-bold ${
+                    stats.ticketsRetornadosInatividade > 0 ? "text-warning" : "text-green-600"
+                  }`}>
+                    {stats.ticketsRetornadosInatividade}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    desbloqueados por inatividade
+                  </p>
+                </CardContent>
+              </Card>
+            )}
             
             {statCards.map((stat) => {
               const Icon = stat.icon;
