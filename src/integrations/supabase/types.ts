@@ -708,30 +708,42 @@ export type Database = {
       }
       sla_notifications: {
         Row: {
+          acknowledged_at: string | null
+          acknowledged_by: string | null
+          acknowledgment_token: string | null
           alert_type: Database["public"]["Enums"]["sla_alert_type"]
           created_at: string | null
           email_content: Json | null
           id: string
+          notification_level: number | null
           recipients: string[]
           sent_at: string
           sla_type: string
           ticket_id: string
         }
         Insert: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          acknowledgment_token?: string | null
           alert_type: Database["public"]["Enums"]["sla_alert_type"]
           created_at?: string | null
           email_content?: Json | null
           id?: string
+          notification_level?: number | null
           recipients: string[]
           sent_at?: string
           sla_type: string
           ticket_id: string
         }
         Update: {
+          acknowledged_at?: string | null
+          acknowledged_by?: string | null
+          acknowledgment_token?: string | null
           alert_type?: Database["public"]["Enums"]["sla_alert_type"]
           created_at?: string | null
           email_content?: Json | null
           id?: string
+          notification_level?: number | null
           recipients?: string[]
           sent_at?: string
           sla_type?: string

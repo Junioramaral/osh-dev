@@ -19,6 +19,8 @@ interface TicketAlert {
   sla_type: 'first_response' | 'resolution';
   deadline: string;
   time_remaining_minutes: number;
+  notification_level: number;
+  escalate: boolean;
 }
 
 interface TicketWithClient {
@@ -49,7 +51,7 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const now = new Date();
-    const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
+    const THROTTLE_HOURS = 12; // Silence notifications for 12 hours after acknowledgment
 
     // ========== BUSCAR TICKETS EM RISCO ==========
 
@@ -86,6 +88,7 @@ serve(async (req) => {
       const clientName = Array.isArray((ticket as any).clients) 
         ? (ticket as any).clients[0]?.name || 'N/A'
         : (ticket as any).clients?.name || 'N/A';
+
       // Verificar First Response SLA
       if (!ticket.first_response_at && ticket.sla_first_response_deadline) {
         const deadline = new Date(ticket.sla_first_response_deadline);
@@ -103,17 +106,16 @@ serve(async (req) => {
         }
 
         if (alertType) {
-          // Verificar se já enviou alerta recentemente
-          const { data: recentNotification } = await adminClient
-            .from("sla_notifications")
-            .select("id")
-            .eq("ticket_id", ticket.id)
-            .eq("sla_type", "first_response")
-            .eq("alert_type", alertType)
-            .gte("sent_at", oneHourAgo.toISOString())
-            .maybeSingle();
+          const shouldSendResult = await shouldSendNotification(
+            adminClient,
+            ticket.id,
+            "first_response",
+            alertType,
+            now,
+            THROTTLE_HOURS
+          );
 
-          if (!recentNotification) {
+          if (shouldSendResult.shouldSend) {
             alerts.push({
               id: ticket.id,
               ticket_number: ticket.ticket_number,
@@ -124,6 +126,8 @@ serve(async (req) => {
               sla_type: 'first_response',
               deadline: ticket.sla_first_response_deadline,
               time_remaining_minutes: minutesRemaining,
+              notification_level: shouldSendResult.nextLevel,
+              escalate: shouldSendResult.escalate,
             });
           }
         }
@@ -146,16 +150,16 @@ serve(async (req) => {
         }
 
         if (alertType) {
-          const { data: recentNotification } = await adminClient
-            .from("sla_notifications")
-            .select("id")
-            .eq("ticket_id", ticket.id)
-            .eq("sla_type", "resolution")
-            .eq("alert_type", alertType)
-            .gte("sent_at", oneHourAgo.toISOString())
-            .maybeSingle();
+          const shouldSendResult = await shouldSendNotification(
+            adminClient,
+            ticket.id,
+            "resolution",
+            alertType,
+            now,
+            THROTTLE_HOURS
+          );
 
-          if (!recentNotification) {
+          if (shouldSendResult.shouldSend) {
             alerts.push({
               id: ticket.id,
               ticket_number: ticket.ticket_number,
@@ -166,6 +170,8 @@ serve(async (req) => {
               sla_type: 'resolution',
               deadline: ticket.sla_resolution_deadline,
               time_remaining_minutes: minutesRemaining,
+              notification_level: shouldSendResult.nextLevel,
+              escalate: shouldSendResult.escalate,
             });
           }
         }
@@ -211,12 +217,35 @@ serve(async (req) => {
       .map(u => u.email!)
       .filter(Boolean);
 
+    // ========== BUSCAR SUPER ADMINS PARA ESCALONAMENTO ==========
+
+    const hasEscalatedAlerts = alerts.some(a => a.escalate);
+    let superAdminEmails: string[] = [];
+
+    if (hasEscalatedAlerts) {
+      const { data: superAdminRoles } = await adminClient
+        .from("user_roles")
+        .select("user_id")
+        .eq("role", "super_admin");
+
+      if (superAdminRoles?.length) {
+        const superAdminIds = superAdminRoles.map(r => r.user_id);
+        superAdminEmails = authUsers.users
+          .filter(u => superAdminIds.includes(u.id))
+          .map(u => u.email!)
+          .filter(Boolean);
+
+        console.log(`📧 Including ${superAdminEmails.length} Super Admins in escalated alerts`);
+      }
+    }
+
     console.log(`📧 Sending alerts to ${otimizzoEmails.length} Otimizzo users`);
 
     // ========== AGRUPAR ALERTAS POR TIPO ==========
 
     const overdueAlerts = alerts.filter(a => a.alert_type === 'overdue');
     const warningAlerts = alerts.filter(a => a.alert_type === 'warning');
+    const escalatedAlerts = alerts.filter(a => a.escalate);
 
     // ========== GERAR HTML DO EMAIL ==========
 
@@ -236,6 +265,35 @@ serve(async (req) => {
       }
     };
 
+    // First, insert notifications to get IDs and tokens
+    const notificationsToInsert = alerts.map(alert => ({
+      ticket_id: alert.id,
+      alert_type: alert.alert_type,
+      sla_type: alert.sla_type,
+      recipients: alert.escalate ? [...otimizzoEmails, ...superAdminEmails] : otimizzoEmails,
+      notification_level: alert.notification_level,
+      email_content: {
+        ticket_number: alert.ticket_number,
+        title: alert.title,
+        client: alert.client_name,
+        time_remaining: alert.time_remaining_minutes,
+      },
+    }));
+
+    const { data: insertedNotifications, error: insertError } = await adminClient
+      .from("sla_notifications")
+      .insert(notificationsToInsert)
+      .select("id, acknowledgment_token, ticket_id");
+
+    if (insertError) {
+      console.error("⚠️ Error recording notifications:", insertError);
+    }
+
+    // Create a map of ticket_id to notification data
+    const notificationMap = new Map(
+      (insertedNotifications || []).map(n => [n.ticket_id, { id: n.id, token: n.acknowledgment_token }])
+    );
+
     const generateTicketRow = (alert: TicketAlert): string => {
       const timeText = alert.time_remaining_minutes < 0
         ? `<span style="color: #dc2626; font-weight: bold;">Venceu há ${formatTime(alert.time_remaining_minutes)}</span>`
@@ -243,10 +301,21 @@ serve(async (req) => {
 
       const slaTypeText = alert.sla_type === 'first_response' ? 'Primeira Resposta' : 'Resolução';
       const priorityColor = alert.priority === 'P1' ? '#dc2626' : alert.priority === 'P2' ? '#f59e0b' : '#3b82f6';
+      
+      const notificationData = notificationMap.get(alert.id);
+      const ackUrl = notificationData 
+        ? `${appUrl}/sla-acknowledge/${notificationData.id}/${notificationData.token}`
+        : null;
+
+      const escalateBadge = alert.escalate 
+        ? '<span style="background: #7c3aed; color: white; padding: 2px 6px; border-radius: 4px; font-size: 10px; margin-left: 8px;">ESCALADO</span>'
+        : '';
 
       return `
         <tr style="border-bottom: 1px solid #e5e7eb;">
-          <td style="padding: 12px; font-family: monospace; font-weight: bold;">${alert.ticket_number}</td>
+          <td style="padding: 12px; font-family: monospace; font-weight: bold;">
+            ${alert.ticket_number}${escalateBadge}
+          </td>
           <td style="padding: 12px;">${alert.title}</td>
           <td style="padding: 12px;">${alert.client_name}</td>
           <td style="padding: 12px;">
@@ -256,6 +325,15 @@ serve(async (req) => {
           </td>
           <td style="padding: 12px;">${slaTypeText}</td>
           <td style="padding: 12px;">${timeText}</td>
+          <td style="padding: 12px;">
+            ${ackUrl ? `
+              <a href="${ackUrl}" 
+                 style="display: inline-block; background: #10b981; color: white; padding: 8px 12px; 
+                        text-decoration: none; border-radius: 4px; font-size: 12px; font-weight: bold;">
+                ✅ Ciente
+              </a>
+            ` : ''}
+          </td>
         </tr>
       `;
     };
@@ -267,10 +345,15 @@ serve(async (req) => {
           <meta charset="utf-8">
         </head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f3f4f6;">
-          <div style="max-width: 800px; margin: 0 auto; padding: 20px;">
+          <div style="max-width: 900px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
               <h1 style="margin: 0;">🚨 Alerta de SLA</h1>
               <p style="margin: 10px 0 0 0; font-size: 16px;">Tickets requerem atenção imediata</p>
+              ${escalatedAlerts.length > 0 ? `
+                <p style="margin: 10px 0 0 0; background: rgba(255,255,255,0.2); padding: 8px 16px; border-radius: 4px; display: inline-block;">
+                  ⚡ ${escalatedAlerts.length} ${escalatedAlerts.length === 1 ? 'ticket escalado' : 'tickets escalados'} para Super Admin
+                </p>
+              ` : ''}
             </div>
             
             <div style="background: white; padding: 30px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
@@ -291,6 +374,7 @@ serve(async (req) => {
                         <th style="padding: 12px; font-weight: 600;">Prioridade</th>
                         <th style="padding: 12px; font-weight: 600;">Tipo SLA</th>
                         <th style="padding: 12px; font-weight: 600;">Status</th>
+                        <th style="padding: 12px; font-weight: 600;">Ação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -317,6 +401,7 @@ serve(async (req) => {
                         <th style="padding: 12px; font-weight: 600;">Prioridade</th>
                         <th style="padding: 12px; font-weight: 600;">Tipo SLA</th>
                         <th style="padding: 12px; font-weight: 600;">Tempo Restante</th>
+                        <th style="padding: 12px; font-weight: 600;">Ação</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -334,7 +419,12 @@ serve(async (req) => {
               </div>
               
               <div style="margin-top: 30px; padding: 15px; background: #f3f4f6; border-radius: 6px; font-size: 14px; color: #6b7280;">
-                <strong>💡 Dica:</strong> Este email é enviado automaticamente a cada 15 minutos. Você receberá um novo alerta para o mesmo ticket apenas se ele ainda estiver em risco após 1 hora.
+                <strong>💡 Como funciona:</strong>
+                <ul style="margin: 10px 0 0 0; padding-left: 20px;">
+                  <li>Clique em <strong>"Ciente"</strong> para confirmar que você viu este alerta</li>
+                  <li>Após confirmar, você não receberá novas notificações sobre este ticket por 12 horas</li>
+                  <li>Se ninguém confirmar em 12 horas, o alerta será escalado para Super Admins</li>
+                </ul>
               </div>
             </div>
             
@@ -349,10 +439,15 @@ serve(async (req) => {
 
     // ========== ENVIAR EMAIL ==========
 
+    // Combine recipients for escalated alerts
+    const allRecipients = hasEscalatedAlerts 
+      ? [...new Set([...otimizzoEmails, ...superAdminEmails])]
+      : otimizzoEmails;
+
     const { data: emailResult, error: emailError } = await resend.emails.send({
       from: "Otimizzo SLA Monitor <noreply@otimizzo.com>",
-      to: otimizzoEmails,
-      subject: `🚨 Alerta de SLA: ${overdueAlerts.length} vencidos, ${warningAlerts.length} em risco`,
+      to: allRecipients,
+      subject: `🚨 Alerta de SLA: ${overdueAlerts.length} vencidos, ${warningAlerts.length} em risco${escalatedAlerts.length > 0 ? ' [ESCALADO]' : ''}`,
       html: emailHtml,
     });
 
@@ -362,31 +457,7 @@ serve(async (req) => {
     }
 
     console.log("✅ Email sent successfully:", emailResult);
-
-    // ========== REGISTRAR NOTIFICAÇÕES ==========
-
-    const notificationsToInsert = alerts.map(alert => ({
-      ticket_id: alert.id,
-      alert_type: alert.alert_type,
-      sla_type: alert.sla_type,
-      recipients: otimizzoEmails,
-      email_content: {
-        ticket_number: alert.ticket_number,
-        title: alert.title,
-        client: alert.client_name,
-        time_remaining: alert.time_remaining_minutes,
-      },
-    }));
-
-    const { error: insertError } = await adminClient
-      .from("sla_notifications")
-      .insert(notificationsToInsert);
-
-    if (insertError) {
-      console.error("⚠️ Error recording notifications:", insertError);
-    } else {
-      console.log(`✅ Recorded ${notificationsToInsert.length} notifications`);
-    }
+    console.log(`✅ Recorded ${notificationsToInsert.length} notifications`);
 
     return new Response(
       JSON.stringify({
@@ -394,7 +465,8 @@ serve(async (req) => {
         alerts_sent: alerts.length,
         overdue: overdueAlerts.length,
         warning: warningAlerts.length,
-        recipients: otimizzoEmails.length,
+        escalated: escalatedAlerts.length,
+        recipients: allRecipients.length,
       }),
       {
         status: 200,
@@ -412,3 +484,60 @@ serve(async (req) => {
     );
   }
 });
+
+// Helper function to check if we should send a notification
+async function shouldSendNotification(
+  adminClient: any,
+  ticketId: string,
+  slaType: string,
+  alertType: string,
+  now: Date,
+  throttleHours: number
+): Promise<{ shouldSend: boolean; nextLevel: number; escalate: boolean }> {
+  const { data: recentNotification } = await adminClient
+    .from("sla_notifications")
+    .select("id, sent_at, acknowledged_at, notification_level")
+    .eq("ticket_id", ticketId)
+    .eq("sla_type", slaType)
+    .eq("alert_type", alertType)
+    .order("sent_at", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (!recentNotification) {
+    // First notification for this ticket/SLA
+    return { shouldSend: true, nextLevel: 1, escalate: false };
+  }
+
+  const sentAt = new Date(recentNotification.sent_at);
+  const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
+
+  // If acknowledged within throttle period, don't send
+  if (recentNotification.acknowledged_at) {
+    const ackAt = new Date(recentNotification.acknowledged_at);
+    const hoursSinceAck = (now.getTime() - ackAt.getTime()) / (1000 * 60 * 60);
+    
+    if (hoursSinceAck < throttleHours) {
+      console.log(`⏳ Ticket ${ticketId}: Silenced (acknowledged ${hoursSinceAck.toFixed(1)}h ago)`);
+      return { shouldSend: false, nextLevel: recentNotification.notification_level, escalate: false };
+    }
+  }
+
+  // If not acknowledged and past throttle period, escalate
+  if (!recentNotification.acknowledged_at && hoursSinceSent >= throttleHours) {
+    console.log(`⚡ Ticket ${ticketId}: Escalating to Super Admin (${hoursSinceSent.toFixed(1)}h without acknowledgment)`);
+    return { 
+      shouldSend: true, 
+      nextLevel: recentNotification.notification_level + 1, 
+      escalate: true 
+    };
+  }
+
+  // If recently sent and not acknowledged, wait for throttle period
+  if (hoursSinceSent < 1) { // Keep 1 hour minimum between emails
+    console.log(`⏳ Ticket ${ticketId}: Waiting (last sent ${hoursSinceSent.toFixed(1)}h ago)`);
+    return { shouldSend: false, nextLevel: recentNotification.notification_level, escalate: false };
+  }
+
+  return { shouldSend: false, nextLevel: recentNotification.notification_level, escalate: false };
+}
