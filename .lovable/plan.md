@@ -1,93 +1,139 @@
 
-
-# Plano: Corrigir Verificação de Assinatura do Webhook Resend
+# Plano: Corrigir Estrutura do Payload do Webhook Resend
 
 ## Problema Identificado
 
-A função `receive-email-reply` está retornando erro 401 porque a verificação de assinatura está incorreta. O Resend usa **Svix** para webhooks e o formato é diferente do implementado atualmente.
+O erro `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` ocorre porque o código assume que o campo `from` é um **objeto** com propriedades `email` e `name`, mas a API do Resend envia `from` como uma **string** no formato:
 
-## Diferenças Entre Implementação Atual e Correta
+```
+"Acme <email@example.com>"
+```
 
-| Aspecto | Implementação Atual | Implementação Correta |
-|---------|---------------------|----------------------|
-| Formato do Secret | Usado diretamente como texto | Remover prefixo `whsec_` e decodificar de Base64 |
-| Signed Content | `${timestamp}.${payload}` | `${svix_id}.${svix_timestamp}.${body}` |
-| Formato da Assinatura | Comparação hexadecimal | Formato `v1,BASE64_SIGNATURE` (decodificar) |
-| Comparação | String simples | Comparar múltiplas assinaturas possíveis |
+### Evidência dos Logs
+
+```
+Processing email from: undefined Subject: Re: [Ticket #00000006]...
+```
+
+O `from.email` retorna `undefined` porque `from` é uma string, não um objeto.
 
 ## Alterações Necessárias
 
 ### Arquivo: `supabase/functions/receive-email-reply/index.ts`
 
-A função `verifyWebhookSignature` será completamente reescrita para:
+#### 1. Corrigir Interface `EmailReceivedPayload`
 
-1. **Extrair o secret real** removendo o prefixo `whsec_` e decodificando de Base64
-2. **Construir o signedContent** no formato correto: `${svix_id}.${svix_timestamp}.${body}`
-3. **Calcular o HMAC-SHA256** usando o secret decodificado
-4. **Comparar com cada assinatura** no header (formato `v1,base64signature v1,base64signature2`)
-5. **Retornar true** se qualquer assinatura corresponder
-
-## Detalhes Técnicos
-
-### Nova Função de Verificação
+Alterar o tipo do campo `from` de objeto para string:
 
 ```text
-Fluxo de Verificação:
-                                    
-┌─────────────────────────────────┐  
-│ Secret: whsec_ABC123...         │  
-│ Remove "whsec_" prefix          │  
-│ Base64 decode → bytes           │  
-└─────────────────────────────────┘  
-                 │                   
-                 ▼                   
-┌─────────────────────────────────┐  
-│ SignedContent =                 │  
-│ svix_id.svix_timestamp.body     │  
-└─────────────────────────────────┘  
-                 │                   
-                 ▼                   
-┌─────────────────────────────────┐  
-│ HMAC-SHA256(secretBytes,        │  
-│             signedContent)      │  
-│ Result → Base64 encode          │  
-└─────────────────────────────────┘  
-                 │                   
-                 ▼                   
-┌─────────────────────────────────┐  
-│ Header: "v1,sig1 v1,sig2"       │  
-│ Split by space                  │  
-│ Extract signature after "v1,"   │  
-│ Compare with computed signature │  
-└─────────────────────────────────┘  
+ANTES:
+from: {
+  email: string;
+  name?: string;
+};
+
+DEPOIS:
+from: string;  // Formato: "Name <email@example.com>"
 ```
 
-### Código da Nova Implementação
+#### 2. Criar Função para Parsear Endereço de Email
 
-A nova função de verificação:
+Adicionar função utilitária para extrair email e nome da string:
 
-1. Decodifica o secret de Base64 (removendo prefixo `whsec_`)
-2. Cria o payload assinado: `svix_id.svix_timestamp.body`
-3. Gera HMAC-SHA256 e codifica em Base64
-4. Extrai todas as assinaturas do header (formato `v1,signature`)
-5. Compara cada uma com a assinatura calculada
+```typescript
+function parseEmailAddress(fromString: string): { email: string; name: string } {
+  // Formato: "Name <email@example.com>" ou "email@example.com"
+  const match = fromString?.match(/^(?:(.+?)\s*)?<(.+)>$/);
+  if (match) {
+    return {
+      name: match[1]?.trim() || "",
+      email: match[2].trim()
+    };
+  }
+  // Fallback: assume que é só o email
+  return {
+    name: "",
+    email: fromString?.trim() || ""
+  };
+}
+```
 
-### Atualização do Handler
+#### 3. Adicionar Validações de Entrada com Null Checks
 
-O handler será atualizado para passar o `svixId` para a função de verificação, pois ele faz parte do signed content.
+Validar se `data` existe antes de processar:
+
+```typescript
+// Validar que os dados necessários existem
+if (!webhookData.data) {
+  console.log("No data in webhook payload");
+  return new Response(...);
+}
+
+const { from, subject, text, html, email_id } = webhookData.data;
+
+// Validar campos obrigatórios
+if (!from || !subject) {
+  console.log("Missing required fields: from or subject");
+  return new Response(...);
+}
+```
+
+#### 4. Atualizar Todas as Referências a `from`
+
+Usar a função de parse e optional chaining:
+
+```text
+Linha 161: from.email → parsedFrom.email
+Linha 193: from.email.toLowerCase() → parsedFrom.email?.toLowerCase()
+Linha 249: from.email → parsedFrom.email
+Linha 250: from.name → parsedFrom.name
+Linha 268: from.email → parsedFrom.email
+Linha 302: from.name → parsedFrom.name
+Linha 303: from.email → parsedFrom.email
+```
 
 ## Resumo das Mudanças
 
-| Linha Aprox. | Mudança |
-|--------------|---------|
-| 31-63 | Reescrever `verifyWebhookSignature` com lógica Svix correta |
-| 88-89 | Garantir que `svixId` está sendo usado |
-| 105-110 | Passar `svixId` para a função de verificação |
+| Seção | Mudança |
+|-------|---------|
+| Linhas 14-28 | Corrigir interface - `from` como string |
+| Após linha 95 | Adicionar função `parseEmailAddress()` |
+| Linhas 149-161 | Adicionar validação de entrada |
+| Linhas 159-161 | Parsear `from` e usar resultado |
+| Linhas 193-204 | Usar `parsedFrom.email?.toLowerCase()` |
+| Linhas 249-252 | Usar `parsedFrom.email` e `parsedFrom.name` |
+| Linhas 268-269 | Usar `parsedFrom.email` no metadata |
+| Linhas 302-303 | Usar `parsedFrom` na notificação |
+
+## Fluxo Corrigido
+
+```text
+┌─────────────────────────────────────┐
+│ Webhook Payload                     │
+│ from: "Cliente <cliente@email.com>" │
+└─────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│ parseEmailAddress(from)             │
+│ → { email: "cliente@email.com",     │
+│     name: "Cliente" }               │
+└─────────────────────────────────────┘
+                │
+                ▼
+┌─────────────────────────────────────┐
+│ Usar parsedFrom.email para:        │
+│ - Log                               │
+│ - Validação com ticket.contact_email│
+│ - Inserir comentário                │
+│ - Histórico                         │
+│ - Notificação ao analista           │
+└─────────────────────────────────────┘
+```
 
 ## Resultado Esperado
 
-Após a implementação:
-- Webhook do Resend será verificado corretamente
-- Emails de resposta serão processados e adicionados como comentários
-- Erro 401 será eliminado para requisições legítimas
-
+- Emails de resposta serão processados corretamente
+- Comentários serão inseridos no banco de dados
+- Erro `TypeError` será eliminado
+- Validações robustas evitarão crashes futuros
