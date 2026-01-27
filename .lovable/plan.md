@@ -1,268 +1,190 @@
 
 
-## Sistema de Throttling e Confirmação de SLA
+## Reorganização dos Cards do Dashboard
 
-Este plano implementa um sistema completo de controle de notificações SLA com confirmação de ciência, escalonamento e indicador visual na interface.
+Este plano propõe uma reorganização visual dos cards KPI do Dashboard em blocos temáticos, melhorando a escaneabilidade e a experiência do usuário.
 
 ---
 
-### Visão Geral do Sistema
+### Problema Atual
+
+Observando o screenshot, os cards estão distribuídos em um grid único de 5 colunas sem agrupamento lógico:
+- Cards de SLA (Taxa de Resolução, Tempo Médio) misturados com contadores de tickets
+- Cards de segmento (Tickets DB, Tickets APP) separados visualmente
+- Não há hierarquia visual clara entre métricas operacionais e informativas
+
+---
+
+### Proposta de Organização
+
+Agrupar os cards em **3 blocos temáticos** com títulos de seção:
 
 ```text
 ┌─────────────────────────────────────────────────────────────────────────────┐
-│                          FLUXO DE NOTIFICAÇÃO SLA                           │
+│                           VISÃO GERAL DE TICKETS                            │
 ├─────────────────────────────────────────────────────────────────────────────┤
-│                                                                             │
-│   ┌──────────┐    SLA Vencido    ┌───────────────────┐                      │
-│   │  Ticket  │ ─────────────────►│ 1ª Notificação    │                      │
-│   │ (overdue)│                   │ (Time Otimizzo)   │                      │
-│   └──────────┘                   └─────────┬─────────┘                      │
-│                                            │                                │
-│                                            ▼                                │
-│                           ┌────────────────────────────────┐                │
-│                           │   Email com Link de Ciência    │                │
-│                           │   [Confirmar Ciência] button   │                │
-│                           └───────────────┬────────────────┘                │
-│                                           │                                 │
-│                    ┌──────────────────────┴──────────────────────┐          │
-│                    │                                             │          │
-│                    ▼                                             ▼          │
-│   ┌─────────────────────────────┐          ┌────────────────────────────┐   │
-│   │   Analista clica no link   │          │ Analista NÃO clica         │   │
-│   │   → Marca acknowledged_at   │          │ (passa 12 horas)           │   │
-│   │   → Silencia por 12h       │          └─────────────┬──────────────┘   │
-│   │   → Remove do sino         │                        │                  │
-│   └─────────────────────────────┘                        ▼                  │
-│                                           ┌────────────────────────────┐   │
-│                                           │ 2ª Notificação             │   │
-│                                           │ (Time + Super Admin)       │   │
-│                                           │ notification_count = 2     │   │
-│                                           └────────────────────────────┘   │
-│                                                                             │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐ ┌─────────────┐            │
+│  │   Total de  │ │   Tickets   │ │  Abertos    │ │    Em       │            │
+│  │   Tickets   │ │  Fechados   │ │   Hoje      │ │ Atendimento │            │
+│  │      6      │ │      4      │ │      0      │ │      0      │            │
+│  └─────────────┘ └─────────────┘ └─────────────┘ └─────────────┘            │
+│  ┌─────────────┐ ┌─────────────┐                                            │
+│  │ Aguardando  │ │ Retornados  │                                            │
+│  │  Cliente    │ │  à Fila     │                                            │
+│  │      0      │ │      0      │                                            │
+│  └─────────────┘ └─────────────┘                                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                          PERFORMANCE E SLA                                  │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                            │
+│  │   Taxa de   │ │ Tempo Médio │ │  Fora do    │                            │
+│  │  Resolução  │ │ Resolução   │ │    SLA      │                            │
+│  │    0%       │ │   5d 6h     │ │      2      │                            │
+│  └─────────────┘ └─────────────┘ └─────────────┘                            │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         DISTRIBUIÇÃO POR SEGMENTO                           │
+├─────────────────────────────────────────────────────────────────────────────┤
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐                            │
+│  │ Tickets DB  │ │ Tickets APP │ │   Total de  │                            │
+│  │      4      │ │      2      │ │  Clientes   │                            │
+│  │             │ │             │ │      3      │                            │
+│  └─────────────┘ └─────────────┘ └─────────────┘                            │
 └─────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-### 1. Alterações no Banco de Dados
+### Alterações no Dashboard.tsx
 
-#### 1.1 Adicionar colunas na tabela `sla_notifications`
+#### 1. Separar os cards em grupos temáticos
 
-```sql
-ALTER TABLE public.sla_notifications
-ADD COLUMN acknowledged_at TIMESTAMP WITH TIME ZONE DEFAULT NULL,
-ADD COLUMN acknowledged_by UUID REFERENCES auth.users(id),
-ADD COLUMN notification_level INTEGER DEFAULT 1,
-ADD COLUMN acknowledgment_token UUID DEFAULT gen_random_uuid();
-```
-
-**Descrição das colunas:**
-- `acknowledged_at`: Timestamp quando o analista confirmou ciência
-- `acknowledged_by`: ID do usuário que confirmou
-- `notification_level`: Nível da notificação (1 = primeira, 2 = escalada com Super Admin)
-- `acknowledgment_token`: Token único para o link de confirmação
-
-#### 1.2 Criar políticas RLS para atualização
-
-```sql
--- Permitir que usuários Otimizzo/Super Admin atualizem acknowledged_at
-CREATE POLICY "Otimizzo can acknowledge notifications"
-ON public.sla_notifications FOR UPDATE
-USING (is_otimizzo_user(auth.uid()) OR is_super_admin(auth.uid()))
-WITH CHECK (is_otimizzo_user(auth.uid()) OR is_super_admin(auth.uid()));
-```
-
----
-
-### 2. Nova Edge Function: `acknowledge-sla`
-
-Endpoint público para processar o clique no link de confirmação.
-
-**Caminho:** `supabase/functions/acknowledge-sla/index.ts`
-
-**Lógica:**
-1. Recebe `notificationId` e `token` via query params
-2. Valida o token contra o `acknowledgment_token` da notificação
-3. Atualiza `acknowledged_at` e `acknowledged_by`
-4. Redireciona para a página do ticket com mensagem de sucesso
-
-**Fluxo:**
-```text
-GET /acknowledge-sla?id={notificationId}&token={acknowledgmentToken}
-     │
-     ▼
-┌────────────────────────────────┐
-│ Validar token                  │
-│ Atualizar acknowledged_at      │
-│ Redirect → /tickets/{ticketId} │
-└────────────────────────────────┘
-```
-
----
-
-### 3. Atualizar Edge Function: `sla-monitor`
-
-**Alterações principais:**
-
-#### 3.1 Nova lógica de throttling (substituir verificação de 1 hora)
+Reorganizar o array `statCards` em 3 grupos distintos:
 
 ```typescript
-// Verificar se há notificação recente NÃO confirmada nas últimas 12 horas
-const { data: recentNotification } = await adminClient
-  .from("sla_notifications")
-  .select("id, acknowledged_at, notification_level")
-  .eq("ticket_id", ticket.id)
-  .eq("sla_type", slaType)
-  .eq("alert_type", alertType)
-  .order("sent_at", { ascending: false })
-  .limit(1)
-  .maybeSingle();
+// Grupo 1: Visão Geral de Tickets
+const ticketOverviewCards = [
+  { title: "Total de Tickets", value: stats.totalTickets, icon: Ticket, ... },
+  { title: "Tickets Fechados", value: stats.ticketsFechados, icon: CheckCircle, ... },
+  { title: "Abertos Hoje", value: stats.ticketsAbertosHoje, icon: TrendingUp, ... },
+  { title: "Em Atendimento", value: stats.ticketsEmAtendimento, icon: Clock, ... },
+  { title: "Aguardando Cliente", value: stats.ticketsAguardando, icon: AlertTriangle, ... },
+  // Retornados à Fila (condicional)
+];
 
-if (recentNotification) {
-  const sentAt = new Date(recentNotification.sent_at);
-  const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
-  
-  // Se confirmado nas últimas 12h, pular
-  if (recentNotification.acknowledged_at) {
-    const ackAt = new Date(recentNotification.acknowledged_at);
-    const hoursSinceAck = (now.getTime() - ackAt.getTime()) / (1000 * 60 * 60);
-    if (hoursSinceAck < 12) continue; // Silenciado
-  }
-  
-  // Se não confirmado e passou 12h, escalar para Super Admin
-  if (!recentNotification.acknowledged_at && hoursSinceSent >= 12) {
-    alert.escalate = true;
-    alert.notification_level = 2;
-  }
-}
+// Grupo 2: Performance e SLA
+const slaPerformanceCards = [
+  { title: "Taxa de Resolução SLA", ... },
+  { title: "Tempo Médio de Resolução", ... },
+  { title: "Fora do SLA", ... },
+];
+
+// Grupo 3: Distribuição
+const distributionCards = [
+  { title: "Tickets DB", ... },
+  { title: "Tickets APP", ... },
+  { title: "Total de Clientes", ... }, // condicional
+];
 ```
 
-#### 3.2 Adicionar link de confirmação no email
-
-```html
-<a href="${appUrl}/api/acknowledge-sla?id=${notificationId}&token=${ackToken}" 
-   style="display: inline-block; background: #10b981; color: white; 
-          padding: 14px 28px; text-decoration: none; border-radius: 6px; 
-          font-weight: bold; margin-right: 10px;">
-  ✅ Confirmar Ciência
-</a>
-```
-
-#### 3.3 Incluir Super Admin em notificações escaladas
-
-```typescript
-if (hasEscalatedAlerts) {
-  // Buscar emails de Super Admins
-  const { data: superAdmins } = await adminClient
-    .from("user_roles")
-    .select("user_id")
-    .eq("role", "super_admin");
-  
-  const superAdminIds = superAdmins?.map(sa => sa.user_id) || [];
-  // Adicionar emails dos Super Admins aos destinatários
-}
-```
-
----
-
-### 4. Interface: Ícone do Sino (Bell)
-
-#### 4.1 Novo hook: `useOverdueSLAAlertsCount.ts`
-
-```typescript
-export const useOverdueSLAAlertsCount = () => {
-  return useQuery({
-    queryKey: ["overdue-sla-alerts-count"],
-    queryFn: async () => {
-      const { count, error } = await supabase
-        .from("sla_notifications")
-        .select("*", { count: "exact", head: true })
-        .eq("alert_type", "overdue")
-        .is("acknowledged_at", null);
-      
-      if (error) throw error;
-      return count || 0;
-    },
-    refetchInterval: 30000, // Atualiza a cada 30 segundos
-  });
-};
-```
-
-#### 4.2 Novo componente: `SLAAlertBell.tsx`
-
-**Localização:** `src/components/layout/SLAAlertBell.tsx`
+#### 2. Criar componente de seção reutilizável
 
 ```tsx
-<Popover>
-  <PopoverTrigger asChild>
-    <Button variant="ghost" size="icon" className="relative">
-      <Bell className="h-5 w-5" />
-      {count > 0 && (
-        <span className="absolute -top-1 -right-1 h-5 w-5 
-          bg-red-500 text-white text-xs rounded-full 
-          flex items-center justify-center">
-          {count > 9 ? "9+" : count}
-        </span>
-      )}
-    </Button>
-  </PopoverTrigger>
-  <PopoverContent>
-    {/* Lista de tickets com SLA estourado aguardando confirmação */}
-  </PopoverContent>
-</Popover>
+interface DashboardSectionProps {
+  title: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}
+
+const DashboardSection = ({ title, icon: Icon, children }: DashboardSectionProps) => (
+  <div className="space-y-4">
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <Icon className="w-4 h-4" />
+      <h3 className="text-sm font-medium uppercase tracking-wider">{title}</h3>
+    </div>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {children}
+    </div>
+  </div>
+);
 ```
 
-#### 4.3 Atualizar AppLayout.tsx
+#### 3. Nova estrutura do JSX
 
-Adicionar o sino no header:
-- **Desktop:** No topo da sidebar, ao lado do logo
-- **Mobile:** Ao lado do botão de menu
-
----
-
-### 5. Nova Página: Confirmação de Ciência
-
-**Rota:** `/sla-acknowledge/:notificationId/:token`
-
-**Fluxo:**
-1. Valida token chamando a edge function
-2. Mostra mensagem de confirmação
-3. Redireciona para o ticket automaticamente
-
----
-
-### 6. Arquivos a Criar/Modificar
-
-| Tipo | Arquivo | Descrição |
-|------|---------|-----------|
-| Migração SQL | Nova migração | Adicionar colunas na tabela `sla_notifications` |
-| Edge Function | `supabase/functions/acknowledge-sla/index.ts` | Processar confirmação de ciência |
-| Edge Function | `supabase/functions/sla-monitor/index.ts` | Atualizar lógica de throttling |
-| Hook | `src/hooks/useOverdueSLAAlertsCount.ts` | Contagem de alertas pendentes |
-| Componente | `src/components/layout/SLAAlertBell.tsx` | Ícone do sino com dropdown |
-| Página | `src/pages/SLAAcknowledge.tsx` | Página de confirmação |
-| Layout | `src/components/layout/AppLayout.tsx` | Integrar o sino |
-| Rotas | `src/App.tsx` | Adicionar rota `/sla-acknowledge` |
-| Supabase Config | `supabase/config.toml` | Registrar nova edge function |
-
----
-
-### 7. Regras de Negócio Resumidas
-
-| Regra | Descrição |
-|-------|-----------|
-| **Primeira Notificação** | Enviada quando SLA vence (>75% ou overdue) |
-| **Silenciamento** | Clicar em "Confirmar Ciência" silencia por 12 horas |
-| **Escalonamento** | Se não confirmar em 12h, nova notificação inclui Super Admin |
-| **Visibilidade** | Sino mostra apenas alertas `overdue` não confirmados |
-| **Permissões** | Apenas usuários Otimizzo/Super Admin podem confirmar |
+```tsx
+<div className="space-y-8">
+  {/* Hero Section - mantém como está */}
+  
+  {loading ? (
+    // Loading skeleton
+  ) : (
+    <div className="space-y-8">
+      {/* Seção 1: Visão Geral de Tickets */}
+      <DashboardSection title="Visão Geral de Tickets" icon={Ticket}>
+        {ticketOverviewCards.map(card => <StatCard key={card.title} {...card} />)}
+      </DashboardSection>
+      
+      {/* Seção 2: Performance e SLA */}
+      <DashboardSection title="Performance e SLA" icon={Target}>
+        {slaPerformanceCards.map(card => <StatCard key={card.title} {...card} />)}
+      </DashboardSection>
+      
+      {/* Seção 3: Distribuição por Segmento */}
+      <DashboardSection title="Distribuição por Segmento" icon={Database}>
+        {distributionCards.map(card => <StatCard key={card.title} {...card} />)}
+      </DashboardSection>
+    </div>
+  )}
+  
+  {/* Alerta SLA - mantém como está */}
+  {/* Gráficos - mantém como está */}
+</div>
+```
 
 ---
 
-### 8. Considerações de Segurança
+### Benefícios da Reorganização
 
-- O `acknowledgment_token` é um UUID único gerado para cada notificação
-- A edge function `acknowledge-sla` valida o token antes de atualizar
-- RLS garante que apenas usuários autorizados podem ver/confirmar alertas
-- Links de confirmação expiram quando uma nova notificação é enviada
+| Aspecto | Antes | Depois |
+|---------|-------|--------|
+| **Hierarquia** | Cards soltos sem agrupamento | Seções temáticas claras |
+| **Escaneabilidade** | Difícil localizar métricas específicas | Fácil identificar categoria |
+| **Espaçamento** | Grid único de 5 colunas | Grids de 4 colunas por seção |
+| **Contexto** | Métricas misturadas | Agrupamento lógico |
+
+---
+
+### Alternativa: Card Container (Wrapper)
+
+Se preferir uma abordagem mais visual, cada seção pode ser envolvida em um Card pai com borda suave:
+
+```tsx
+<Card className="p-6 bg-muted/30 border-dashed">
+  <CardTitle className="text-sm mb-4">Visão Geral de Tickets</CardTitle>
+  <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+    {/* Cards internos */}
+  </div>
+</Card>
+```
+
+---
+
+### Arquivos a Modificar
+
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/pages/Dashboard.tsx` | Reorganizar cards em grupos, adicionar títulos de seção |
+
+---
+
+### Resumo das Alterações
+
+1. Separar `statCards` em 3 arrays temáticos
+2. Adicionar títulos de seção com ícones
+3. Ajustar grid para 4 colunas por seção (melhor simetria)
+4. Adicionar espaçamento vertical entre seções (`space-y-8`)
+5. Opcionalmente, envolver cada seção em um Card container para destaque visual
 
