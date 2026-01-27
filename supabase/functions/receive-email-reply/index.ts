@@ -249,7 +249,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (RESEND_API_KEY && email_id) {
       try {
         const emailDetailResponse = await fetch(
-          `https://api.resend.com/emails/${email_id}`,
+          `https://api.resend.com/emails/receiving/${email_id}`,
           {
             headers: {
               Authorization: `Bearer ${RESEND_API_KEY}`,
@@ -259,6 +259,8 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (emailDetailResponse.ok) {
           const emailDetail = await emailDetailResponse.json();
+          console.log("Email content fetched - text length:", emailDetail.text?.length || 0);
+          console.log("Email content fetched - html length:", emailDetail.html?.length || 0);
           emailContent = emailDetail.text || emailDetail.html || text || "";
         }
       } catch (error) {
