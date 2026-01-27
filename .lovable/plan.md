@@ -1,57 +1,68 @@
 
-# Plano: Corrigir preenchimento do campo `author_email` em comentários do portal
 
-## Problema Identificado
+# Plano: Renomear `author_email` para `sender_email`
 
-O campo `author_email` na tabela `ticket_comments` está `NULL` para todos os comentários criados via portal (source='portal'), enquanto deveria conter o email do usuário conectado.
+## Objetivo
 
-## Causa Raiz
+Renomear o campo `author_email` para `sender_email` na tabela `ticket_comments` para melhor clareza semântica, já que o campo representa quem enviou a mensagem.
 
-No arquivo `src/components/tickets/TicketComments.tsx`, ao inserir um novo comentário, o campo `author_email` não está sendo incluído no objeto de inserção.
+## Análise de Impacto
 
-**Código Atual (linhas 156-164):**
-```typescript
-const { data: commentData, error: commentError } = await supabase
-  .from('ticket_comments')
-  .insert({
-    ticket_id: ticketId,
-    author_id: user?.id,
-    author_name: profile?.full_name,
-    content,
-    is_internal
-    // author_email está FALTANDO
-  })
-```
+O campo `author_email` é utilizado em **4 locais** no projeto:
 
-## Solução
-
-Adicionar o campo `author_email` utilizando `user?.email` que já está disponível através do contexto de autenticação (`useAuth()`).
+| Arquivo | Uso |
+|---------|-----|
+| `supabase/migrations/...` | Migração original (apenas histórico) |
+| `src/integrations/supabase/types.ts` | Tipos TypeScript gerados automaticamente |
+| `src/components/tickets/TicketComments.tsx` | Leitura e inserção de comentários |
+| `supabase/functions/receive-email-reply/index.ts` | Inserção de comentários via email |
 
 ## Mudanças Necessárias
 
-### Arquivo: `src/components/tickets/TicketComments.tsx`
+### 1. Migração de Banco de Dados
 
-**Linha 158-164** - Adicionar `author_email: user?.email` ao objeto de inserção:
+Criar uma nova migração SQL para renomear a coluna:
 
-```typescript
-const { data: commentData, error: commentError } = await supabase
-  .from('ticket_comments')
-  .insert({
-    ticket_id: ticketId,
-    author_id: user?.id,
-    author_name: profile?.full_name,
-    author_email: user?.email,  // NOVA LINHA
-    content,
-    is_internal
-  })
+```sql
+-- Renomear coluna author_email para sender_email
+ALTER TABLE public.ticket_comments 
+RENAME COLUMN author_email TO sender_email;
+
+-- Atualizar comentário da coluna
+COMMENT ON COLUMN public.ticket_comments.sender_email IS 'Email do remetente do comentário';
 ```
 
-## Impacto
+### 2. Atualizar Código Frontend
 
-- **Novos comentários**: Terão o campo `author_email` preenchido automaticamente
-- **Comentários existentes**: Permanecerão com `NULL` (não é necessário migração, pois a UI já trata fallback)
-- **Sem quebra de compatibilidade**: O campo é opcional e a lógica de exibição já usa fallback
+**Arquivo: `src/components/tickets/TicketComments.tsx`**
 
-## Verificação
+Substituir todas as referências de `author_email` para `sender_email`:
 
-Após a implementação, ao adicionar um novo comentário via portal, verificar no banco de dados se o campo `author_email` está preenchido com o email do usuário logado.
+- Linha 32: `comment.author_email` → `comment.sender_email`
+- Linha 37: `comment.author_email` → `comment.sender_email`
+- Linha 162: `author_email: user?.email` → `sender_email: user?.email`
+
+### 3. Atualizar Edge Function
+
+**Arquivo: `supabase/functions/receive-email-reply/index.ts`**
+
+Substituir na inserção do comentário:
+
+- Linha 222: `author_email: from.email` → `sender_email: from.email`
+
+### 4. Tipos TypeScript
+
+O arquivo `src/integrations/supabase/types.ts` será atualizado automaticamente após a migração ser aplicada (este arquivo é gerado pelo Supabase CLI).
+
+## Ordem de Execução
+
+1. Primeiro: Executar a migração do banco de dados
+2. Segundo: Atualizar o código frontend e a Edge Function
+3. Os tipos serão regenerados automaticamente
+
+## Considerações
+
+- **Sem perda de dados**: A operação `RENAME COLUMN` preserva todos os dados existentes
+- **Compatibilidade**: Todos os comentários existentes continuarão funcionando
+- **Consistência**: Manter o prefixo "sender_" também poderia ser aplicado a `author_name` → `sender_name` no futuro, se desejado
+
