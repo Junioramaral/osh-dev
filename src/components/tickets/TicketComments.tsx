@@ -159,6 +159,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           ticket_id: ticketId,
           author_id: user?.id,
           author_name: profile?.full_name,
+          author_email: user?.email,
           content,
           is_internal
         })
