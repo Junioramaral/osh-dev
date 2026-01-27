@@ -1,139 +1,94 @@
 
-# Plano: Corrigir Estrutura do Payload do Webhook Resend
+# Plano: Corrigir Endpoint da API do Resend para Emails Inbound
 
 ## Problema Identificado
 
-O erro `TypeError: Cannot read properties of undefined (reading 'toLowerCase')` ocorre porque o código assume que o campo `from` é um **objeto** com propriedades `email` e `name`, mas a API do Resend envia `from` como uma **string** no formato:
+O conteúdo dos emails de resposta está chegando vazio porque a função está usando o **endpoint errado** da API do Resend:
+
+| Situação Atual | Situação Correta |
+|----------------|------------------|
+| `https://api.resend.com/emails/${email_id}` | `https://api.resend.com/emails/receiving/${email_id}` |
+| Retorna emails **enviados** | Retorna emails **recebidos** |
+| Não encontra o email_id de inbound | Retorna html e text do email recebido |
+
+### Evidência no Banco de Dados
 
 ```
-"Acme <email@example.com>"
+content: ""  ← Vazio para comentários de email
+sender_email: contato@lexisflow.adv.br
+source: email
 ```
 
-### Evidência dos Logs
+O comentário é criado, mas sem conteúdo porque a API retorna vazio ou erro para o endpoint errado.
 
-```
-Processing email from: undefined Subject: Re: [Ticket #00000006]...
-```
-
-O `from.email` retorna `undefined` porque `from` é uma string, não um objeto.
-
-## Alterações Necessárias
+## Alteração Necessária
 
 ### Arquivo: `supabase/functions/receive-email-reply/index.ts`
 
-#### 1. Corrigir Interface `EmailReceivedPayload`
-
-Alterar o tipo do campo `from` de objeto para string:
+**Linha 251-252** - Alterar a URL do endpoint:
 
 ```text
 ANTES:
-from: {
-  email: string;
-  name?: string;
-};
+const emailDetailResponse = await fetch(
+  `https://api.resend.com/emails/${email_id}`,
 
 DEPOIS:
-from: string;  // Formato: "Name <email@example.com>"
+const emailDetailResponse = await fetch(
+  `https://api.resend.com/emails/receiving/${email_id}`,
 ```
 
-#### 2. Criar Função para Parsear Endereço de Email
+### Adicionar Logs de Debug
 
-Adicionar função utilitária para extrair email e nome da string:
+Para garantir visibilidade do conteúdo recebido, adicionar logs após buscar o email:
 
 ```typescript
-function parseEmailAddress(fromString: string): { email: string; name: string } {
-  // Formato: "Name <email@example.com>" ou "email@example.com"
-  const match = fromString?.match(/^(?:(.+?)\s*)?<(.+)>$/);
-  if (match) {
-    return {
-      name: match[1]?.trim() || "",
-      email: match[2].trim()
-    };
-  }
-  // Fallback: assume que é só o email
-  return {
-    name: "",
-    email: fromString?.trim() || ""
-  };
+if (emailDetailResponse.ok) {
+  const emailDetail = await emailDetailResponse.json();
+  console.log("Email content fetched - text length:", emailDetail.text?.length || 0);
+  console.log("Email content fetched - html length:", emailDetail.html?.length || 0);
+  emailContent = emailDetail.text || emailDetail.html || text || "";
 }
 ```
-
-#### 3. Adicionar Validações de Entrada com Null Checks
-
-Validar se `data` existe antes de processar:
-
-```typescript
-// Validar que os dados necessários existem
-if (!webhookData.data) {
-  console.log("No data in webhook payload");
-  return new Response(...);
-}
-
-const { from, subject, text, html, email_id } = webhookData.data;
-
-// Validar campos obrigatórios
-if (!from || !subject) {
-  console.log("Missing required fields: from or subject");
-  return new Response(...);
-}
-```
-
-#### 4. Atualizar Todas as Referências a `from`
-
-Usar a função de parse e optional chaining:
-
-```text
-Linha 161: from.email → parsedFrom.email
-Linha 193: from.email.toLowerCase() → parsedFrom.email?.toLowerCase()
-Linha 249: from.email → parsedFrom.email
-Linha 250: from.name → parsedFrom.name
-Linha 268: from.email → parsedFrom.email
-Linha 302: from.name → parsedFrom.name
-Linha 303: from.email → parsedFrom.email
-```
-
-## Resumo das Mudanças
-
-| Seção | Mudança |
-|-------|---------|
-| Linhas 14-28 | Corrigir interface - `from` como string |
-| Após linha 95 | Adicionar função `parseEmailAddress()` |
-| Linhas 149-161 | Adicionar validação de entrada |
-| Linhas 159-161 | Parsear `from` e usar resultado |
-| Linhas 193-204 | Usar `parsedFrom.email?.toLowerCase()` |
-| Linhas 249-252 | Usar `parsedFrom.email` e `parsedFrom.name` |
-| Linhas 268-269 | Usar `parsedFrom.email` no metadata |
-| Linhas 302-303 | Usar `parsedFrom` na notificação |
 
 ## Fluxo Corrigido
 
 ```text
-┌─────────────────────────────────────┐
-│ Webhook Payload                     │
-│ from: "Cliente <cliente@email.com>" │
-└─────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────┐
-│ parseEmailAddress(from)             │
-│ → { email: "cliente@email.com",     │
-│     name: "Cliente" }               │
-└─────────────────────────────────────┘
-                │
-                ▼
-┌─────────────────────────────────────┐
-│ Usar parsedFrom.email para:        │
-│ - Log                               │
-│ - Validação com ticket.contact_email│
-│ - Inserir comentário                │
-│ - Histórico                         │
-│ - Notificação ao analista           │
-└─────────────────────────────────────┘
+┌────────────────────────────────────────┐
+│ Webhook recebido com email_id          │
+└────────────────────────────────────────┘
+                 │
+                 ▼
+┌────────────────────────────────────────┐
+│ GET /emails/receiving/{email_id}       │
+│ (antes: /emails/{email_id} ← ERRADO)   │
+└────────────────────────────────────────┘
+                 │
+                 ▼
+┌────────────────────────────────────────┐
+│ Response:                              │
+│ {                                      │
+│   "html": "<p>Conteúdo do email</p>",  │
+│   "text": "Conteúdo do email",         │
+│   ...                                  │
+│ }                                      │
+└────────────────────────────────────────┘
+                 │
+                 ▼
+┌────────────────────────────────────────┐
+│ cleanContent = Limpa quoted text       │
+│ Insere comentário com conteúdo real    │
+└────────────────────────────────────────┘
 ```
+
+## Resumo das Mudanças
+
+| Linha | Mudança |
+|-------|---------|
+| 251-252 | Corrigir URL: `/emails/${email_id}` → `/emails/receiving/${email_id}` |
+| 260-262 | Adicionar logs de debug para visualizar tamanho do conteúdo |
 
 ## Resultado Esperado
 
-- Emails de resposta serão processados corretamente
-- Comentários serão inseridos no banco de dados
-- Erro `TypeError` será eliminado
-- Validações robustas evitarão crashes futuros
+- Emails de resposta terão seu conteúdo exibido corretamente
+- Comentários serão inseridos com o texto real da mensagem
+- Logs mostrarão o tamanho do conteúdo recebido para debugging
