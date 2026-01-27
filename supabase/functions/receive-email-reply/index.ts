@@ -27,19 +27,33 @@ interface EmailReceivedPayload {
   };
 }
 
-// Função para validar webhook signature do Resend
+// Função para validar webhook signature do Resend (Svix)
 async function verifyWebhookSignature(
   payload: string,
-  signature: string,
+  signatureHeader: string,
   timestamp: string,
+  svixId: string,
   secret: string
 ): Promise<boolean> {
   try {
-    const signedPayload = `${timestamp}.${payload}`;
+    // 1. Remove o prefixo "whsec_" e decodifica de Base64
+    const secretWithoutPrefix = secret.startsWith("whsec_") 
+      ? secret.slice(6) 
+      : secret;
+    
+    const secretBytes = Uint8Array.from(
+      atob(secretWithoutPrefix),
+      (c) => c.charCodeAt(0)
+    );
+    
+    // 2. Constrói o signedContent no formato Svix: msg_id.timestamp.body
+    const signedContent = `${svixId}.${timestamp}.${payload}`;
+    
+    // 3. Calcula HMAC-SHA256
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
-      encoder.encode(secret),
+      secretBytes,
       { name: "HMAC", hash: "SHA-256" },
       false,
       ["sign"]
@@ -48,14 +62,26 @@ async function verifyWebhookSignature(
     const signatureBytes = await crypto.subtle.sign(
       "HMAC",
       key,
-      encoder.encode(signedPayload)
+      encoder.encode(signedContent)
     );
     
-    const expectedSignature = Array.from(new Uint8Array(signatureBytes))
-      .map(b => b.toString(16).padStart(2, '0'))
-      .join('');
+    // 4. Codifica o resultado em Base64
+    const computedSignature = btoa(
+      String.fromCharCode(...new Uint8Array(signatureBytes))
+    );
     
-    return signature === expectedSignature;
+    // 5. Extrai e compara as assinaturas do header (formato: "v1,sig1 v1,sig2")
+    const signatures = signatureHeader.split(" ");
+    
+    for (const sig of signatures) {
+      const [version, signature] = sig.split(",");
+      if (version === "v1" && signature === computedSignature) {
+        return true;
+      }
+    }
+    
+    console.error("Signature mismatch. Computed:", computedSignature);
+    return false;
   } catch (error) {
     console.error("Error verifying webhook signature:", error);
     return false;
@@ -106,6 +132,7 @@ const handler = async (req: Request): Promise<Response> => {
       payload,
       svixSignature,
       svixTimestamp,
+      svixId!,
       RESEND_WEBHOOK_SECRET
     );
     
