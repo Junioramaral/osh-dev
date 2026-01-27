@@ -219,7 +219,7 @@ const handler = async (req: Request): Promise<Response> => {
         content: cleanContent,
         is_internal: false,
         source: "email",
-        author_email: from.email,
+        sender_email: from.email,
         author_name: from.name || ticket.contact_name,
         email_message_id: email_id,
       });
