@@ -876,7 +876,6 @@ export type Database = {
       ticket_comments: {
         Row: {
           attachments: Json | null
-          author_email: string | null
           author_id: string | null
           author_name: string | null
           content: string
@@ -884,12 +883,12 @@ export type Database = {
           email_message_id: string | null
           id: string
           is_internal: boolean | null
+          sender_email: string | null
           source: Database["public"]["Enums"]["comment_source"] | null
           ticket_id: string
         }
         Insert: {
           attachments?: Json | null
-          author_email?: string | null
           author_id?: string | null
           author_name?: string | null
           content: string
@@ -897,12 +896,12 @@ export type Database = {
           email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
+          sender_email?: string | null
           source?: Database["public"]["Enums"]["comment_source"] | null
           ticket_id: string
         }
         Update: {
           attachments?: Json | null
-          author_email?: string | null
           author_id?: string | null
           author_name?: string | null
           content?: string
@@ -910,6 +909,7 @@ export type Database = {
           email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
+          sender_email?: string | null
           source?: Database["public"]["Enums"]["comment_source"] | null
           ticket_id?: string
         }
