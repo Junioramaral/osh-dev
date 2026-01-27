@@ -14,16 +14,35 @@ const corsHeaders = {
 interface EmailReceivedPayload {
   type: "email.received";
   data: {
-    from: {
-      email: string;
-      name?: string;
-    };
+    from: string;  // Formato: "Name <email@example.com>"
     to: string[];
     subject: string;
     html?: string;
     text?: string;
     email_id: string;
     created_at: string;
+  };
+}
+
+// Função para parsear endereço de email no formato "Name <email@example.com>"
+function parseEmailAddress(fromString: string): { email: string; name: string } {
+  if (!fromString) {
+    return { email: "", name: "" };
+  }
+  
+  // Formato: "Name <email@example.com>" ou apenas "email@example.com"
+  const match = fromString.match(/^(?:(.+?)\s*)?<(.+)>$/);
+  if (match) {
+    return {
+      name: match[1]?.trim() || "",
+      email: match[2].trim()
+    };
+  }
+  
+  // Fallback: assume que é só o email
+  return {
+    name: "",
+    email: fromString.trim()
   };
 }
 
@@ -156,9 +175,30 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Validar que os dados necessários existem
+    if (!webhookData.data) {
+      console.log("No data in webhook payload");
+      return new Response(
+        JSON.stringify({ message: "No data in payload" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const { from, subject, text, html, email_id } = webhookData.data;
     
-    console.log("Processing email from:", from.email, "Subject:", subject);
+    // Validar campos obrigatórios
+    if (!from || !subject) {
+      console.log("Missing required fields - from:", from, "subject:", subject);
+      return new Response(
+        JSON.stringify({ message: "Missing required fields" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
+    // Parsear o endereço de email
+    const parsedFrom = parseEmailAddress(from);
+    
+    console.log("Processing email from:", parsedFrom.email, "Name:", parsedFrom.name, "Subject:", subject);
 
     // Extrair número do ticket
     const ticketNumber = extractTicketNumber(subject);
@@ -190,10 +230,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     // Validar que o remetente é o contato do ticket
-    if (from.email.toLowerCase() !== ticket.contact_email.toLowerCase()) {
+    if (!parsedFrom.email || parsedFrom.email.toLowerCase() !== ticket.contact_email?.toLowerCase()) {
       console.error(
         "Sender email does not match ticket contact:",
-        from.email,
+        parsedFrom.email,
         "vs",
         ticket.contact_email
       );
@@ -246,8 +286,8 @@ const handler = async (req: Request): Promise<Response> => {
         content: cleanContent,
         is_internal: false,
         source: "email",
-        sender_email: from.email,
-        sender_name: from.name || ticket.contact_name,
+        sender_email: parsedFrom.email,
+        sender_name: parsedFrom.name || ticket.contact_name,
         email_message_id: email_id,
       });
 
@@ -265,7 +305,7 @@ const handler = async (req: Request): Promise<Response> => {
         action_type: "comment_added_email",
         new_value: "Cliente respondeu por email",
         metadata: {
-          email: from.email,
+          email: parsedFrom.email,
           email_id: email_id,
         },
       });
@@ -299,8 +339,8 @@ const handler = async (req: Request): Promise<Response> => {
               ticketNumber: ticket.ticket_number,
               ticketTitle: ticket.title,
               commentContent: cleanContent,
-              clientName: from.name || ticket.contact_name,
-              clientEmail: from.email,
+              clientName: parsedFrom.name || ticket.contact_name,
+              clientEmail: parsedFrom.email,
             }),
           }
         );
