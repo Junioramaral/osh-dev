@@ -28,7 +28,28 @@ import {
   UserCheck,
   FileText,
   Undo2,
+  LucideIcon,
+  LayoutGrid,
 } from "lucide-react";
+
+// Componente de Seção do Dashboard
+interface DashboardSectionProps {
+  title: string;
+  icon: LucideIcon;
+  children: React.ReactNode;
+}
+
+const DashboardSection = ({ title, icon: Icon, children }: DashboardSectionProps) => (
+  <div className="space-y-4">
+    <div className="flex items-center gap-2 text-muted-foreground">
+      <Icon className="w-4 h-4" />
+      <h3 className="text-sm font-medium uppercase tracking-wider">{title}</h3>
+    </div>
+    <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+      {children}
+    </div>
+  </div>
+);
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import AppLayout from "@/components/layout/AppLayout";
 import { format, subMonths, startOfMonth, endOfMonth, differenceInMinutes, subDays } from "date-fns";
@@ -322,7 +343,8 @@ const Dashboard = () => {
     }
   };
 
-  const statCards = [
+  // Grupo 1: Visão Geral de Tickets
+  const ticketOverviewCards = [
     {
       title: "Total de Tickets",
       value: stats.totalTickets,
@@ -358,6 +380,10 @@ const Dashboard = () => {
       color: "text-purple-600",
       bgColor: "bg-purple-100",
     },
+  ];
+
+  // Grupo 2: Performance e SLA
+  const slaPerformanceCards = [
     {
       title: "Fora do SLA",
       value: stats.ticketsForaSLA,
@@ -365,6 +391,10 @@ const Dashboard = () => {
       color: "text-destructive",
       bgColor: "bg-destructive/10",
     },
+  ];
+
+  // Grupo 3: Distribuição por Segmento
+  const distributionCards = [
     {
       title: "Tickets DB",
       value: stats.ticketsDB,
@@ -381,8 +411,10 @@ const Dashboard = () => {
     },
   ];
 
-  if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
-    statCards.push({
+  // Card de clientes (condicional)
+  const showClientsCard = isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app');
+  if (showClientsCard) {
+    distributionCards.push({
       title: "Total de Clientes",
       value: stats.totalClientes,
       icon: Users,
@@ -390,6 +422,26 @@ const Dashboard = () => {
       bgColor: "bg-primary/10",
     });
   }
+
+  // Helper para renderizar cards individuais
+  const renderStatCard = (stat: { title: string; value: number; icon: LucideIcon; color: string; bgColor: string }) => {
+    const Icon = stat.icon;
+    return (
+      <Card key={stat.title} className="hover:shadow-md transition-shadow">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-medium text-muted-foreground">
+            {stat.title}
+          </CardTitle>
+          <div className={`p-2 rounded-lg ${stat.bgColor}`}>
+            <Icon className={`w-4 h-4 ${stat.color}`} />
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="text-2xl font-bold">{stat.value}</div>
+        </CardContent>
+      </Card>
+    );
+  };
 
   return (
     <AppLayout>
@@ -466,108 +518,114 @@ const Dashboard = () => {
         </Card>
 
         {loading ? (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            {[...Array(10)].map((_, i) => (
-              <Card key={i} className="animate-pulse">
-                <CardHeader className="space-y-2">
-                  <div className="h-4 bg-muted rounded w-2/3" />
-                </CardHeader>
-                <CardContent>
-                  <div className="h-8 bg-muted rounded w-1/2" />
-                </CardContent>
-              </Card>
+          <div className="space-y-8">
+            {[...Array(3)].map((_, sectionIdx) => (
+              <div key={sectionIdx} className="space-y-4">
+                <div className="flex items-center gap-2">
+                  <div className="h-4 w-4 bg-muted rounded animate-pulse" />
+                  <div className="h-4 w-32 bg-muted rounded animate-pulse" />
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                  {[...Array(4)].map((_, i) => (
+                    <Card key={i} className="animate-pulse">
+                      <CardHeader className="space-y-2">
+                        <div className="h-4 bg-muted rounded w-2/3" />
+                      </CardHeader>
+                      <CardContent>
+                        <div className="h-8 bg-muted rounded w-1/2" />
+                      </CardContent>
+                    </Card>
+                  ))}
+                </div>
+              </div>
             ))}
           </div>
         ) : (
-          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
-            {/* Card especial de Taxa SLA */}
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Taxa de Resolução SLA
-                </CardTitle>
-                <div className={`p-2 rounded-lg ${
-                  stats.taxaSLA >= 90 ? "bg-green-100" : stats.taxaSLA >= 70 ? "bg-yellow-100" : "bg-red-100"
-                }`}>
-                  <Target className={`w-4 h-4 ${
-                    stats.taxaSLA >= 90 ? "text-green-600" : stats.taxaSLA >= 70 ? "text-yellow-600" : "text-red-600"
-                  }`} />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className={`text-2xl font-bold ${
-                  stats.taxaSLA >= 90 ? "text-green-600" : stats.taxaSLA >= 70 ? "text-yellow-600" : "text-red-600"
-                }`}>
-                  {stats.taxaSLA}%
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {stats.ticketsResolvidosDentroSLA} de {stats.ticketsResolvidosDentroSLA + stats.ticketsResolvidosForaSLA} no prazo
-                </p>
-              </CardContent>
-            </Card>
+          <div className="space-y-8">
+            {/* Seção 1: Visão Geral de Tickets */}
+            <DashboardSection title="Visão Geral de Tickets" icon={Ticket}>
+              {ticketOverviewCards.map(renderStatCard)}
+              {/* Card de Tickets Retornados por Inatividade - Apenas Admin */}
+              {(isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app') || hasRole('tenant_admin')) && (
+                <Card className="hover:shadow-md transition-shadow">
+                  <CardHeader className="flex flex-row items-center justify-between pb-2">
+                    <CardTitle className="text-sm font-medium text-muted-foreground">
+                      Retornados à Fila ({stats.inactivityDays}d)
+                    </CardTitle>
+                    <div className="p-2 rounded-lg bg-warning/20">
+                      <Undo2 className="w-4 h-4 text-warning" />
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <div className={`text-2xl font-bold ${
+                      stats.ticketsRetornadosInatividade > 0 ? "text-warning" : "text-green-600"
+                    }`}>
+                      {stats.ticketsRetornadosInatividade}
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      desbloqueados por inatividade
+                    </p>
+                  </CardContent>
+                </Card>
+              )}
+            </DashboardSection>
 
-            {/* Card de Tempo Médio de Resolução */}
-            <Card className="hover:shadow-md transition-shadow">
-              <CardHeader className="flex flex-row items-center justify-between pb-2">
-                <CardTitle className="text-sm font-medium text-muted-foreground">
-                  Tempo Médio de Resolução
-                </CardTitle>
-                <div className="p-2 rounded-lg bg-blue-100">
-                  <Timer className="w-4 h-4 text-blue-600" />
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="text-2xl font-bold text-blue-600">
-                  {formatarTempoResolucao(stats.tempoMedioResolucaoMinutos)}
-                </div>
-                <p className="text-xs text-muted-foreground mt-1">
-                  baseado em {stats.ticketsFechados} tickets resolvidos
-                </p>
-              </CardContent>
-            </Card>
-
-            {/* Card de Tickets Retornados por Inatividade - Apenas Admin */}
-            {(isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app') || hasRole('tenant_admin')) && (
+            {/* Seção 2: Performance e SLA */}
+            <DashboardSection title="Performance e SLA" icon={Target}>
+              {/* Card especial de Taxa SLA */}
               <Card className="hover:shadow-md transition-shadow">
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
                   <CardTitle className="text-sm font-medium text-muted-foreground">
-                    Retornados à Fila ({stats.inactivityDays}d)
+                    Taxa de Resolução SLA
                   </CardTitle>
-                  <div className="p-2 rounded-lg bg-warning/20">
-                    <Undo2 className="w-4 h-4 text-warning" />
+                  <div className={`p-2 rounded-lg ${
+                    stats.taxaSLA >= 90 ? "bg-green-100" : stats.taxaSLA >= 70 ? "bg-yellow-100" : "bg-red-100"
+                  }`}>
+                    <Target className={`w-4 h-4 ${
+                      stats.taxaSLA >= 90 ? "text-green-600" : stats.taxaSLA >= 70 ? "text-yellow-600" : "text-red-600"
+                    }`} />
                   </div>
                 </CardHeader>
                 <CardContent>
                   <div className={`text-2xl font-bold ${
-                    stats.ticketsRetornadosInatividade > 0 ? "text-warning" : "text-green-600"
+                    stats.taxaSLA >= 90 ? "text-green-600" : stats.taxaSLA >= 70 ? "text-yellow-600" : "text-red-600"
                   }`}>
-                    {stats.ticketsRetornadosInatividade}
+                    {stats.taxaSLA}%
                   </div>
                   <p className="text-xs text-muted-foreground mt-1">
-                    desbloqueados por inatividade
+                    {stats.ticketsResolvidosDentroSLA} de {stats.ticketsResolvidosDentroSLA + stats.ticketsResolvidosForaSLA} no prazo
                   </p>
                 </CardContent>
               </Card>
-            )}
-            
-            {statCards.map((stat) => {
-              const Icon = stat.icon;
-              return (
-                <Card key={stat.title} className="hover:shadow-md transition-shadow">
-                  <CardHeader className="flex flex-row items-center justify-between pb-2">
-                    <CardTitle className="text-sm font-medium text-muted-foreground">
-                      {stat.title}
-                    </CardTitle>
-                    <div className={`p-2 rounded-lg ${stat.bgColor}`}>
-                      <Icon className={`w-4 h-4 ${stat.color}`} />
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="text-2xl font-bold">{stat.value}</div>
-                  </CardContent>
-                </Card>
-              );
-            })}
+
+              {/* Card de Tempo Médio de Resolução */}
+              <Card className="hover:shadow-md transition-shadow">
+                <CardHeader className="flex flex-row items-center justify-between pb-2">
+                  <CardTitle className="text-sm font-medium text-muted-foreground">
+                    Tempo Médio de Resolução
+                  </CardTitle>
+                  <div className="p-2 rounded-lg bg-blue-100">
+                    <Timer className="w-4 h-4 text-blue-600" />
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  <div className="text-2xl font-bold text-blue-600">
+                    {formatarTempoResolucao(stats.tempoMedioResolucaoMinutos)}
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    baseado em {stats.ticketsFechados} tickets resolvidos
+                  </p>
+                </CardContent>
+              </Card>
+
+              {/* Outros cards de SLA */}
+              {slaPerformanceCards.map(renderStatCard)}
+            </DashboardSection>
+
+            {/* Seção 3: Distribuição por Segmento */}
+            <DashboardSection title="Distribuição por Segmento" icon={LayoutGrid}>
+              {distributionCards.map(renderStatCard)}
+            </DashboardSection>
           </div>
         )}
 
