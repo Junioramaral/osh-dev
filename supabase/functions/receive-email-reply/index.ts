@@ -198,6 +198,20 @@ const handler = async (req: Request): Promise<Response> => {
     // Parsear o endereço de email
     const parsedFrom = parseEmailAddress(from);
     
+    // Ignorar emails enviados pelo próprio sistema (previne loop de notificação)
+    const systemEmails = [
+      "noreply@otimizzo.com",
+      "suporte@otimizzo.com"
+    ];
+    
+    if (systemEmails.includes(parsedFrom.email?.toLowerCase() || "")) {
+      console.log("Ignoring email from system address:", parsedFrom.email);
+      return new Response(
+        JSON.stringify({ message: "System email ignored" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+    
     console.log("Processing email from:", parsedFrom.email, "Name:", parsedFrom.name, "Subject:", subject);
 
     // Extrair número do ticket
