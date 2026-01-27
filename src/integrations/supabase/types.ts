@@ -877,39 +877,39 @@ export type Database = {
         Row: {
           attachments: Json | null
           author_id: string | null
-          author_name: string | null
           content: string
           created_at: string | null
           email_message_id: string | null
           id: string
           is_internal: boolean | null
           sender_email: string | null
+          sender_name: string | null
           source: Database["public"]["Enums"]["comment_source"] | null
           ticket_id: string
         }
         Insert: {
           attachments?: Json | null
           author_id?: string | null
-          author_name?: string | null
           content: string
           created_at?: string | null
           email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
           sender_email?: string | null
+          sender_name?: string | null
           source?: Database["public"]["Enums"]["comment_source"] | null
           ticket_id: string
         }
         Update: {
           attachments?: Json | null
           author_id?: string | null
-          author_name?: string | null
           content?: string
           created_at?: string | null
           email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
           sender_email?: string | null
+          sender_name?: string | null
           source?: Database["public"]["Enums"]["comment_source"] | null
           ticket_id?: string
         }

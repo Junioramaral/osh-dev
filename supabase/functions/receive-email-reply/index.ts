@@ -220,7 +220,7 @@ const handler = async (req: Request): Promise<Response> => {
         is_internal: false,
         source: "email",
         sender_email: from.email,
-        author_name: from.name || ticket.contact_name,
+        sender_name: from.name || ticket.contact_name,
         email_message_id: email_id,
       });
 
