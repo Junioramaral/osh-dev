@@ -58,7 +58,7 @@ export function useTicketActions() {
         .insert({
           ticket_id: ticketId,
           author_id: userId,
-          author_name: authorName,
+          sender_name: authorName,
           content: `Motivo da Resolução: ${reason}`,
           is_internal: false,
         });

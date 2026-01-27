@@ -161,7 +161,7 @@ export function useBulkTicketActions() {
           .insert({
             ticket_id: ticket.id,
             author_id: userId,
-            author_name: authorName,
+            sender_name: authorName,
             content: commentContent,
             is_internal: false,
           });
@@ -316,7 +316,7 @@ export function useBulkTicketActions() {
           .insert({
             ticket_id: ticketId,
             author_id: userId,
-            author_name: authorName,
+            sender_name: authorName,
             content: `📋 Ticket transferido de outro analista.\n\nMotivo: ${reason}`,
             is_internal: true,
           });
@@ -392,7 +392,7 @@ export function useBulkTicketActions() {
           .insert({
             ticket_id: ticketId,
             author_id: userId,
-            author_name: authorName,
+            sender_name: authorName,
             content: `📋 Ticket transferido para ${newAnalystName}.\n\nMotivo: ${reason}`,
             is_internal: true,
           });
