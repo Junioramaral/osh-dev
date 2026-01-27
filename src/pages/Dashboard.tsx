@@ -40,15 +40,15 @@ interface DashboardSectionProps {
 }
 
 const DashboardSection = ({ title, icon: Icon, children }: DashboardSectionProps) => (
-  <div className="space-y-4">
-    <div className="flex items-center gap-2 text-muted-foreground">
+  <Card className="p-6 bg-muted/30 border-dashed">
+    <div className="flex items-center gap-2 text-muted-foreground mb-4">
       <Icon className="w-4 h-4" />
       <h3 className="text-sm font-medium uppercase tracking-wider">{title}</h3>
     </div>
     <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
       {children}
     </div>
-  </div>
+  </Card>
 );
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import AppLayout from "@/components/layout/AppLayout";
