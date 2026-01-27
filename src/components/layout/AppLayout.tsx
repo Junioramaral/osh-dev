@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { usePendingTicketsCount } from "@/hooks/usePendingTicketsCount";
 import { useMyTicketsCount } from "@/hooks/useMyTicketsCount";
 import { TicketCountBadge } from "@/components/layout/TicketCountBadge";
+import { SLAAlertBell } from "@/components/layout/SLAAlertBell";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
 import { GradientSeparator } from "@/components/ui/gradient-separator";
@@ -79,14 +80,17 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
   const SidebarContent = () => (
     <>
-      <div className="flex items-center gap-2 p-4 border-b border-sidebar-border">
-        <div className="flex items-center justify-center w-10 h-10 bg-sidebar-primary rounded-lg">
-          <Server className="w-5 h-5 text-sidebar-primary-foreground" />
+      <div className="flex items-center justify-between p-4 border-b border-sidebar-border">
+        <div className="flex items-center gap-2">
+          <div className="flex items-center justify-center w-10 h-10 bg-sidebar-primary rounded-lg">
+            <Server className="w-5 h-5 text-sidebar-primary-foreground" />
+          </div>
+          <div>
+            <h2 className="font-semibold text-sidebar-foreground">Otimizzo</h2>
+            <p className="text-xs text-sidebar-foreground/70">Service Hub</p>
+          </div>
         </div>
-        <div>
-          <h2 className="font-semibold text-sidebar-foreground">Otimizzo</h2>
-          <p className="text-xs text-sidebar-foreground/70">Service Hub</p>
-        </div>
+        <SLAAlertBell />
       </div>
 
       <nav className="flex-1 p-4 space-y-4 overflow-y-auto">
@@ -201,18 +205,21 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           </div>
           <span className="font-semibold">Otimizzo</span>
         </div>
-        <Sheet open={open} onOpenChange={setOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon">
-              <Menu className="w-5 h-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">
-            <div className="flex flex-col h-full">
-              <SidebarContent />
-            </div>
-          </SheetContent>
-        </Sheet>
+        <div className="flex items-center gap-2">
+          <SLAAlertBell />
+          <Sheet open={open} onOpenChange={setOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon">
+                <Menu className="w-5 h-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">
+              <div className="flex flex-col h-full">
+                <SidebarContent />
+              </div>
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
       {/* Main Content */}

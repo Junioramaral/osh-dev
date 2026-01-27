@@ -20,6 +20,7 @@ import FAQ from "./pages/FAQ";
 import TenantAdmin from "./pages/TenantAdmin";
 import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
+import SLAAcknowledge from "./pages/SLAAcknowledge";
 import CSATDashboard from "./pages/CSATDashboard";
 import UserPermissions from "./pages/UserPermissions";
 import SystemSettings from "./pages/SystemSettings";
@@ -45,6 +46,7 @@ const App = () => (
             <Route path="/tickets/:ticketId" element={<TicketDetail />} />
             <Route path="/feedback/:ticketId/:token" element={<TicketFeedback />} />
             <Route path="/sla-dashboard" element={<SLADashboard />} />
+            <Route path="/sla-acknowledge/:notificationId/:token" element={<SLAAcknowledge />} />
             <Route path="/csat" element={<CSATDashboard />} />
             <Route path="/clients" element={<Clients />} />
             <Route path="/databases" element={<Databases />} />
