@@ -1,79 +1,93 @@
 
 
-# Plano: Renomear `author_name` para `sender_name`
+# Plano: Corrigir Verificação de Assinatura do Webhook Resend
 
-## Objetivo
+## Problema Identificado
 
-Renomear o campo `author_name` para `sender_name` na tabela `ticket_comments` para manter consistência semântica com o campo `sender_email` que acabou de ser renomeado.
+A função `receive-email-reply` está retornando erro 401 porque a verificação de assinatura está incorreta. O Resend usa **Svix** para webhooks e o formato é diferente do implementado atualmente.
 
-## Análise de Impacto
+## Diferenças Entre Implementação Atual e Correta
 
-O campo `author_name` é utilizado em **5 arquivos** do projeto:
+| Aspecto | Implementação Atual | Implementação Correta |
+|---------|---------------------|----------------------|
+| Formato do Secret | Usado diretamente como texto | Remover prefixo `whsec_` e decodificar de Base64 |
+| Signed Content | `${timestamp}.${payload}` | `${svix_id}.${svix_timestamp}.${body}` |
+| Formato da Assinatura | Comparação hexadecimal | Formato `v1,BASE64_SIGNATURE` (decodificar) |
+| Comparação | String simples | Comparar múltiplas assinaturas possíveis |
 
-| Arquivo | Ocorrências | Uso |
-|---------|-------------|-----|
-| `src/components/tickets/TicketComments.tsx` | 4 | Leitura e inserção de comentários |
-| `src/hooks/useTicketActions.ts` | 1 | Inserção de comentário na resolução |
-| `src/hooks/useBulkTicketActions.ts` | 4 | Inserção de comentários em ações em massa |
-| `supabase/functions/receive-email-reply/index.ts` | 1 | Inserção de comentários via email |
-| `src/integrations/supabase/types.ts` | 3 | Tipos TypeScript (gerado automaticamente) |
+## Alterações Necessárias
 
-## Mudanças Necessárias
+### Arquivo: `supabase/functions/receive-email-reply/index.ts`
 
-### 1. Migração de Banco de Dados
+A função `verifyWebhookSignature` será completamente reescrita para:
 
-```sql
--- Renomear coluna author_name para sender_name
-ALTER TABLE public.ticket_comments 
-RENAME COLUMN author_name TO sender_name;
+1. **Extrair o secret real** removendo o prefixo `whsec_` e decodificando de Base64
+2. **Construir o signedContent** no formato correto: `${svix_id}.${svix_timestamp}.${body}`
+3. **Calcular o HMAC-SHA256** usando o secret decodificado
+4. **Comparar com cada assinatura** no header (formato `v1,base64signature v1,base64signature2`)
+5. **Retornar true** se qualquer assinatura corresponder
 
--- Atualizar comentário da coluna
-COMMENT ON COLUMN public.ticket_comments.sender_name IS 'Nome do remetente do comentário';
+## Detalhes Técnicos
+
+### Nova Função de Verificação
+
+```text
+Fluxo de Verificação:
+                                    
+┌─────────────────────────────────┐  
+│ Secret: whsec_ABC123...         │  
+│ Remove "whsec_" prefix          │  
+│ Base64 decode → bytes           │  
+└─────────────────────────────────┘  
+                 │                   
+                 ▼                   
+┌─────────────────────────────────┐  
+│ SignedContent =                 │  
+│ svix_id.svix_timestamp.body     │  
+└─────────────────────────────────┘  
+                 │                   
+                 ▼                   
+┌─────────────────────────────────┐  
+│ HMAC-SHA256(secretBytes,        │  
+│             signedContent)      │  
+│ Result → Base64 encode          │  
+└─────────────────────────────────┘  
+                 │                   
+                 ▼                   
+┌─────────────────────────────────┐  
+│ Header: "v1,sig1 v1,sig2"       │  
+│ Split by space                  │  
+│ Extract signature after "v1,"   │  
+│ Compare with computed signature │  
+└─────────────────────────────────┘  
 ```
 
-### 2. Atualizar Frontend
+### Código da Nova Implementação
 
-**Arquivo: `src/components/tickets/TicketComments.tsx`**
+A nova função de verificação:
 
-Linhas a alterar:
-- Linha 32: `comment.author_name` → `comment.sender_name` (2 ocorrências)
-- Linha 33: `comment.author_name` → `comment.sender_name`
-- Linha 37: `comment.author_name` → `comment.sender_name`
-- Linha 161: `author_name: profile?.full_name` → `sender_name: profile?.full_name`
+1. Decodifica o secret de Base64 (removendo prefixo `whsec_`)
+2. Cria o payload assinado: `svix_id.svix_timestamp.body`
+3. Gera HMAC-SHA256 e codifica em Base64
+4. Extrai todas as assinaturas do header (formato `v1,signature`)
+5. Compara cada uma com a assinatura calculada
 
-### 3. Atualizar Hooks
+### Atualização do Handler
 
-**Arquivo: `src/hooks/useTicketActions.ts`**
+O handler será atualizado para passar o `svixId` para a função de verificação, pois ele faz parte do signed content.
 
-- Linha 61: `author_name: authorName` → `sender_name: authorName`
+## Resumo das Mudanças
 
-**Arquivo: `src/hooks/useBulkTicketActions.ts`**
+| Linha Aprox. | Mudança |
+|--------------|---------|
+| 31-63 | Reescrever `verifyWebhookSignature` com lógica Svix correta |
+| 88-89 | Garantir que `svixId` está sendo usado |
+| 105-110 | Passar `svixId` para a função de verificação |
 
-- Linha 164: `author_name: authorName` → `sender_name: authorName`
-- Linha 319: `author_name: authorName` → `sender_name: authorName`
-- Linha 395: `author_name: authorName` → `sender_name: authorName`
+## Resultado Esperado
 
-### 4. Atualizar Edge Function
-
-**Arquivo: `supabase/functions/receive-email-reply/index.ts`**
-
-- Linha 223: `author_name: from.name || ticket.contact_name` → `sender_name: from.name || ticket.contact_name`
-
-### 5. Tipos TypeScript
-
-O arquivo `src/integrations/supabase/types.ts` será atualizado automaticamente após a migração ser aplicada.
-
-## Ordem de Execução
-
-1. **Primeiro**: Executar a migração do banco de dados
-2. **Segundo**: Atualizar todos os arquivos de código simultaneamente
-3. **Terceiro**: Os tipos TypeScript serão regenerados automaticamente
-
-## Considerações
-
-- **Sem perda de dados**: A operação `RENAME COLUMN` preserva todos os dados existentes
-- **Compatibilidade**: Todos os comentários existentes continuarão funcionando
-- **Consistência completa**: Após esta alteração, os campos terão o padrão consistente:
-  - `sender_email` - Email do remetente
-  - `sender_name` - Nome do remetente
+Após a implementação:
+- Webhook do Resend será verificado corretamente
+- Emails de resposta serão processados e adicionados como comentários
+- Erro 401 será eliminado para requisições legítimas
 
