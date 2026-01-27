@@ -14,7 +14,7 @@ const corsHeaders = {
 interface EmailReceivedPayload {
   type: "email.received";
   data: {
-    from: string;  // Formato: "Name <email@example.com>"
+    from: string;
     to: string[];
     subject: string;
     html?: string;
@@ -24,25 +24,33 @@ interface EmailReceivedPayload {
   };
 }
 
+// Helper para normalizar emails para comparações
+function normalizeEmail(email: string | undefined | null): string {
+  return email?.trim().toLowerCase() || "";
+}
+
 // Função para parsear endereço de email no formato "Name <email@example.com>"
 function parseEmailAddress(fromString: string): { email: string; name: string } {
   if (!fromString) {
     return { email: "", name: "" };
   }
   
+  // Normalizar: trim antes do match
+  const normalized = fromString.trim();
+  
   // Formato: "Name <email@example.com>" ou apenas "email@example.com"
-  const match = fromString.match(/^(?:(.+?)\s*)?<(.+)>$/);
+  const match = normalized.match(/^(?:(.+?)\s*)?<(.+)>$/);
   if (match) {
     return {
       name: match[1]?.trim() || "",
-      email: match[2].trim()
+      email: match[2].trim().toLowerCase()
     };
   }
   
   // Fallback: assume que é só o email
   return {
     name: "",
-    email: fromString.trim()
+    email: normalized.toLowerCase()
   };
 }
 
@@ -55,7 +63,6 @@ async function verifyWebhookSignature(
   secret: string
 ): Promise<boolean> {
   try {
-    // 1. Remove o prefixo "whsec_" e decodifica de Base64
     const secretWithoutPrefix = secret.startsWith("whsec_") 
       ? secret.slice(6) 
       : secret;
@@ -65,10 +72,8 @@ async function verifyWebhookSignature(
       (c) => c.charCodeAt(0)
     );
     
-    // 2. Constrói o signedContent no formato Svix: msg_id.timestamp.body
     const signedContent = `${svixId}.${timestamp}.${payload}`;
     
-    // 3. Calcula HMAC-SHA256
     const encoder = new TextEncoder();
     const key = await crypto.subtle.importKey(
       "raw",
@@ -84,12 +89,10 @@ async function verifyWebhookSignature(
       encoder.encode(signedContent)
     );
     
-    // 4. Codifica o resultado em Base64
     const computedSignature = btoa(
       String.fromCharCode(...new Uint8Array(signatureBytes))
     );
     
-    // 5. Extrai e compara as assinaturas do header (formato: "v1,sig1 v1,sig2")
     const signatures = signatureHeader.split(" ");
     
     for (const sig of signatures) {
@@ -107,10 +110,91 @@ async function verifyWebhookSignature(
   }
 }
 
-// Extrair número do ticket do assunto
-function extractTicketNumber(subject: string): string | null {
+// Extrair número do ticket do campo "to" (ticket-00000006@otimizzo.com)
+function extractTicketNumberFromTo(toAddresses: string[]): string | null {
+  if (!toAddresses || !Array.isArray(toAddresses)) {
+    return null;
+  }
+  
+  for (const addr of toAddresses) {
+    const match = addr.match(/ticket-(\d+)@/i);
+    if (match) {
+      return match[1];
+    }
+  }
+  return null;
+}
+
+// Extrair número do ticket do assunto [Ticket #00000006]
+function extractTicketNumberFromSubject(subject: string): string | null {
   const match = subject.match(/\[Ticket #(\d+)\]/);
   return match ? match[1] : null;
+}
+
+// Converter HTML básico para texto (strip tags)
+function htmlToText(html: string): string {
+  if (!html) return "";
+  
+  return html
+    // Remover scripts e styles
+    .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
+    .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
+    // Substituir <br> e <p> por quebras de linha
+    .replace(/<br\s*\/?>/gi, "\n")
+    .replace(/<\/p>/gi, "\n\n")
+    .replace(/<\/div>/gi, "\n")
+    // Remover todas as outras tags
+    .replace(/<[^>]+>/g, "")
+    // Decodificar entidades HTML comuns
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    // Limpar espaços extras
+    .replace(/\n{3,}/g, "\n\n")
+    .trim();
+}
+
+// Lista de emails do sistema para ignorar
+const SYSTEM_EMAILS = [
+  "noreply@otimizzo.com",
+  "suporte@otimizzo.com",
+  "mailer-daemon@",
+  "postmaster@",
+  "no-reply@",
+  "noreply@"
+];
+
+// Verificar se é email do sistema ou bounce
+function isSystemOrBounceEmail(email: string, subject: string): boolean {
+  const normalizedEmail = normalizeEmail(email);
+  
+  // Verificar emails do sistema
+  for (const sysEmail of SYSTEM_EMAILS) {
+    if (normalizedEmail === sysEmail || normalizedEmail.startsWith(sysEmail)) {
+      return true;
+    }
+  }
+  
+  // Verificar assuntos típicos de bounce
+  const bounceSubjects = [
+    "undelivered mail",
+    "delivery status notification",
+    "mail delivery failed",
+    "returned mail",
+    "failure notice"
+  ];
+  
+  const normalizedSubject = subject?.toLowerCase() || "";
+  for (const bounceSubj of bounceSubjects) {
+    if (normalizedSubject.includes(bounceSubj)) {
+      return true;
+    }
+  }
+  
+  return false;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -121,7 +205,6 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     console.log("Received email webhook from Resend");
 
-    // SECURITY: Require webhook secret - fail if not configured
     if (!RESEND_WEBHOOK_SECRET) {
       console.error("RESEND_WEBHOOK_SECRET not configured - rejecting request");
       return new Response(
@@ -130,12 +213,10 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Obter headers para validação
     const svixId = req.headers.get("svix-id");
     const svixTimestamp = req.headers.get("svix-timestamp");
     const svixSignature = req.headers.get("svix-signature");
 
-    // SECURITY: Require signature headers
     if (!svixSignature || !svixTimestamp) {
       console.error("Missing webhook signature headers");
       return new Response(
@@ -146,7 +227,6 @@ const handler = async (req: Request): Promise<Response> => {
 
     const payload = await req.text();
     
-    // Validar signature do webhook - MANDATORY
     const isValid = await verifyWebhookSignature(
       payload,
       svixSignature,
@@ -175,7 +255,6 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Validar que os dados necessários existem
     if (!webhookData.data) {
       console.log("No data in webhook payload");
       return new Response(
@@ -184,9 +263,8 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const { from, subject, text, html, email_id } = webhookData.data;
+    const { from, to, subject, text, html, email_id } = webhookData.data;
     
-    // Validar campos obrigatórios
     if (!from || !subject) {
       console.log("Missing required fields - from:", from, "subject:", subject);
       return new Response(
@@ -198,62 +276,86 @@ const handler = async (req: Request): Promise<Response> => {
     // Parsear o endereço de email
     const parsedFrom = parseEmailAddress(from);
     
-    // Ignorar emails enviados pelo próprio sistema (previne loop de notificação)
-    const systemEmails = [
-      "noreply@otimizzo.com",
-      "suporte@otimizzo.com"
-    ];
-    
-    if (systemEmails.includes(parsedFrom.email?.toLowerCase() || "")) {
-      console.log("Ignoring email from system address:", parsedFrom.email);
+    // VERIFICAÇÃO ROBUSTA: Ignorar emails do sistema ou bounces
+    if (isSystemOrBounceEmail(parsedFrom.email, subject)) {
+      console.log("Ignoring system/bounce email from:", parsedFrom.email, "Subject:", subject);
       return new Response(
-        JSON.stringify({ message: "System email ignored" }),
+        JSON.stringify({ message: "System/bounce email ignored" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
     
     console.log("Processing email from:", parsedFrom.email, "Name:", parsedFrom.name, "Subject:", subject);
 
-    // Extrair número do ticket
-    const ticketNumber = extractTicketNumber(subject);
+    // Extrair número do ticket - primeiro do "to", depois do subject
+    let ticketNumber = extractTicketNumberFromTo(to);
     
     if (!ticketNumber) {
-      console.log("No ticket number found in subject");
+      ticketNumber = extractTicketNumberFromSubject(subject);
+    }
+    
+    if (!ticketNumber) {
+      console.log("No ticket number found in 'to' addresses or subject");
       return new Response(
-        JSON.stringify({ message: "No ticket number in subject" }),
+        JSON.stringify({ message: "No ticket number found" }),
         { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
+    
+    console.log("Ticket number extracted:", ticketNumber);
 
     // Criar cliente Supabase
     const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+    // IDEMPOTÊNCIA: Verificar se este email já foi processado
+    if (email_id) {
+      const { data: existingComment } = await supabase
+        .from("ticket_comments")
+        .select("id")
+        .eq("email_message_id", email_id)
+        .maybeSingle();
+      
+      if (existingComment) {
+        console.log("Email already processed, skipping:", email_id);
+        return new Response(
+          JSON.stringify({ message: "Email already processed" }),
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    }
+
     // Buscar ticket
     const { data: ticket, error: ticketError } = await supabase
       .from("tickets")
-      .select("id, contact_email, contact_name, status, analyst_id, ticket_number, title")
+      .select("id, contact_email, contact_name, status, analyst_id, ticket_number, title, client_id")
       .eq("ticket_number", ticketNumber)
-      .single();
+      .maybeSingle();
 
     if (ticketError || !ticket) {
-      console.error("Ticket not found:", ticketNumber);
+      console.log("Ticket not found:", ticketNumber);
+      // Retorna 200 para não gerar retry
       return new Response(
-        JSON.stringify({ error: "Ticket not found" }),
-        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ message: "Ticket not found" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     // Validar que o remetente é o contato do ticket
-    if (!parsedFrom.email || parsedFrom.email.toLowerCase() !== ticket.contact_email?.toLowerCase()) {
-      console.error(
+    const senderEmail = normalizeEmail(parsedFrom.email);
+    const contactEmail = normalizeEmail(ticket.contact_email);
+    
+    if (!senderEmail || senderEmail !== contactEmail) {
+      console.log(
         "Sender email does not match ticket contact:",
-        parsedFrom.email,
+        senderEmail,
         "vs",
-        ticket.contact_email
+        contactEmail,
+        "- ignoring (returning 200)"
       );
+      // Retorna 200 para não gerar retry infinito
       return new Response(
-        JSON.stringify({ error: "Unauthorized sender" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ message: "Sender not authorized for this ticket" }),
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -273,32 +375,45 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (emailDetailResponse.ok) {
           const emailDetail = await emailDetailResponse.json();
-          console.log("Email content fetched - text length:", emailDetail.text?.length || 0);
-          console.log("Email content fetched - html length:", emailDetail.html?.length || 0);
-          emailContent = emailDetail.text || emailDetail.html || text || "";
+          console.log("Email content fetched - text length:", emailDetail.text?.length || 0, "html length:", emailDetail.html?.length || 0);
+          
+          // Priorizar text, mas converter HTML se text estiver vazio
+          if (emailDetail.text && emailDetail.text.trim()) {
+            emailContent = emailDetail.text;
+          } else if (emailDetail.html && emailDetail.html.trim()) {
+            emailContent = htmlToText(emailDetail.html);
+            console.log("Converted HTML to text, length:", emailContent.length);
+          } else {
+            emailContent = text || "";
+          }
         }
       } catch (error) {
         console.error("Error fetching email details:", error);
       }
     }
 
+    // Se ainda não tiver conteúdo, tentar do webhook
+    if (!emailContent && html) {
+      emailContent = htmlToText(html);
+    }
+
     // Limpar conteúdo do email (remover quoted text)
-    const cleanContent = emailContent.split(/On .* wrote:|Em .* escreveu:/)[0].trim();
+    let cleanContent = emailContent.split(/On .* wrote:|Em .* escreveu:/)[0].trim();
+    
+    // Se o conteúdo estiver vazio, usar um placeholder
+    if (!cleanContent) {
+      console.log("Warning: Email content is empty after processing");
+      cleanContent = "[Conteúdo do email não pôde ser extraído]";
+    }
+    
+    console.log("Final content length:", cleanContent.length);
 
-    // Tentar encontrar usuário existente
-    const { data: profile } = await supabase
-      .from("profiles")
-      .select("id")
-      .eq("client_id", ticket.id)
-      .limit(1)
-      .single();
-
-    // Inserir comentário
+    // Inserir comentário (author_id = null para replies por email)
     const { error: commentError } = await supabase
       .from("ticket_comments")
       .insert({
         ticket_id: ticket.id,
-        author_id: profile?.id || null,
+        author_id: null,
         content: cleanContent,
         is_internal: false,
         source: "email",
@@ -312,12 +427,14 @@ const handler = async (req: Request): Promise<Response> => {
       throw commentError;
     }
 
+    console.log("Comment inserted successfully");
+
     // Registrar no histórico
     const { error: historyError } = await supabase
       .from("ticket_history")
       .insert({
         ticket_id: ticket.id,
-        user_id: profile?.id || null,
+        user_id: null,
         action_type: "comment_added_email",
         new_value: "Cliente respondeu por email",
         metadata: {
@@ -336,6 +453,7 @@ const handler = async (req: Request): Promise<Response> => {
         .from("tickets")
         .update({ status: "em_atendimento" })
         .eq("id", ticket.id);
+      console.log("Ticket status updated to em_atendimento");
     }
 
     // Notificar analista responsável
@@ -368,7 +486,6 @@ const handler = async (req: Request): Promise<Response> => {
         }
       } catch (notifyError) {
         console.error("Error notifying analyst:", notifyError);
-        // Don't fail the request - the comment was saved
       }
     }
 
@@ -383,10 +500,11 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error("Error in receive-email-reply function:", error);
+    // Retorna 200 mesmo em erro para evitar retries infinitos do Resend
     return new Response(
       JSON.stringify({ error: error.message }),
       {
-        status: 500,
+        status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       }
     );
