@@ -2,6 +2,7 @@ import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.80.0";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+const RESEND_RECEIVING_API_KEY = Deno.env.get("RESEND_RECEIVING_API_KEY"); // Optional: separate key for receiving
 const RESEND_WEBHOOK_SECRET = Deno.env.get("RESEND_WEBHOOK_SECRET");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -382,15 +383,19 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     // PASSO 2: Se vazio, tentar da API do Resend (mais completo)
-    if (!emailContent && RESEND_API_KEY && email_id) {
+    // Usar RESEND_RECEIVING_API_KEY se disponível, senão RESEND_API_KEY
+    const receivingApiKey = RESEND_RECEIVING_API_KEY || RESEND_API_KEY;
+    
+    if (!emailContent && receivingApiKey && email_id) {
       try {
         console.log("Fetching full email content from Resend API for email_id:", email_id);
+        console.log("Using API key:", RESEND_RECEIVING_API_KEY ? "RESEND_RECEIVING_API_KEY" : "RESEND_API_KEY");
         
         const emailDetailResponse = await fetch(
           `https://api.resend.com/emails/receiving/${email_id}`,
           {
             headers: {
-              Authorization: `Bearer ${RESEND_API_KEY}`,
+              Authorization: `Bearer ${receivingApiKey}`,
             },
           }
         );
@@ -416,6 +421,17 @@ const handler = async (req: Request): Promise<Response> => {
         } else {
           const errorBody = await emailDetailResponse.text();
           console.error("Resend API error:", emailDetailResponse.status, errorBody);
+          
+          // Detectar erro de permissão e salvar placeholder mais informativo
+          try {
+            const errorJson = JSON.parse(errorBody);
+            if (errorJson.name === "restricted_api_key") {
+              emailContent = "[Erro de Permissão: A RESEND_API_KEY configurada não tem permissão para ler emails recebidos. Configure uma API key 'Full Access' no Resend e atualize o segredo no Supabase (Settings → Functions → Secrets).]";
+              console.error("CRITICAL: API key lacks receiving permission. Update to Full Access key.");
+            }
+          } catch {
+            // Ignore parse error, use generic placeholder later
+          }
         }
       } catch (error) {
         console.error("Error fetching email details:", error);
