@@ -129,15 +129,15 @@ const handler = async (req: Request): Promise<Response> => {
     const feedbackUrl = `${appUrl}/feedback/${ticketId}/${ticket.feedback_token}`;
 
     const emailResponse = await resend.emails.send({
-      from: "Otimizzo Suporte <noreply@otimizzo.com>",
-      replyTo: `ticket-${ticketNumber}@otimizzo.com`,
+      from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
+      replyTo: `ticket-${ticketNumber}@resend.otimizzo.com`,
       to: [contactEmail],
       cc: ccEmails && ccEmails.length > 0 ? ccEmails : undefined,
       subject: `[Ticket #${ticketNumber}] ✅ Resolvido - ${ticketTitle}`,
       headers: {
         'X-Ticket-Number': ticketNumber,
-        'In-Reply-To': `<ticket-${ticketNumber}@otimizzo.com>`,
-        'References': `<ticket-${ticketNumber}@otimizzo.com>`,
+        'In-Reply-To': `<ticket-${ticketNumber}@resend.otimizzo.com>`,
+        'References': `<ticket-${ticketNumber}@resend.otimizzo.com>`,
       },
       html: `
         <!DOCTYPE html>

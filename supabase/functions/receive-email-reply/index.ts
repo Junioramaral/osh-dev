@@ -110,14 +110,15 @@ async function verifyWebhookSignature(
   }
 }
 
-// Extrair número do ticket do campo "to" (ticket-00000006@otimizzo.com)
+// Extrair número do ticket do campo "to" (ticket-00000006@resend.otimizzo.com)
 function extractTicketNumberFromTo(toAddresses: string[]): string | null {
   if (!toAddresses || !Array.isArray(toAddresses)) {
     return null;
   }
   
   for (const addr of toAddresses) {
-    const match = addr.match(/ticket-(\d+)@/i);
+    // Aceita ambos: ticket-XXXXX@resend.otimizzo.com e ticket-XXXXX@otimizzo.com
+    const match = addr.match(/ticket-(\d+)@(?:resend\.)?otimizzo\.com/i);
     if (match) {
       return match[1];
     }
@@ -159,8 +160,10 @@ function htmlToText(html: string): string {
 
 // Lista de emails do sistema para ignorar
 const SYSTEM_EMAILS = [
-  "noreply@otimizzo.com",
-  "suporte@otimizzo.com",
+  "noreply@resend.otimizzo.com",
+  "suporte@resend.otimizzo.com",
+  "noreply@otimizzo.com",  // manter para compatibilidade
+  "suporte@otimizzo.com",  // manter para compatibilidade
   "mailer-daemon@",
   "postmaster@",
   "no-reply@",

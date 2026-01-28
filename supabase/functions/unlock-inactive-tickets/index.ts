@@ -221,8 +221,8 @@ serve(async (req) => {
 
       try {
         await resend.emails.send({
-          from: "Sistema Otimizzo <noreply@otimizzo.com>",
-          to: ["suporte@otimizzo.com"],
+          from: "Sistema Otimizzo <noreply@resend.otimizzo.com>",
+          to: ["suporte@resend.otimizzo.com"],
           subject: `⏰ ${ticketsForEmail.length} ticket(s) retornaram à fila por inatividade`,
           html: emailHtml,
         });

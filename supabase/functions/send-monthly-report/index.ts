@@ -432,7 +432,7 @@ const handler = async (req: Request): Promise<Response> => {
         // Send email
         const monthName = MONTH_NAMES[targetMonth - 1];
         const { error: emailError } = await resend.emails.send({
-          from: "Otimizzo Suporte <noreply@otimizzo.com>",
+          from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
           to: toEmails.length > 0 ? toEmails : ccEmails.slice(0, 1),
           cc: toEmails.length > 0 ? ccEmails : ccEmails.slice(1),
           subject: `Relatório Mensal de Suporte - ${monthName}/${targetYear}`,
