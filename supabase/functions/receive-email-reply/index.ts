@@ -289,6 +289,14 @@ const handler = async (req: Request): Promise<Response> => {
     }
     
     console.log("Processing email from:", parsedFrom.email, "Name:", parsedFrom.name, "Subject:", subject);
+    
+    // Log do payload do webhook para diagnóstico
+    console.log("Webhook payload preview:", JSON.stringify({
+      hasText: !!text,
+      textLength: text?.length || 0,
+      hasHtml: !!html,
+      htmlLength: html?.length || 0,
+    }));
 
     // Extrair número do ticket - primeiro do "to", depois do subject
     let ticketNumber = extractTicketNumberFromTo(to);
@@ -362,11 +370,22 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Buscar conteúdo completo do email via API do Resend
-    let emailContent = text || "";
+    // PASSO 1: Tentar extrair conteúdo do payload do webhook primeiro
+    let emailContent = "";
     
-    if (RESEND_API_KEY && email_id) {
+    if (text && text.trim()) {
+      emailContent = text.trim();
+      console.log("Content from webhook text, length:", emailContent.length);
+    } else if (html && html.trim()) {
+      emailContent = htmlToText(html);
+      console.log("Content from webhook HTML (converted), length:", emailContent.length);
+    }
+    
+    // PASSO 2: Se vazio, tentar da API do Resend (mais completo)
+    if (!emailContent && RESEND_API_KEY && email_id) {
       try {
+        console.log("Fetching full email content from Resend API for email_id:", email_id);
+        
         const emailDetailResponse = await fetch(
           `https://api.resend.com/emails/receiving/${email_id}`,
           {
@@ -376,36 +395,39 @@ const handler = async (req: Request): Promise<Response> => {
           }
         );
 
+        console.log("Resend API response status:", emailDetailResponse.status);
+
         if (emailDetailResponse.ok) {
           const emailDetail = await emailDetailResponse.json();
-          console.log("Email content fetched - text length:", emailDetail.text?.length || 0, "html length:", emailDetail.html?.length || 0);
+          console.log("API response:", JSON.stringify({
+            hasText: !!emailDetail.text,
+            textLength: emailDetail.text?.length || 0,
+            hasHtml: !!emailDetail.html,
+            htmlLength: emailDetail.html?.length || 0,
+          }));
           
-          // Priorizar text, mas converter HTML se text estiver vazio
           if (emailDetail.text && emailDetail.text.trim()) {
-            emailContent = emailDetail.text;
+            emailContent = emailDetail.text.trim();
+            console.log("Content from API text, length:", emailContent.length);
           } else if (emailDetail.html && emailDetail.html.trim()) {
             emailContent = htmlToText(emailDetail.html);
-            console.log("Converted HTML to text, length:", emailContent.length);
-          } else {
-            emailContent = text || "";
+            console.log("Content from API HTML (converted), length:", emailContent.length);
           }
+        } else {
+          const errorBody = await emailDetailResponse.text();
+          console.error("Resend API error:", emailDetailResponse.status, errorBody);
         }
       } catch (error) {
         console.error("Error fetching email details:", error);
       }
     }
 
-    // Se ainda não tiver conteúdo, tentar do webhook
-    if (!emailContent && html) {
-      emailContent = htmlToText(html);
-    }
-
-    // Limpar conteúdo do email (remover quoted text)
-    let cleanContent = emailContent.split(/On .* wrote:|Em .* escreveu:/)[0].trim();
+    // PASSO 3: Limpar conteúdo do email (remover quoted text e assinaturas)
+    let cleanContent = emailContent.split(/On .* wrote:|Em .* escreveu:|Sent with .*/i)[0].trim();
     
-    // Se o conteúdo estiver vazio, usar um placeholder
+    // PASSO 4: Se o conteúdo estiver vazio, usar um placeholder
     if (!cleanContent) {
-      console.log("Warning: Email content is empty after processing");
+      console.log("Warning: Email content is empty after all attempts");
       cleanContent = "[Conteúdo do email não pôde ser extraído]";
     }
     
