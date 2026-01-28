@@ -1,222 +1,238 @@
 
-# Plano: Migrar Domínio de Email para resend.otimizzo.com
 
-## Contexto
+# Plano: Corrigir Extração de Conteúdo do Email
 
-O usuário criou o subdomínio `resend.otimizzo.com` na Hostinger com registros MX configurados para o Resend. Agora precisamos atualizar todas as Edge Functions para usar este novo subdomínio.
+## Problema Identificado
 
-## Mudanças Necessárias
+O sistema está recebendo os emails corretamente (extração de ticket via endereço `ticket-XXXXX@resend.otimizzo.com` funcionou!), mas o **conteúdo não está sendo extraído**.
 
-### Resumo das Alterações
+### Evidência dos Logs
+```
+2026-01-28T00:29:59Z INFO Warning: Email content is empty after processing
+2026-01-28T00:29:59Z INFO Final content length: 41
+```
+
+O log "Email content fetched" que deveria aparecer se a API fosse chamada com sucesso **NÃO APARECE**, indicando que:
+1. A chamada à API do Resend falhou
+2. OU a resposta não foi OK (status != 200)
+3. OU `text` e `html` vieram vazios
+
+### Causa Provável
+
+O código atual **não loga** quando a resposta da API não é OK:
+```typescript
+if (emailDetailResponse.ok) {
+  // só entra aqui se status 200
+} 
+// PROBLEMA: não há else para logar o erro!
+```
+
+## Solução Proposta
+
+### 1. Adicionar Logs Detalhados na Chamada à API
+
+Quando a resposta não for OK, precisamos logar o status e o corpo da resposta para entender o problema:
+
+```typescript
+if (RESEND_API_KEY && email_id) {
+  try {
+    console.log("Fetching email content from Resend API for email_id:", email_id);
+    
+    const emailDetailResponse = await fetch(
+      `https://api.resend.com/emails/receiving/${email_id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+      }
+    );
+
+    console.log("Resend API response status:", emailDetailResponse.status);
+
+    if (emailDetailResponse.ok) {
+      const emailDetail = await emailDetailResponse.json();
+      console.log("Email detail received:", JSON.stringify({
+        hasText: !!emailDetail.text,
+        textLength: emailDetail.text?.length || 0,
+        hasHtml: !!emailDetail.html,
+        htmlLength: emailDetail.html?.length || 0,
+      }));
+      
+      // ... resto do código
+    } else {
+      // NOVO: Logar quando a resposta não for OK
+      const errorBody = await emailDetailResponse.text();
+      console.error("Resend API error:", emailDetailResponse.status, errorBody);
+    }
+  } catch (error) {
+    console.error("Error fetching email details:", error);
+  }
+}
+```
+
+### 2. Usar Dados do Webhook como Fallback
+
+O webhook do Resend **já inclui** `text` e `html` no payload inicial. Atualmente priorizamos a API, mas devemos garantir que usamos o webhook como fallback robusto:
+
+```typescript
+// Usar dados do webhook primeiro se disponíveis
+let emailContent = "";
+
+// Tentar do webhook primeiro
+if (text && text.trim()) {
+  emailContent = text;
+  console.log("Using text from webhook payload, length:", text.length);
+} else if (html && html.trim()) {
+  emailContent = htmlToText(html);
+  console.log("Using HTML from webhook payload (converted), length:", emailContent.length);
+}
+
+// Se vazio, tentar da API (mais completo)
+if (!emailContent && RESEND_API_KEY && email_id) {
+  // ... chamada à API
+}
+```
+
+### 3. Verificar se o Webhook Está Enviando Conteúdo
+
+Adicionar log para ver o que o webhook está enviando:
+
+```typescript
+console.log("Webhook payload preview:", JSON.stringify({
+  from: parsedFrom.email,
+  subject: subject,
+  hasText: !!text,
+  textLength: text?.length || 0,
+  hasHtml: !!html,
+  htmlLength: html?.length || 0,
+}));
+```
+
+## Arquivo a Modificar
 
 | Arquivo | Alteração |
 |---------|-----------|
-| `receive-email-reply/index.ts` | Atualizar lista de emails do sistema e padrão de extração |
-| `send-comment-notification/index.ts` | Alterar `from` e `replyTo` |
-| `send-resolution-notification/index.ts` | Alterar `from`, `replyTo` e headers |
-| `send-analyst-notification/index.ts` | Alterar `from` e `replyTo` |
-| `sla-monitor/index.ts` | Alterar `from` |
-| `send-monthly-report/index.ts` | Alterar `from` |
-| `invite-user/index.ts` | Alterar `from` |
-| `unlock-inactive-tickets/index.ts` | Alterar `from` e `to` |
+| `supabase/functions/receive-email-reply/index.ts` | Adicionar logs detalhados e melhorar fallback |
 
----
+## Mudanças Específicas
 
-## Detalhamento das Alterações
+### receive-email-reply/index.ts
 
-### 1. receive-email-reply/index.ts
-
-**Lista de emails do sistema (linha 161-168):**
+**Após linha 291 (depois de logar "Processing email from:"):**
 ```typescript
-// ANTES:
-const SYSTEM_EMAILS = [
-  "noreply@otimizzo.com",
-  "suporte@otimizzo.com",
-  ...
-];
-
-// DEPOIS:
-const SYSTEM_EMAILS = [
-  "noreply@resend.otimizzo.com",
-  "suporte@resend.otimizzo.com",
-  "noreply@otimizzo.com",  // manter para compatibilidade
-  "suporte@otimizzo.com",  // manter para compatibilidade
-  "mailer-daemon@",
-  "postmaster@",
-  "no-reply@",
-  "noreply@"
-];
+// Adicionar log do payload do webhook
+console.log("Webhook payload preview:", JSON.stringify({
+  hasText: !!text,
+  textLength: text?.length || 0,
+  hasHtml: !!html,
+  htmlLength: html?.length || 0,
+}));
 ```
 
-**Função extractTicketNumberFromTo (linha 114-126):**
+**Linhas 365-396 (busca de conteúdo):**
 ```typescript
-// ANTES:
-const match = addr.match(/ticket-(\d+)@/i);
+// Reescrever a lógica de busca de conteúdo
+let emailContent = "";
 
-// DEPOIS (aceita ambos domínios):
-const match = addr.match(/ticket-(\d+)@(?:resend\.)?otimizzo\.com/i);
+// PASSO 1: Tentar extrair do payload do webhook primeiro
+if (text && text.trim()) {
+  emailContent = text.trim();
+  console.log("Content from webhook text, length:", emailContent.length);
+} else if (html && html.trim()) {
+  emailContent = htmlToText(html);
+  console.log("Content from webhook HTML (converted), length:", emailContent.length);
+}
+
+// PASSO 2: Se vazio, tentar da API do Resend (mais completo)
+if (!emailContent && RESEND_API_KEY && email_id) {
+  try {
+    console.log("Fetching full email content from Resend API...");
+    
+    const emailDetailResponse = await fetch(
+      `https://api.resend.com/emails/receiving/${email_id}`,
+      {
+        headers: {
+          Authorization: `Bearer ${RESEND_API_KEY}`,
+        },
+      }
+    );
+
+    console.log("Resend API response status:", emailDetailResponse.status);
+
+    if (emailDetailResponse.ok) {
+      const emailDetail = await emailDetailResponse.json();
+      console.log("API response:", JSON.stringify({
+        hasText: !!emailDetail.text,
+        textLength: emailDetail.text?.length || 0,
+        hasHtml: !!emailDetail.html,
+        htmlLength: emailDetail.html?.length || 0,
+      }));
+      
+      if (emailDetail.text && emailDetail.text.trim()) {
+        emailContent = emailDetail.text.trim();
+      } else if (emailDetail.html && emailDetail.html.trim()) {
+        emailContent = htmlToText(emailDetail.html);
+      }
+    } else {
+      const errorBody = await emailDetailResponse.text();
+      console.error("Resend API error:", emailDetailResponse.status, errorBody);
+    }
+  } catch (error) {
+    console.error("Error fetching email details:", error);
+  }
+}
+
+// PASSO 3: Limpar conteúdo (remover quoted text)
+let cleanContent = emailContent.split(/On .* wrote:|Em .* escreveu:|Sent with .*/i)[0].trim();
+
+// PASSO 4: Se ainda vazio, usar placeholder
+if (!cleanContent) {
+  console.log("Warning: Email content is empty after all attempts");
+  cleanContent = "[Conteúdo do email não pôde ser extraído]";
+}
+
+console.log("Final content length:", cleanContent.length);
 ```
-
----
-
-### 2. send-comment-notification/index.ts
-
-**Envio de email (linha 149-159):**
-```typescript
-// ANTES:
-from: "Otimizzo Suporte <noreply@otimizzo.com>",
-replyTo: `ticket-${ticketNumber}@otimizzo.com`,
-...
-'In-Reply-To': `<ticket-${ticketNumber}@otimizzo.com>`,
-'References': `<ticket-${ticketNumber}@otimizzo.com>`,
-
-// DEPOIS:
-from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
-replyTo: `ticket-${ticketNumber}@resend.otimizzo.com`,
-...
-'In-Reply-To': `<ticket-${ticketNumber}@resend.otimizzo.com>`,
-'References': `<ticket-${ticketNumber}@resend.otimizzo.com>`,
-```
-
----
-
-### 3. send-resolution-notification/index.ts
-
-**Envio de email (linha 131-141):**
-```typescript
-// ANTES:
-from: "Otimizzo Suporte <noreply@otimizzo.com>",
-replyTo: `ticket-${ticketNumber}@otimizzo.com`,
-...
-'In-Reply-To': `<ticket-${ticketNumber}@otimizzo.com>`,
-'References': `<ticket-${ticketNumber}@otimizzo.com>`,
-
-// DEPOIS:
-from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
-replyTo: `ticket-${ticketNumber}@resend.otimizzo.com`,
-...
-'In-Reply-To': `<ticket-${ticketNumber}@resend.otimizzo.com>`,
-'References': `<ticket-${ticketNumber}@resend.otimizzo.com>`,
-```
-
----
-
-### 4. send-analyst-notification/index.ts
-
-**Envio de email (linha 117-119):**
-```typescript
-// ANTES:
-from: "Otimizzo Suporte <noreply@otimizzo.com>",
-replyTo: "suporte@otimizzo.com",
-
-// DEPOIS:
-from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
-replyTo: "suporte@resend.otimizzo.com",
-```
-
----
-
-### 5. sla-monitor/index.ts
-
-**Envio de email (linha 447-449):**
-```typescript
-// ANTES:
-from: "Otimizzo SLA Monitor <noreply@otimizzo.com>",
-
-// DEPOIS:
-from: "Otimizzo SLA Monitor <noreply@resend.otimizzo.com>",
-```
-
----
-
-### 6. send-monthly-report/index.ts
-
-**Envio de email (linha 434-435):**
-```typescript
-// ANTES:
-from: "Otimizzo Suporte <noreply@otimizzo.com>",
-
-// DEPOIS:
-from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
-```
-
----
-
-### 7. invite-user/index.ts
-
-**Envio de email (linha 367-368):**
-```typescript
-// ANTES:
-from: "Otimizzo Service Hub <noreply@otimizzo.com>",
-
-// DEPOIS:
-from: "Otimizzo Service Hub <noreply@resend.otimizzo.com>",
-```
-
----
-
-### 8. unlock-inactive-tickets/index.ts
-
-**Envio de email (linha 223-225):**
-```typescript
-// ANTES:
-from: "Sistema Otimizzo <noreply@otimizzo.com>",
-to: ["suporte@otimizzo.com"],
-
-// DEPOIS:
-from: "Sistema Otimizzo <noreply@resend.otimizzo.com>",
-to: ["suporte@resend.otimizzo.com"],
-```
-
----
-
-## Fluxo Após as Alterações
-
-```text
-┌─────────────────────────────────────────────────────────────┐
-│ Sistema envia email para cliente                            │
-│ From: noreply@resend.otimizzo.com                           │
-│ Reply-To: ticket-00000006@resend.otimizzo.com               │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Cliente clica "Responder"                                   │
-│ Email vai para: ticket-00000006@resend.otimizzo.com         │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ Resend Receiving (subdomínio resend.otimizzo.com)           │
-│ Aciona webhook → receive-email-reply                        │
-└─────────────────────────────────────────────────────────────┘
-                              │
-                              ▼
-┌─────────────────────────────────────────────────────────────┐
-│ receive-email-reply processa:                               │
-│ 1. Ignora se from = noreply@resend.otimizzo.com (sistema)   │
-│ 2. Extrai ticket de ticket-XXXXX@resend.otimizzo.com        │
-│ 3. Insere comentário no banco                               │
-└─────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Checklist de Configuração no Resend
-
-Certifique-se de que no Resend Dashboard:
-
-1. **Domain**: `resend.otimizzo.com` está verificado
-2. **Sending**: Habilitado para o subdomínio
-3. **Receiving**: Habilitado com endpoint de webhook apontando para:
-   - `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/receive-email-reply`
-4. **Catch-all**: Configurado para receber `*@resend.otimizzo.com` (ou pelo menos `ticket-*@resend.otimizzo.com`)
-
----
 
 ## Resultado Esperado
 
-- Todos os emails enviados terão `@resend.otimizzo.com` como remetente
-- Clientes podem responder e o email chegará via webhook
-- Não haverá mais loops ou bounces relacionados ao domínio
-- O sistema continuará ignorando emails do próprio sistema (agora com o novo domínio)
+Após as alterações, os logs mostrarão:
+1. Se o webhook já contém `text` ou `html`
+2. O status da resposta da API do Resend
+3. Se a API retornou conteúdo
+4. Qual fonte foi usada para o conteúdo final
+
+Isso nos permitirá diagnosticar exatamente onde o conteúdo está sendo perdido e corrigir o problema de forma definitiva.
+
+## Fluxo Corrigido
+
+```text
+┌─────────────────────────────────────────────────────────────┐
+│ 1. Webhook recebido com text/html                           │
+│    → Tentar usar texto do webhook primeiro                  │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼ (se vazio)
+┌─────────────────────────────────────────────────────────────┐
+│ 2. Chamar API /emails/receiving/{id}                        │
+│    → Logar status da resposta                               │
+│    → Logar erro se não OK                                   │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 3. Limpar conteúdo                                          │
+│    → Remover quoted text                                    │
+│    → Remover "Sent with..." do Hostinger Mail               │
+└─────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────┐
+│ 4. Salvar comentário                                        │
+└─────────────────────────────────────────────────────────────┘
+```
+
+## Observação Importante
+
+Note que no print do email do cliente há "Sent with Hostinger Mail" no final. A regex atual para limpar quoted text não remove isso. Vamos adicionar esse padrão na limpeza.
+
