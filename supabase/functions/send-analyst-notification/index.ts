@@ -115,8 +115,8 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     const emailResponse = await resend.emails.send({
-      from: "Otimizzo Suporte <noreply@otimizzo.com>",
-      replyTo: "suporte@otimizzo.com",
+      from: "Otimizzo Suporte <noreply@resend.otimizzo.com>",
+      replyTo: "suporte@resend.otimizzo.com",
       to: [analystEmail],
       cc: ccEmails && ccEmails.length > 0 ? ccEmails : undefined,
       subject: `[Ticket #${ticketNumber}] Nova resposta do cliente - ${ticketTitle}`,
