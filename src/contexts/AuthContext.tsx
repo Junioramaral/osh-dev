@@ -55,6 +55,21 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     // Set up auth state listener
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        console.log('[AuthContext] Auth event:', event);
+        
+        // Tratar eventos de logout/expiração de sessão
+        if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+          console.log('[AuthContext] Session ended, clearing state');
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          setRoles([]);
+          setMustChangePassword(false);
+          setLoading(false);
+          // Navegação será tratada pelo AppLayout
+          return;
+        }
+        
         setSession(session);
         setUser(session?.user ?? null);
         

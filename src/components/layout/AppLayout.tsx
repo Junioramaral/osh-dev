@@ -59,6 +59,12 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     );
   }
 
+  // Redirecionar para login se não há usuário autenticado (sessão expirou)
+  if (!user) {
+    console.log('[AppLayout] No authenticated user, redirecting to /auth');
+    return <Navigate to="/auth" replace />;
+  }
+
   const operationalNav = [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
