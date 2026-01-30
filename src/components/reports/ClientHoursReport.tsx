@@ -213,19 +213,19 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Média por Registro</CardTitle>
+                  <CardTitle className="text-sm font-medium">Média por Ticket</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
                   <div className="text-2xl font-bold">
-                    {data.overall.avg_hours_per_entry}h
+                    {formatHours(data.overall.avg_hours_per_entry)}
                   </div>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader className="flex flex-row items-center justify-between pb-2">
-                  <CardTitle className="text-sm font-medium">Registros</CardTitle>
+                  <CardTitle className="text-sm font-medium">Total de Tickets</CardTitle>
                   <FileText className="h-4 w-4 text-muted-foreground" />
                 </CardHeader>
                 <CardContent>
@@ -423,8 +423,8 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
                       <TableRow>
                         <TableHead>Cliente</TableHead>
                         <TableHead className="text-right">Total Horas</TableHead>
-                        <TableHead className="text-right">Registros</TableHead>
-                        <TableHead className="text-right">Média/Registro</TableHead>
+                        <TableHead className="text-right">Tickets</TableHead>
+                        <TableHead className="text-right">Média/Ticket</TableHead>
                         <TableHead>Principal Analista</TableHead>
                       </TableRow>
                     </TableHeader>
