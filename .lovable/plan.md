@@ -1,237 +1,328 @@
 
-
-# Plano: Lançamento Manual de Horas nos Tickets
+# Plano: Gerenciamento de Logs de Horas com Regras de Permissao
 
 ## Resumo
 
-Implementar funcionalidade para que analistas possam registrar manualmente as horas trabalhadas em cada ticket, com botão de acesso rápido na tela de detalhes e exibição na timeline.
+Implementar funcionalidades de edicao e exclusao de logs de horas com regras especificas de permissao baseadas em tempo e papeis de usuario, alem de exibir o total de horas registradas no ticket.
 
-## Estrutura de Dados Existente
+---
 
-A tabela `ticket_time_logs` já existe e está pronta para uso:
+## Regras de Permissao
 
-| Coluna | Tipo | Obrigatório | Descrição |
-|--------|------|-------------|-----------|
-| id | uuid | Sim | Chave primária |
-| ticket_id | uuid | Sim | FK para tickets |
-| analyst_id | uuid | Sim | FK para profiles |
-| hours | numeric | Sim | Horas trabalhadas |
-| description | text | Não | Descrição do trabalho |
-| logged_at | timestamp | Não | Data/hora do registro (default: now) |
+### Analistas (analyst_db, analyst_app, Otimizzo)
+- Podem editar/excluir **apenas seus proprios logs**
+- **Limite de tempo: 48 horas uteis** a partir do registro
+  - Segunda a Quinta: 48 horas corridas
+  - Sexta-feira: 24h de sexta + fim de semana + 24h de segunda = efetivamente ate segunda-feira no mesmo horario
 
-As RLS policies já permitem que Otimizzo e Super admins façam insert/update/delete.
+### Super Admin e Tenant Admin
+- **Acesso total** para editar/excluir qualquer log
+- Sem restricao de tempo
+
+### Viewers (Auditores)
+- Apenas visualizacao, sem acoes de edicao/exclusao
+
+---
+
+## Logica de Calculo de 48h Uteis
+
+```typescript
+function canEditWithinBusinessHours(loggedAt: Date): boolean {
+  const now = new Date();
+  const logDate = new Date(loggedAt);
+  
+  // Dia da semana do log (0=domingo, 5=sexta, 6=sabado)
+  const logDayOfWeek = logDate.getDay();
+  
+  // Se foi registrado na sexta-feira
+  if (logDayOfWeek === 5) {
+    // Adiciona 48h + fim de semana (48h do sabado/domingo)
+    // Efetivamente: sexta 14:00 -> pode editar ate segunda 14:00
+    const deadline = new Date(logDate);
+    deadline.setDate(deadline.getDate() + 3); // +3 dias (seg)
+    return now <= deadline;
+  }
+  
+  // Para outros dias, simplesmente 48h corridas
+  const deadline = new Date(logDate);
+  deadline.setHours(deadline.getHours() + 48);
+  return now <= deadline;
+}
+```
 
 ---
 
 ## Arquivos a Criar
 
-### 1. `src/components/tickets/TimeLogDialog.tsx`
+### 1. `src/components/tickets/TimeLogEditDialog.tsx`
 
-Dialog modal para registrar horas trabalhadas.
+Dialog para edicao de log de horas existente.
 
-**Campos do formulário:**
-- **Horas trabalhadas** (obrigatório): Input numérico com step 0.5 (permite 0.5, 1, 1.5, etc.)
-- **Descrição** (opcional): Textarea para descrever o trabalho realizado
+**Campos:**
+- Horas trabalhadas (pre-preenchido)
+- Descricao do trabalho (pre-preenchido)
 
-**Comportamento:**
-- Validação: mínimo 0.5h, máximo 24h
-- Ao salvar: insere na tabela `ticket_time_logs` com o `analyst_id` do usuário logado
-- Após sucesso: invalida queries para atualizar a Timeline
+**Botoes:**
+- Cancelar
+- Salvar Alteracoes
 
 ---
 
-### 2. `src/hooks/useTimeLogMutations.ts`
+### 2. `src/components/tickets/TimeLogDeleteDialog.tsx`
 
-Hook com mutations para gerenciar logs de horas.
+Dialog de confirmacao para exclusao.
 
-**Mutations:**
+**Conteudo:**
+- Aviso de que a acao e irreversivel
+- Exibir detalhes do log (horas, descricao, data)
+- Botoes: Cancelar / Excluir
+
+---
+
+### 3. `src/lib/timeLogPermissions.ts`
+
+Utilitario centralizado para calculo de permissoes.
+
 ```typescript
-// Adicionar novo log
-addTimeLog.mutate({
-  ticketId: string,
-  hours: number,
-  description?: string
-})
+interface TimeLogPermissions {
+  canEdit: boolean;
+  canDelete: boolean;
+  reason?: string; // "Prazo de 48h expirado" ou "Apenas o autor pode editar"
+}
 
-// Remover log (futuro)
-deleteTimeLog.mutate({ logId: string })
+export function getTimeLogPermissions(
+  log: TimeLog,
+  userId: string,
+  isSuperAdmin: boolean,
+  isTenantAdmin: boolean,
+  isViewer: boolean
+): TimeLogPermissions;
+
+export function isWithin48BusinessHours(loggedAt: Date): boolean;
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-### 1. `src/components/tickets/TicketSidebar.tsx`
+### 1. `src/hooks/useTimeLogMutations.ts`
 
-Adicionar botão "Registrar Horas" no card de Ações do Ticket.
+Adicionar mutations para editar e excluir:
 
-**Localização:** Abaixo do botão "Resolver Ticket"
+```typescript
+// NOVO: Editar log existente
+const updateTimeLog = useMutation({
+  mutationFn: async ({ logId, hours, description }) => {
+    const { error } = await supabase
+      .from("ticket_time_logs")
+      .update({ hours, description })
+      .eq("id", logId);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    toast.success("Horas atualizadas com sucesso!");
+    queryClient.invalidateQueries({ queryKey: ["ticket-time-logs"] });
+  }
+});
 
-**Design:**
+// NOVO: Excluir log
+const deleteTimeLog = useMutation({
+  mutationFn: async ({ logId }) => {
+    const { error } = await supabase
+      .from("ticket_time_logs")
+      .delete()
+      .eq("id", logId);
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    toast.success("Registro de horas excluído!");
+    queryClient.invalidateQueries({ queryKey: ["ticket-time-logs"] });
+  }
+});
+```
+
+---
+
+### 2. `src/components/tickets/TicketTimeline.tsx`
+
+Modificar o componente `TimelineItem` para:
+- Adicionar botoes de Editar/Excluir nos logs de horas (`time_logged`)
+- Verificar permissoes antes de exibir botoes
+- Integrar dialogs de edicao/exclusao
+
+**Nova aparencia do item de log de horas:**
+
+```text
+┌────────────────────────────────────────────────────────────┐
+│ ⏱ 2.5h registradas                              há 5 min  │
+│   João Silva                                               │
+│   ┌──────────────────────────────────────────────────────┐ │
+│   │ Análise de logs e identificação do problema...       │ │
+│   └──────────────────────────────────────────────────────┘ │
+│                                         [✏️ Editar] [🗑️]   │  <-- NOVO
+└────────────────────────────────────────────────────────────┘
+```
+
+---
+
+### 3. `src/components/tickets/TicketSidebar.tsx`
+
+Adicionar card de resumo com **Total de Horas**:
+
 ```text
 ┌─────────────────────────────────────┐
-│  Ações do Ticket                    │
+│  ⏱ Horas Trabalhadas               │
 ├─────────────────────────────────────┤
-│  Status Atual: [Em Atendimento]     │
 │                                     │
-│  Alterar Status: [Dropdown]         │
+│  Total: 12.5 horas                  │
+│  Registros: 5                       │
 │                                     │
-│  ┌─────────────────────────────────┐│
-│  │ ✓ Resolver Ticket               ││
-│  └─────────────────────────────────┘│
-│                                     │
-│  ┌─────────────────────────────────┐│
-│  │ ⏱ Registrar Horas               ││  <-- NOVO
-│  └─────────────────────────────────┘│
+│  [Registrar Horas]                  │
 └─────────────────────────────────────┘
 ```
 
-**Visibilidade:**
-- Apenas para usuários Otimizzo/SuperAdmin (não clientes)
-- Não exibir para Viewers (modo leitura)
-- Visível mesmo em tickets resolvidos (pode registrar horas retroativas)
+**Hook necessario:** `useTicketTimeLogs(ticketId)` ja existe.
 
 ---
 
-### 2. `src/components/tickets/TicketTimeline.tsx` (já preparado)
+### 4. `src/contexts/AuthContext.tsx`
 
-A Timeline já está configurada para exibir logs de horas:
+Adicionar helper `isTenantAdmin`:
+
 ```typescript
-case 'time_logged': return `${event.hours}h registradas`;
-```
+const isTenantAdmin = hasRole('tenant_admin');
 
-Nenhuma modificação necessária - os logs aparecerão automaticamente.
-
----
-
-## Interface do Dialog
-
-```text
-┌─────────────────────────────────────────────────┐
-│  ⏱ Registrar Horas Trabalhadas         [X]     │
-├─────────────────────────────────────────────────┤
-│                                                 │
-│  Ticket #00000001 - Título do Ticket            │
-│  ──────────────────────────────────────────     │
-│                                                 │
-│  Horas Trabalhadas *                            │
-│  ┌─────────────────────────────────────────┐    │
-│  │ 2.5                                     │    │
-│  └─────────────────────────────────────────┘    │
-│  Mínimo: 0.5h | Máximo: 24h                     │
-│                                                 │
-│  Descrição do Trabalho                          │
-│  ┌─────────────────────────────────────────┐    │
-│  │ Análise de logs e identificação do      │    │
-│  │ problema de performance na query...     │    │
-│  │                                         │    │
-│  └─────────────────────────────────────────┘    │
-│                                                 │
-├─────────────────────────────────────────────────┤
-│                    [Cancelar]  [Registrar Horas]│
-└─────────────────────────────────────────────────┘
+// Exportar no provider
 ```
 
 ---
 
-## Fluxo de Uso
+## Interface Visual - Acoes na Timeline
 
+### Para analistas (dentro do prazo):
 ```text
-1. Analista abre ticket
-        ↓
-2. Clica em "Registrar Horas" na sidebar
-        ↓
-3. Dialog abre com formulário
-        ↓
-4. Preenche horas e descrição
-        ↓
-5. Clica "Registrar Horas"
-        ↓
-6. Sistema salva em ticket_time_logs
-        ↓
-7. Toast de sucesso
-        ↓
-8. Timeline atualiza mostrando o novo registro
+○ 2.5h registradas                           há 2 horas
+  João Silva (você)
+  ┌────────────────────────────────────────┐
+  │ Análise de performance...              │
+  └────────────────────────────────────────┘
+  [✏️ Editar] [🗑️ Excluir]
+```
+
+### Para analistas (fora do prazo):
+```text
+○ 2.5h registradas                           há 3 dias
+  João Silva (você)
+  ┌────────────────────────────────────────┐
+  │ Análise de performance...              │
+  └────────────────────────────────────────┘
+  ⚠️ Prazo de edição expirado
+```
+
+### Para Super/Tenant Admin:
+```text
+○ 2.5h registradas                           há 3 dias
+  João Silva
+  ┌────────────────────────────────────────┐
+  │ Análise de performance...              │
+  └────────────────────────────────────────┘
+  [✏️ Editar] [🗑️ Excluir]    ← Sempre disponível
 ```
 
 ---
 
 ## Arquivos Afetados
 
-| Arquivo | Ação | Descrição |
+| Arquivo | Acao | Descricao |
 |---------|------|-----------|
-| `src/components/tickets/TimeLogDialog.tsx` | Criar | Dialog com formulário de lançamento |
-| `src/hooks/useTimeLogMutations.ts` | Criar | Hook com mutation para inserir logs |
-| `src/components/tickets/TicketSidebar.tsx` | Modificar | Adicionar botão e integrar dialog |
+| `src/lib/timeLogPermissions.ts` | Criar | Logica de permissoes centralizada |
+| `src/components/tickets/TimeLogEditDialog.tsx` | Criar | Dialog de edicao |
+| `src/components/tickets/TimeLogDeleteDialog.tsx` | Criar | Dialog de confirmacao de exclusao |
+| `src/hooks/useTimeLogMutations.ts` | Modificar | Adicionar update e delete mutations |
+| `src/components/tickets/TicketTimeline.tsx` | Modificar | Adicionar botoes e integrar dialogs |
+| `src/components/tickets/TicketSidebar.tsx` | Modificar | Adicionar card de total de horas |
+| `src/contexts/AuthContext.tsx` | Modificar | Adicionar isTenantAdmin |
 
 ---
 
 ## Detalhes Tecnicos
 
-### Mutation para inserir log
+### Calculo de 48h uteis (considerando fim de semana)
 
 ```typescript
-const addTimeLog = useMutation({
-  mutationFn: async ({ ticketId, hours, description }) => {
-    const { error } = await supabase
-      .from('ticket_time_logs')
-      .insert({
-        ticket_id: ticketId,
-        analyst_id: profile.id,
-        hours,
-        description: description || null,
-      });
-    if (error) throw error;
-  },
-  onSuccess: () => {
-    toast.success("Horas registradas com sucesso!");
-    queryClient.invalidateQueries({ queryKey: ['ticket-time-logs'] });
-    queryClient.invalidateQueries({ queryKey: ['ticket-history'] });
+export function isWithin48BusinessHours(loggedAt: Date): boolean {
+  const now = new Date();
+  const logDate = new Date(loggedAt);
+  const dayOfWeek = logDate.getDay();
+  
+  let deadline = new Date(logDate);
+  
+  // Sexta-feira (5): adiciona 3 dias (pula sabado/domingo)
+  if (dayOfWeek === 5) {
+    deadline.setDate(deadline.getDate() + 3);
   }
-});
+  // Sabado (6): adiciona 2 dias para chegar em segunda + 48h
+  else if (dayOfWeek === 6) {
+    deadline.setDate(deadline.getDate() + 2);
+    deadline.setHours(deadline.getHours() + 48);
+  }
+  // Domingo (0): adiciona 1 dia para chegar em segunda + 48h
+  else if (dayOfWeek === 0) {
+    deadline.setDate(deadline.getDate() + 1);
+    deadline.setHours(deadline.getHours() + 48);
+  }
+  // Segunda a Quinta: 48h normais
+  else {
+    deadline.setHours(deadline.getHours() + 48);
+  }
+  
+  return now <= deadline;
+}
 ```
 
-### Input de horas com step
+### Verificacao de permissoes completa
 
 ```typescript
-<Input
-  type="number"
-  min={0.5}
-  max={24}
-  step={0.5}
-  value={hours}
-  onChange={(e) => setHours(parseFloat(e.target.value))}
-/>
-```
-
-### Permissões verificadas via AuthContext
-
-```typescript
-const { isOtimizzo, isSuperAdmin, isViewer } = useAuth();
-const canLogTime = (isOtimizzo || isSuperAdmin) && !isViewer;
+export function getTimeLogPermissions(
+  log: { analyst_id: string; logged_at: string },
+  currentUserId: string,
+  isSuperAdmin: boolean,
+  isTenantAdmin: boolean,
+  isViewer: boolean
+): TimeLogPermissions {
+  // Viewers nao podem editar/excluir nada
+  if (isViewer) {
+    return { canEdit: false, canDelete: false, reason: "Modo somente leitura" };
+  }
+  
+  // Super Admin e Tenant Admin tem acesso total
+  if (isSuperAdmin || isTenantAdmin) {
+    return { canEdit: true, canDelete: true };
+  }
+  
+  // Analistas so podem editar seus proprios logs
+  if (log.analyst_id !== currentUserId) {
+    return { canEdit: false, canDelete: false, reason: "Apenas o autor pode editar" };
+  }
+  
+  // Verificar prazo de 48h uteis
+  const withinDeadline = isWithin48BusinessHours(new Date(log.logged_at));
+  if (!withinDeadline) {
+    return { canEdit: false, canDelete: false, reason: "Prazo de 48h expirado" };
+  }
+  
+  return { canEdit: true, canDelete: true };
+}
 ```
 
 ---
 
-## Exibição na Timeline
+## Resumo das Regras
 
-Após implementação, a Timeline mostrará:
-
-```text
-Timeline
-─────────────────────────────────────────────
-○ 2.5h registradas                 há 5 min
-  João Silva
-  ┌────────────────────────────────────────┐
-  │ Análise de logs e identificação do     │
-  │ problema de performance na query...    │
-  └────────────────────────────────────────┘
-
-○ Status alterado de "novo" para     há 1h
-  "em_atendimento"
-  Sistema
-
-○ Ticket criado                   26/11/2025
-  Sistema
-```
-
+| Role | Editar Proprio | Editar de Outros | Prazo |
+|------|----------------|------------------|-------|
+| Super Admin | Sim | Sim | Sem limite |
+| Tenant Admin | Sim | Sim | Sem limite |
+| Analyst (Otimizzo) | Sim | Nao | 48h uteis |
+| Viewer | Nao | Nao | - |
+| Cliente | Nao | Nao | - |
