@@ -93,7 +93,7 @@ export default function TicketDetail() {
                 <TicketSLATab ticket={ticket} />
               </TabsContent>
               <TabsContent value="timeline" className="mt-6">
-                <TicketTimeline ticketId={ticket.id} />
+                <TicketTimeline ticketId={ticket.id} clientId={ticket.client_id} />
               </TabsContent>
               <TabsContent value="comments" className="mt-6">
                 <TicketComments ticketId={ticket.id} />

@@ -1051,26 +1051,38 @@ export type Database = {
         Row: {
           analyst_id: string
           description: string | null
+          end_time: string
           hours: number
           id: string
           logged_at: string | null
+          project_id: string | null
+          start_time: string
           ticket_id: string
+          work_date: string
         }
         Insert: {
           analyst_id: string
           description?: string | null
+          end_time?: string
           hours: number
           id?: string
           logged_at?: string | null
+          project_id?: string | null
+          start_time?: string
           ticket_id: string
+          work_date?: string
         }
         Update: {
           analyst_id?: string
           description?: string | null
+          end_time?: string
           hours?: number
           id?: string
           logged_at?: string | null
+          project_id?: string | null
+          start_time?: string
           ticket_id?: string
+          work_date?: string
         }
         Relationships: [
           {
@@ -1078,6 +1090,13 @@ export type Database = {
             columns: ["analyst_id"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_time_logs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "client_projects"
             referencedColumns: ["id"]
           },
           {
