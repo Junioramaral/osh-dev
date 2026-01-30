@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered, Clock } from "lucide-react";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered, Clock, ClipboardCheck } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
 import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
 import CategoriesReport from "@/components/reports/CategoriesReport";
@@ -12,13 +12,14 @@ import ResolutionTimeReport from "@/components/reports/ResolutionTimeReport";
 import ClosureRankingReport from "@/components/reports/ClosureRankingReport";
 import QueueWorkloadReport from "@/components/reports/QueueWorkloadReport";
 import ClientHoursReport from "@/components/reports/ClientHoursReport";
+import AnalystHoursManagementReport from "@/components/reports/AnalystHoursManagementReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
 import { useAuth } from "@/contexts/AuthContext";
 
 const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | null;
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | "analyst-hours-management" | null;
 
 const reportTypes = [
   {
@@ -79,6 +80,14 @@ const reportTypes = [
     highlight: false,
     internalOnly: true,
   },
+  {
+    id: "analyst-hours-management" as const,
+    title: "Gestão de Horas Analistas",
+    description: "Compare horas de vida dos tickets com horas registradas pelos analistas",
+    icon: ClipboardCheck,
+    highlight: false,
+    internalOnly: true,
+  },
 ];
 
 const Reports = () => {
@@ -129,6 +138,10 @@ const Reports = () => {
 
   if (selectedReport === "client-hours") {
     return <ClientHoursReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "analyst-hours-management") {
+    return <AnalystHoursManagementReport onBack={() => setSelectedReport(null)} />;
   }
 
   return (
