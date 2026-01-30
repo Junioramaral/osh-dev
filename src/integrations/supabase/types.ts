@@ -1417,7 +1417,12 @@ export type Database = {
         | "aguardando_cliente"
         | "resolvido"
         | "fechado"
-      ticket_type: "incidente" | "duvida" | "solicitacao"
+      ticket_type:
+        | "incidente"
+        | "duvida"
+        | "solicitacao"
+        | "problema"
+        | "service_request"
       user_role: "admin" | "analista-db" | "analista-app" | "cliente"
     }
     CompositeTypes: {
@@ -1573,7 +1578,13 @@ export const Constants = {
         "resolvido",
         "fechado",
       ],
-      ticket_type: ["incidente", "duvida", "solicitacao"],
+      ticket_type: [
+        "incidente",
+        "duvida",
+        "solicitacao",
+        "problema",
+        "service_request",
+      ],
       user_role: ["admin", "analista-db", "analista-app", "cliente"],
     },
   },

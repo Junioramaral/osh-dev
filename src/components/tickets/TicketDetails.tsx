@@ -1,6 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { format } from "date-fns";
 import { FileText, Server, AlertCircle, Search } from "lucide-react";
+import { getTicketTypeLabel } from "@/lib/ticketUtils";
 
 interface TicketDetailsProps {
   ticket: any;
@@ -71,12 +72,12 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <AlertCircle className="h-5 w-5 text-muted-foreground" />
-            Detalhes do Incidente
+            Detalhes do Ticket
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="space-y-0">
-            <InfoRow label="Tipo" value={ticket.ticket_type} />
+            <InfoRow label="Tipo" value={getTicketTypeLabel(ticket.ticket_type)} />
             <InfoRow label="Categoria" value={ticket.category} />
             <InfoRow label="Subcategoria" value={ticket.subcategory} />
             <InfoRow label="Frequência" value={ticket.frequency} />
