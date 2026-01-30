@@ -1,174 +1,132 @@
 
-# Plano: Atualizar Landing Page com Novas Funcionalidades
+# Plano: Ajustar Tipos de Ticket
 
-## Análise do Sistema Atual
+## Resumo da Análise
 
-O Otimizzo Service Hub é uma plataforma completa de Service Desk multi-tenant com as seguintes funcionalidades:
+Ao analisar o sistema, identifiquei todos os pontos onde o tipo de ticket é definido ou exibido:
 
-### Funcionalidades Principais Identificadas
+### Pontos de Alteração Identificados
 
-| Categoria | Funcionalidade | Descrição |
-|-----------|---------------|-----------|
-| **Gestão de Tickets** | Sistema completo de tickets | Criação, acompanhamento, comentários, anexos, timeline |
-| **Gestão de Tickets** | Meus Tickets | Dashboard pessoal do analista |
-| **Gestão de Tickets** | Ações em lote (Bulk) | Atribuir analista, fila, equipe, status em massa |
-| **Gestão de Tickets** | Sistema de Lock | Reserva de tickets com TTL para evitar conflitos |
-| **SLA** | Monitoramento em tempo real | Dashboard com métricas de compliance |
-| **SLA** | Alertas automáticos | Notificações por email quando SLA próximo de vencer |
-| **SLA** | Reconhecimento (Acknowledge) | Analistas confirmam ciência de SLA em risco |
-| **Satisfação** | CSAT Dashboard | Pesquisa de satisfação com rating 1-5 estrelas |
-| **Satisfação** | Ranking de analistas | Performance baseada em avaliações |
-| **Conhecimento** | Base de Conhecimento (FAQ) | Artigos com 3 níveis de visibilidade |
-| **Relatórios** | 7 tipos de relatórios | Mensal, Performance, Categorias, Comparativo, Tempo, Ranking, Filas |
-| **Relatórios** | Envio automático por email | Relatórios mensais automáticos para clientes |
-| **Infraestrutura** | Catálogo de Máquinas | Servidores e VMs do cliente |
-| **Infraestrutura** | Bancos de Dados | Instâncias Oracle, PostgreSQL, MySQL, MongoDB, SQL Server |
-| **Infraestrutura** | Aplicativos | ContaDia, Sec4File, LexisFlow com módulos |
-| **Comunicação** | Notificações por Email | Via Resend com reply-to para conversas |
-| **Comunicação** | Respostas por Email | Clientes respondem diretamente pelo email |
-| **Segurança** | Multi-tenant RBAC | Isolamento de dados, roles configuráveis |
-| **Segurança** | Auditoria | Papel de viewer/auditor |
+| Local | Arquivo | Tipo de Alteração |
+|-------|---------|-------------------|
+| Banco de Dados | Migration SQL | Adicionar "problema" e "service_request" ao ENUM `ticket_type` |
+| Types TypeScript | `src/integrations/supabase/types.ts` | Atualizar tipagem (será regenerado automaticamente após migration) |
+| Formulário de Criação | `src/components/tickets/NewTicketDialog.tsx` | Atualizar schema Zod + opções do Select |
+| Exibição de Detalhes | `src/components/tickets/TicketDetails.tsx` | Usar função de formatação para labels legíveis |
+| Utilitários | `src/lib/ticketUtils.tsx` | Adicionar função `getTicketTypeLabel()` |
 
 ---
 
-## Proposta de Redesign da Landing Page
+## Alterações Detalhadas
 
-### Estrutura Proposta
+### 1. Migration SQL (Novo arquivo)
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│ HEADER (Logo + Navegação + CTAs)                            │
-├─────────────────────────────────────────────────────────────┤
-│ HERO SECTION (Título impactante + Imagem/Mockup)            │
-├─────────────────────────────────────────────────────────────┤
-│ ESTATÍSTICAS (Números do sistema - credibilidade)           │
-├─────────────────────────────────────────────────────────────┤
-│ FEATURES PRINCIPAIS (6 cards destacados)                    │
-├─────────────────────────────────────────────────────────────┤
-│ SCREENSHOT/MOCKUP SECTION (Imagem do Dashboard)             │
-├─────────────────────────────────────────────────────────────┤
-│ FEATURES SECUNDÁRIAS (Grid 3x2 com ícones)                  │
-├─────────────────────────────────────────────────────────────┤
-│ BENEFÍCIOS POR PERSONA (Tabs: Gestor / Analista / Cliente)  │
-├─────────────────────────────────────────────────────────────┤
-│ CTA FINAL (Chamada para ação)                               │
-├─────────────────────────────────────────────────────────────┤
-│ FOOTER (Copyright)                                           │
-└─────────────────────────────────────────────────────────────┘
+Criar migration para alterar o ENUM `ticket_type`:
+
+```sql
+-- Adicionar novos valores ao ENUM ticket_type
+ALTER TYPE public.ticket_type ADD VALUE IF NOT EXISTS 'problema';
+ALTER TYPE public.ticket_type ADD VALUE IF NOT EXISTS 'service_request';
 ```
 
----
+Os valores atuais são: `incidente`, `duvida`, `solicitacao`
 
-## Detalhamento das Seções
+Os novos valores serão:
+- `incidente` - Incidente (mantido)
+- `duvida` - Dúvida (mantido)
+- `problema` - Problema (novo)
+- `service_request` - Service Request (substitui "solicitacao" como novo padrão, mas mantém o antigo para compatibilidade)
 
-### 1. Header Redesenhado
-- Logo Otimizzo com ícone Server
-- Links de navegação suave (scroll para seções)
-- Botões "Acessar" e "Saiba Mais"
+### 2. `src/lib/ticketUtils.tsx`
 
-### 2. Hero Section Modernizado
-**Título**: "Transforme seu Suporte em Vantagem Competitiva"
+Adicionar função para formatação de labels:
 
-**Subtítulo**: "Plataforma completa de Service Desk para equipes de suporte a Bancos de Dados e Aplicativos. Controle SLA, CSAT, relatórios e muito mais."
+```typescript
+export const getTicketTypeLabel = (type: string): string => {
+  switch (type) {
+    case 'incidente':
+      return 'Incidente';
+    case 'duvida':
+      return 'Dúvida';
+    case 'problema':
+      return 'Problema';
+    case 'service_request':
+      return 'Service Request';
+    case 'solicitacao':
+      return 'Service Request'; // Manter compatibilidade com dados antigos
+    default:
+      return type;
+  }
+};
+```
 
-**Área de imagem**: Placeholder para screenshot do dashboard (210x297mm para futuras imagens)
+### 3. `src/components/tickets/NewTicketDialog.tsx`
 
-### 3. Seção de Estatísticas (Social Proof)
-Cards horizontais com números:
-- "99.5% SLA Compliance"
-- "4.8/5 Satisfação Média"
-- "< 2h Tempo de Resposta"
-- "7 Tipos de Relatórios"
+**Schema Zod (linha 38):**
+```typescript
+// De:
+ticket_type: z.enum(["incidente", "duvida", "solicitacao"]),
 
-### 4. Features Principais (Grid 3x2)
+// Para:
+ticket_type: z.enum(["incidente", "duvida", "problema", "service_request"]),
+```
 
-| Feature | Ícone | Descrição |
-|---------|-------|-----------|
-| Gestão de Tickets | Ticket | Sistema completo com timeline, comentários e ações em lote |
-| Monitoramento SLA | BarChart3 | Dashboards em tempo real com alertas automáticos |
-| Satisfação (CSAT) | Star | Pesquisa de satisfação com ranking de analistas |
-| Base de Conhecimento | BookOpen | Artigos com 3 níveis de visibilidade e busca |
-| Relatórios Avançados | FileBarChart | 7 tipos de relatórios com envio automático por email |
-| Notificações Email | Mail | Comunicação bidirecional via email |
+**Select Options (linhas 700-703):**
+```typescript
+// De:
+<SelectItem value="incidente">Incidente</SelectItem>
+<SelectItem value="duvida">Dúvida</SelectItem>
+<SelectItem value="solicitacao">Solicitação</SelectItem>
 
-### 5. Área de Screenshot
-- Container com sombra elegante
-- Placeholder para imagem do dashboard (usuário pode adicionar depois)
-- Texto: "Interface intuitiva e profissional"
+// Para:
+<SelectItem value="incidente">Incidente</SelectItem>
+<SelectItem value="problema">Problema</SelectItem>
+<SelectItem value="duvida">Dúvida</SelectItem>
+<SelectItem value="service_request">Service Request</SelectItem>
+```
 
-### 6. Features Secundárias (Grid 2x3)
+### 4. `src/components/tickets/TicketDetails.tsx`
 
-| Feature | Descrição |
-|---------|-----------|
-| Multi-tenant Seguro | Isolamento completo de dados por cliente |
-| Catálogo de Infraestrutura | Máquinas, BDs e Aplicativos |
-| Sistema de Lock | Reserva de tickets com TTL |
-| Ações em Lote | Atribuição massiva de tickets |
-| Filas por Especialidade | Segmentação DB e APP |
-| Auditoria Completa | Papel de viewer para compliance |
+Usar a função de formatação para exibir o label correto:
 
-### 7. Benefícios por Persona (Tabs)
+```typescript
+// Importar
+import { getTicketTypeLabel } from "@/lib/ticketUtils";
 
-**Gestores**:
-- Visão 360° do suporte
-- Relatórios executivos automáticos
-- Métricas de SLA e CSAT
+// Linha 79 - De:
+<InfoRow label="Tipo" value={ticket.ticket_type} />
 
-**Analistas**:
-- "Meus Tickets" pessoal
-- Base de conhecimento
-- Alertas de SLA
+// Para:
+<InfoRow label="Tipo" value={getTicketTypeLabel(ticket.ticket_type)} />
+```
 
-**Clientes**:
-- Portal de autoatendimento
-- Resposta por email
-- Pesquisa de satisfação
+Também renomear o título do card de "Detalhes do Incidente" para "Detalhes do Ticket":
 
-### 8. CTA Final
-Gradiente primário com:
-- Título: "Pronto para Elevar seu Suporte?"
-- Botão: "Começar Agora"
+```typescript
+// Linha 74 - De:
+Detalhes do Incidente
 
----
-
-## Código a Modificar
-
-| Arquivo | Alteração |
-|---------|-----------|
-| `src/pages/Index.tsx` | Reescrever completamente com nova estrutura |
-
----
-
-## Sobre Imagens
-
-A landing page terá **áreas preparadas para imagens**:
-1. **Hero Section**: Espaço para mockup/screenshot do dashboard (pode ser adicionado depois)
-2. **Feature Showcase**: Container para screenshot da interface
-
-Como não há imagens no projeto atualmente, criaremos containers com:
-- Placeholder visual com ícones
-- Gradiente sutil de fundo
-- Texto indicando onde adicionar screenshot
-
-O usuário pode depois fazer upload de screenshots reais do sistema.
+// Para:
+Detalhes do Ticket
+```
 
 ---
 
-## Benefícios do Redesign
+## Arquivos a Modificar
 
-1. **Hierarquia Visual Clara**: Seções bem definidas guiam o visitante
-2. **Social Proof**: Estatísticas geram credibilidade
-3. **Personas Específicas**: Cada tipo de usuário se identifica
-4. **Preparado para Imagens**: Containers prontos para screenshots
-5. **Responsivo**: Layout adaptável para mobile e desktop
-6. **Coerência Visual**: Usa design system existente (cores, componentes)
+| Arquivo | Ação |
+|---------|------|
+| `supabase/migrations/XXXXXXXX_add_ticket_types.sql` | Criar nova migration |
+| `src/lib/ticketUtils.tsx` | Adicionar função `getTicketTypeLabel()` |
+| `src/components/tickets/NewTicketDialog.tsx` | Atualizar schema e opções do Select |
+| `src/components/tickets/TicketDetails.tsx` | Usar formatação e renomear título do card |
 
 ---
 
-## Ícones Utilizados (Lucide)
+## Notas Técnicas
 
-- Server, Database, AppWindow (infraestrutura)
-- Ticket, UserCheck, Clock (tickets)
-- BarChart3, Star, FileBarChart (métricas)
-- BookOpen, Mail, Shield (features)
-- Users, ArrowRight (CTAs)
+1. **Compatibilidade**: O valor `solicitacao` será mantido no banco para não quebrar tickets existentes. A função `getTicketTypeLabel()` traduz tanto `solicitacao` quanto `service_request` para "Service Request"
+
+2. **Ordem no Select**: Os tipos serão ordenados logicamente: Incidente, Problema, Dúvida, Service Request (do mais urgente para menos urgente)
+
+3. **Regeneração de Types**: Após a migration, o arquivo `types.ts` será automaticamente regenerado pelo Supabase, incluindo os novos valores do ENUM
