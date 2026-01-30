@@ -1,159 +1,237 @@
 
 
-# Plano: Corrigir Relatório de Horas para Usar Tempo de Vida dos Tickets
+# Plano: Lançamento Manual de Horas nos Tickets
 
-## Problema Identificado
+## Resumo
 
-O relatório atual busca dados da tabela `ticket_time_logs`, que está **vazia** (0 registros). O usuário precisa que as horas sejam calculadas a partir do **Tempo de Vida** dos tickets, ou seja, a diferença entre a data de criação (`created_at`) e a data de resolução (`resolved_at`).
+Implementar funcionalidade para que analistas possam registrar manualmente as horas trabalhadas em cada ticket, com botão de acesso rápido na tela de detalhes e exibição na timeline.
 
-## Solucao Proposta
+## Estrutura de Dados Existente
 
-Modificar o hook `useClientHoursData.ts` para:
-1. Buscar dados diretamente da tabela `tickets` (não mais de `ticket_time_logs`)
-2. Calcular as horas automaticamente como: `(resolved_at - created_at)` em horas
-3. Para tickets não resolvidos, usar a data atual como referência
+A tabela `ticket_time_logs` já existe e está pronta para uso:
+
+| Coluna | Tipo | Obrigatório | Descrição |
+|--------|------|-------------|-----------|
+| id | uuid | Sim | Chave primária |
+| ticket_id | uuid | Sim | FK para tickets |
+| analyst_id | uuid | Sim | FK para profiles |
+| hours | numeric | Sim | Horas trabalhadas |
+| description | text | Não | Descrição do trabalho |
+| logged_at | timestamp | Não | Data/hora do registro (default: now) |
+
+As RLS policies já permitem que Otimizzo e Super admins façam insert/update/delete.
 
 ---
 
-## Alteracoes Detalhadas
+## Arquivos a Criar
 
-### Arquivo: `src/hooks/useClientHoursData.ts`
+### 1. `src/components/tickets/TimeLogDialog.tsx`
 
-**Mudanca principal:**
-- **De:** Query na tabela `ticket_time_logs`
-- **Para:** Query direta na tabela `tickets`
+Dialog modal para registrar horas trabalhadas.
 
-**Nova lógica de cálculo:**
+**Campos do formulário:**
+- **Horas trabalhadas** (obrigatório): Input numérico com step 0.5 (permite 0.5, 1, 1.5, etc.)
+- **Descrição** (opcional): Textarea para descrever o trabalho realizado
+
+**Comportamento:**
+- Validação: mínimo 0.5h, máximo 24h
+- Ao salvar: insere na tabela `ticket_time_logs` com o `analyst_id` do usuário logado
+- Após sucesso: invalida queries para atualizar a Timeline
+
+---
+
+### 2. `src/hooks/useTimeLogMutations.ts`
+
+Hook com mutations para gerenciar logs de horas.
+
+**Mutations:**
 ```typescript
-// Calcular horas de vida do ticket
-const calculateTicketHours = (createdAt: string, resolvedAt: string | null): number => {
-  const start = new Date(createdAt);
-  const end = resolvedAt ? new Date(resolvedAt) : new Date();
-  const diffMs = end.getTime() - start.getTime();
-  return diffMs / (1000 * 60 * 60); // Converter para horas
-};
-```
+// Adicionar novo log
+addTimeLog.mutate({
+  ticketId: string,
+  hours: number,
+  description?: string
+})
 
-**Nova query:**
-```typescript
-supabase
-  .from("tickets")
-  .select(`
-    id,
-    created_at,
-    resolved_at,
-    client_id,
-    analyst_id,
-    queue_id,
-    team_id,
-    ticket_type,
-    segment,
-    status,
-    clients(name),
-    queues(name),
-    teams(name),
-    profiles!tickets_analyst_id_fkey(full_name)
-  `)
-  .gte("created_at", startDate)
-  .lte("created_at", endDate + "T23:59:59")
-```
-
----
-
-## Campos a Agregar
-
-Para cada ticket, as horas serão calculadas e agregadas por:
-
-| Dimensao | Fonte | Agrupamento |
-|----------|-------|-------------|
-| Por Cliente | `tickets.client_id` -> `clients.name` | Soma das horas de todos os tickets do cliente |
-| Por Analista | `tickets.analyst_id` -> `profiles.full_name` | Soma das horas dos tickets atribuídos ao analista |
-| Por Fila | `tickets.queue_id` -> `queues.name` | Soma das horas dos tickets na fila |
-| Por Time | `tickets.team_id` -> `teams.name` | Soma das horas dos tickets do time |
-| Por Tipo | `tickets.ticket_type` | Soma das horas por tipo (Incidente, Problema, etc.) |
-
----
-
-## Exemplo de Cálculo
-
-```text
-Ticket #00000001:
-  - Criado: 2025-11-26 13:32:34
-  - Resolvido: 2025-12-16 17:46:39
-  - Tempo de Vida: ~484 horas (20.2 dias)
-  - Cliente: Cliente X
-  - Analista: João
-  - Fila: Suporte N1
-  - Time: Time DB
-  - Tipo: Incidente
-
-Este ticket contribui com 484h para:
-  - Total do Cliente X
-  - Total do Analista João
-  - Total da Fila Suporte N1
-  - Total do Time DB
-  - Total de Incidentes
+// Remover log (futuro)
+deleteTimeLog.mutate({ logId: string })
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Acao |
-|---------|------|
-| `src/hooks/useClientHoursData.ts` | Reescrever para buscar tickets diretamente e calcular horas de vida |
-| `src/components/reports/ClientHoursReport.tsx` | Ajustar labels (de "Registros" para "Tickets") |
+### 1. `src/components/tickets/TicketSidebar.tsx`
 
----
+Adicionar botão "Registrar Horas" no card de Ações do Ticket.
 
-## Detalhes da Implementacao
+**Localização:** Abaixo do botão "Resolver Ticket"
 
-### 1. Nova funcao de calculo de horas
-
-```typescript
-const calculateTicketHours = (createdAt: string, resolvedAt: string | null): number => {
-  const start = new Date(createdAt);
-  const end = resolvedAt ? new Date(resolvedAt) : new Date();
-  const diffMs = end.getTime() - start.getTime();
-  // Retornar horas com 1 casa decimal
-  return Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
-};
+**Design:**
+```text
+┌─────────────────────────────────────┐
+│  Ações do Ticket                    │
+├─────────────────────────────────────┤
+│  Status Atual: [Em Atendimento]     │
+│                                     │
+│  Alterar Status: [Dropdown]         │
+│                                     │
+│  ┌─────────────────────────────────┐│
+│  │ ✓ Resolver Ticket               ││
+│  └─────────────────────────────────┘│
+│                                     │
+│  ┌─────────────────────────────────┐│
+│  │ ⏱ Registrar Horas               ││  <-- NOVO
+│  └─────────────────────────────────┘│
+└─────────────────────────────────────┘
 ```
 
-### 2. Filtros de periodo
-
-O filtro de período será aplicado à data de criação do ticket (`created_at`), mantendo a mesma lógica:
-- Mês Atual: tickets criados no mês atual
-- Mês Anterior: tickets criados no mês anterior
-- Últimos 3 meses: tickets criados nos últimos 3 meses
-- Últimos 6 meses: tickets criados nos últimos 6 meses
-
-### 3. Tratamento de tickets sem analista
-
-Para tickets sem analista atribuído (`analyst_id = null`), será criada uma categoria "Não Atribuído" nos gráficos.
+**Visibilidade:**
+- Apenas para usuários Otimizzo/SuperAdmin (não clientes)
+- Não exibir para Viewers (modo leitura)
+- Visível mesmo em tickets resolvidos (pode registrar horas retroativas)
 
 ---
 
-## Resultado Esperado
+### 2. `src/components/tickets/TicketTimeline.tsx` (já preparado)
 
-Após a implementação, o relatório mostrará:
+A Timeline já está configurada para exibir logs de horas:
+```typescript
+case 'time_logged': return `${event.hours}h registradas`;
+```
 
-1. **Cards de Resumo:**
-   - Total de Horas (soma do tempo de vida de todos os tickets)
-   - Média de Horas por Ticket
-   - Total de Tickets
-   - Analistas Únicos
+Nenhuma modificação necessária - os logs aparecerão automaticamente.
 
-2. **Gráficos:**
-   - Horas por Analista (com "Não Atribuído" quando aplicável)
-   - Horas por Fila (com "Sem Fila" quando aplicável)
-   - Horas por Time (com "Sem Time" quando aplicável)
-   - Horas por Tipo de Ticket
+---
 
-3. **Tabela de Clientes:**
-   - Nome do cliente
-   - Total de horas consumidas
-   - Quantidade de tickets
-   - Média de horas por ticket
-   - Principal analista
+## Interface do Dialog
+
+```text
+┌─────────────────────────────────────────────────┐
+│  ⏱ Registrar Horas Trabalhadas         [X]     │
+├─────────────────────────────────────────────────┤
+│                                                 │
+│  Ticket #00000001 - Título do Ticket            │
+│  ──────────────────────────────────────────     │
+│                                                 │
+│  Horas Trabalhadas *                            │
+│  ┌─────────────────────────────────────────┐    │
+│  │ 2.5                                     │    │
+│  └─────────────────────────────────────────┘    │
+│  Mínimo: 0.5h | Máximo: 24h                     │
+│                                                 │
+│  Descrição do Trabalho                          │
+│  ┌─────────────────────────────────────────┐    │
+│  │ Análise de logs e identificação do      │    │
+│  │ problema de performance na query...     │    │
+│  │                                         │    │
+│  └─────────────────────────────────────────┘    │
+│                                                 │
+├─────────────────────────────────────────────────┤
+│                    [Cancelar]  [Registrar Horas]│
+└─────────────────────────────────────────────────┘
+```
+
+---
+
+## Fluxo de Uso
+
+```text
+1. Analista abre ticket
+        ↓
+2. Clica em "Registrar Horas" na sidebar
+        ↓
+3. Dialog abre com formulário
+        ↓
+4. Preenche horas e descrição
+        ↓
+5. Clica "Registrar Horas"
+        ↓
+6. Sistema salva em ticket_time_logs
+        ↓
+7. Toast de sucesso
+        ↓
+8. Timeline atualiza mostrando o novo registro
+```
+
+---
+
+## Arquivos Afetados
+
+| Arquivo | Ação | Descrição |
+|---------|------|-----------|
+| `src/components/tickets/TimeLogDialog.tsx` | Criar | Dialog com formulário de lançamento |
+| `src/hooks/useTimeLogMutations.ts` | Criar | Hook com mutation para inserir logs |
+| `src/components/tickets/TicketSidebar.tsx` | Modificar | Adicionar botão e integrar dialog |
+
+---
+
+## Detalhes Tecnicos
+
+### Mutation para inserir log
+
+```typescript
+const addTimeLog = useMutation({
+  mutationFn: async ({ ticketId, hours, description }) => {
+    const { error } = await supabase
+      .from('ticket_time_logs')
+      .insert({
+        ticket_id: ticketId,
+        analyst_id: profile.id,
+        hours,
+        description: description || null,
+      });
+    if (error) throw error;
+  },
+  onSuccess: () => {
+    toast.success("Horas registradas com sucesso!");
+    queryClient.invalidateQueries({ queryKey: ['ticket-time-logs'] });
+    queryClient.invalidateQueries({ queryKey: ['ticket-history'] });
+  }
+});
+```
+
+### Input de horas com step
+
+```typescript
+<Input
+  type="number"
+  min={0.5}
+  max={24}
+  step={0.5}
+  value={hours}
+  onChange={(e) => setHours(parseFloat(e.target.value))}
+/>
+```
+
+### Permissões verificadas via AuthContext
+
+```typescript
+const { isOtimizzo, isSuperAdmin, isViewer } = useAuth();
+const canLogTime = (isOtimizzo || isSuperAdmin) && !isViewer;
+```
+
+---
+
+## Exibição na Timeline
+
+Após implementação, a Timeline mostrará:
+
+```text
+Timeline
+─────────────────────────────────────────────
+○ 2.5h registradas                 há 5 min
+  João Silva
+  ┌────────────────────────────────────────┐
+  │ Análise de logs e identificação do     │
+  │ problema de performance na query...    │
+  └────────────────────────────────────────┘
+
+○ Status alterado de "novo" para     há 1h
+  "em_atendimento"
+  Sistema
+
+○ Ticket criado                   26/11/2025
+  Sistema
+```
 
