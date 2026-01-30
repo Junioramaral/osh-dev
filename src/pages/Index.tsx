@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
+import dashboardScreenshot from "@/assets/dashboard-screenshot.png";
 import { Card, CardContent } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { 
@@ -327,32 +328,14 @@ const Index = () => {
             </p>
           </div>
 
-          {/* Large Screenshot Placeholder */}
+          {/* Dashboard Screenshot */}
           <div className="max-w-5xl mx-auto">
-            <div className="aspect-video rounded-xl bg-gradient-to-br from-card via-muted to-card border border-border shadow-2xl overflow-hidden relative">
-              <div className="absolute inset-0 flex items-center justify-center">
-                <div className="text-center space-y-4 p-8">
-                  <div className="flex justify-center gap-3 mb-6">
-                    <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center">
-                      <MonitorDot className="w-6 h-6 text-primary" />
-                    </div>
-                    <div className="w-12 h-12 rounded-lg bg-accent/20 flex items-center justify-center">
-                      <BarChart3 className="w-6 h-6 text-accent" />
-                    </div>
-                    <div className="w-12 h-12 rounded-lg bg-success/20 flex items-center justify-center">
-                      <CheckCircle className="w-6 h-6 text-success" />
-                    </div>
-                  </div>
-                  <p className="text-muted-foreground">
-                    Área reservada para screenshot do Dashboard
-                  </p>
-                  <p className="text-xs text-muted-foreground/60">
-                    Faça upload de uma imagem do sistema para exibir aqui
-                  </p>
-                </div>
-              </div>
-              {/* Decorative grid overlay */}
-              <div className="absolute inset-0 bg-[linear-gradient(rgba(0,0,0,0.02)_1px,transparent_1px),linear-gradient(90deg,rgba(0,0,0,0.02)_1px,transparent_1px)] bg-[size:20px_20px]" />
+            <div className="rounded-xl border border-border shadow-2xl overflow-hidden">
+              <img 
+                src={dashboardScreenshot} 
+                alt="Otimizzo Service Hub Dashboard - Interface completa de gestão de tickets" 
+                className="w-full h-auto"
+              />
             </div>
           </div>
         </div>
