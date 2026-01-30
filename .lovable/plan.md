@@ -1,259 +1,169 @@
 
 
-# Plano: Adicionar Aba de Projetos na Tela de Clientes
+# Plano: Adicionar Campo "Hora-Extra" nos Projetos
 
-## Resumo
+## Objetivo
 
-Adicionar uma nova aba **"Projetos"** no dialog de clientes, junto com as abas existentes (Informacoes Basicas, Contrato, SLAs). Cada projeto tera nome, descricao e um toggle para indicar se esta ativo ou nao.
-
----
-
-## Estrutura Proposta
-
-### Antes (3 abas)
-```text
-┌────────────────────┬──────────┬───────┐
-│ Informacoes Basicas│ Contrato │ SLAs  │
-└────────────────────┴──────────┴───────┘
-```
-
-### Depois (4 abas)
-```text
-┌────────────────────┬──────────┬───────┬──────────┐
-│ Informacoes Basicas│ Contrato │ SLAs  │ Projetos │
-└────────────────────┴──────────┴───────┴──────────┘
-```
+Adicionar um campo booleano que indica se o projeto e de hora-extra (executado fora do horario comercial). Esse campo sera utilizado posteriormente nos lancamentos de horas pelos analistas.
 
 ---
 
-## 1. Nova Tabela no Banco de Dados
+## 1. Alteracao no Banco de Dados
 
-Criar tabela `client_projects` com a seguinte estrutura:
-
-| Coluna | Tipo | Descricao |
-|--------|------|-----------|
-| id | uuid | Chave primaria |
-| client_id | uuid | FK para clients |
-| name | text | Nome do projeto (obrigatorio) |
-| description | text | Descricao do projeto (opcional) |
-| is_active | boolean | Se o projeto esta ativo (default: true) |
-| created_at | timestamp | Data de criacao |
-| updated_at | timestamp | Data de atualizacao |
-
-### SQL da Migration
+Adicionar a coluna `is_overtime` na tabela `client_projects`:
 
 ```sql
--- Criar tabela de projetos do cliente
-CREATE TABLE IF NOT EXISTS public.client_projects (
-  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-  client_id uuid NOT NULL REFERENCES public.clients(id) ON DELETE CASCADE,
-  name text NOT NULL,
-  description text,
-  is_active boolean DEFAULT true,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now()
-);
+ALTER TABLE public.client_projects 
+ADD COLUMN is_overtime boolean DEFAULT false;
 
--- Indices
-CREATE INDEX idx_client_projects_client_id ON public.client_projects(client_id);
-
--- RLS
-ALTER TABLE public.client_projects ENABLE ROW LEVEL SECURITY;
-
--- Politicas RLS (seguindo o padrao de client_contacts)
-CREATE POLICY "Client view own projects"
-  ON public.client_projects FOR SELECT
-  USING (
-    auth.uid() IS NOT NULL
-    AND NOT is_super_admin(auth.uid())
-    AND NOT is_otimizzo_user(auth.uid())
-    AND client_id = get_user_tenant_id(auth.uid())
-  );
-
-CREATE POLICY "Otimizzo view projects"
-  ON public.client_projects FOR SELECT
-  USING (auth.uid() IS NOT NULL AND is_otimizzo_user(auth.uid()));
-
-CREATE POLICY "Super admins manage projects"
-  ON public.client_projects FOR ALL
-  USING (auth.uid() IS NOT NULL AND is_super_admin(auth.uid()))
-  WITH CHECK (auth.uid() IS NOT NULL AND is_super_admin(auth.uid()));
-
-CREATE POLICY "Viewers can view all projects"
-  ON public.client_projects FOR SELECT
-  USING (auth.uid() IS NOT NULL AND is_viewer(auth.uid()));
-
--- Trigger para updated_at
-CREATE TRIGGER update_client_projects_updated_at
-  BEFORE UPDATE ON public.client_projects
-  FOR EACH ROW
-  EXECUTE FUNCTION update_updated_at_column();
+COMMENT ON COLUMN public.client_projects.is_overtime IS 
+'Indica se o projeto deve ser executado fora do horario comercial (hora-extra)';
 ```
 
 ---
 
-## 2. Arquivos a Criar
+## 2. Arquivos a Modificar
 
-### `src/hooks/useClientProjects.ts`
-
-Hook para gerenciar projetos do cliente:
-
-```typescript
-// Query para buscar projetos do cliente
-export const useClientProjects = (clientId: string | undefined) => {
-  return useQuery({
-    queryKey: ["client-projects", clientId],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("client_projects")
-        .select("*")
-        .eq("client_id", clientId)
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-    enabled: !!clientId,
-  });
-};
-
-// Mutations para criar, atualizar e excluir projetos
-export const useCreateProject = () => { ... };
-export const useUpdateProject = () => { ... };
-export const useDeleteProject = () => { ... };
-```
+| Arquivo | Alteracao |
+|---------|-----------|
+| `src/hooks/useClientProjects.ts` | Adicionar `is_overtime` na interface e mutations |
+| `src/components/clients/ClientProjectsTab.tsx` | Adicionar checkbox no formulario e exibicao na lista |
 
 ---
 
-## 3. Arquivos a Modificar
+## 3. Interface do Usuario
 
-### `src/components/clients/ClientDialog.tsx`
-
-| Alteracao | Descricao |
-|-----------|-----------|
-| TabsList | Mudar de `grid-cols-3` para `grid-cols-4` |
-| Novo TabsTrigger | Adicionar `value="projects"` com icone `FolderKanban` |
-| Novo TabsContent | Adicionar conteudo da aba Projetos |
-
----
-
-## 4. Interface da Aba Projetos
+### Formulario de Novo Projeto
 
 ```text
 ┌─────────────────────────────────────────────────────────────────┐
-│  Projetos                                         [Novo Projeto]│
-├─────────────────────────────────────────────────────────────────┤
+│  Nome *                                                         │
+│  [____________________________]                                 │
 │                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Nome: [________________________]                          │  │
-│  │ Descricao: [______________________________________________]│  │
-│  │ Ativo: [Toggle ON/OFF]                     [Salvar] [🗑️]  │  │
-│  └───────────────────────────────────────────────────────────┘  │
+│  Descricao                                                      │
+│  [____________________________]                                 │
 │                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Nome: Projeto Alpha                                       │  │
-│  │ Descricao: Sistema de automacao comercial                 │  │
-│  │ Ativo: [Toggle ON]                         [Editar] [🗑️]  │  │
-│  └───────────────────────────────────────────────────────────┘  │
+│  [✓] Projeto de Hora-Extra                                      │
+│      Executado fora do horario comercial                        │
 │                                                                 │
-│  ┌───────────────────────────────────────────────────────────┐  │
-│  │ Nome: Projeto Beta                                        │  │
-│  │ Descricao: Integracao com ERP                             │  │
-│  │ Ativo: [Toggle OFF]                        [Editar] [🗑️]  │  │
-│  └───────────────────────────────────────────────────────────┘  │
-│                                                                 │
+│                              [Cancelar] [Salvar]                │
 └─────────────────────────────────────────────────────────────────┘
 ```
 
----
+### Card do Projeto na Lista
 
-## 5. Comportamento da Aba Projetos
-
-### Modo Criacao de Cliente
-- Aba "Projetos" ficara **desabilitada** com tooltip explicando que e necessario salvar o cliente primeiro
-- Apos criar o cliente, podera adicionar projetos abrindo o dialog em modo edicao
-
-### Modo Edicao de Cliente
-- Lista todos os projetos vinculados ao cliente
-- Permite adicionar novo projeto (formulario inline ou modal simples)
-- Permite editar projetos existentes
-- Permite ativar/desativar com toggle
-- Permite excluir projeto (com confirmacao)
-
----
-
-## 6. Arquivos Afetados
-
-| Arquivo | Acao | Descricao |
-|---------|------|-----------|
-| `supabase/migrations/...` | Criar | Migration para tabela client_projects |
-| `src/hooks/useClientProjects.ts` | Criar | Hook com queries e mutations |
-| `src/components/clients/ClientDialog.tsx` | Modificar | Adicionar aba Projetos |
-
----
-
-## 7. Detalhes Tecnicos
-
-### Icone para a Aba
-```typescript
-import { FolderKanban } from "lucide-react";
-
-<TabsTrigger value="projects" disabled={mode === "create"}>
-  <FolderKanban className="h-4 w-4 mr-1" />
-  Projetos
-</TabsTrigger>
+```text
+┌─────────────────────────────────────────────────────────────────┐
+│  📁 Projeto Alpha                           ⏰ Hora-Extra       │
+│  Descricao do projeto                                           │
+│                                    [Ativo ●]  [✏️] [🗑️]         │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-### Formulario Inline para Novo Projeto
-```typescript
-// Estado local para novo projeto
-const [newProject, setNewProject] = useState({ name: "", description: "" });
-const [showNewForm, setShowNewForm] = useState(false);
+O badge "Hora-Extra" aparece com icone de relogio (Clock) quando `is_overtime = true`.
 
-// Ao salvar
-const handleAddProject = async () => {
-  await createProject.mutateAsync({
-    client_id: client.id,
-    name: newProject.name,
-    description: newProject.description,
-    is_active: true,
-  });
-  setNewProject({ name: "", description: "" });
-  setShowNewForm(false);
-};
+---
+
+## 4. Detalhes da Implementacao
+
+### 4.1 Hook (`useClientProjects.ts`)
+
+```typescript
+export interface ClientProject {
+  id: string;
+  client_id: string;
+  name: string;
+  description: string | null;
+  is_active: boolean;
+  is_overtime: boolean;  // NOVO
+  created_at: string;
+  updated_at: string;
+}
+
+// Mutation de create
+mutationFn: async (project: { 
+  client_id: string; 
+  name: string; 
+  description?: string; 
+  is_active?: boolean;
+  is_overtime?: boolean;  // NOVO
+})
 ```
 
-### Toggle de Status
+### 4.2 Componente (`ClientProjectsTab.tsx`)
+
+**Estado para novo projeto:**
 ```typescript
-<Switch
-  checked={project.is_active}
-  onCheckedChange={(checked) => {
-    updateProject.mutate({
-      id: project.id,
-      is_active: checked,
-    });
-  }}
-/>
+const [newProject, setNewProject] = useState({ 
+  name: "", 
+  description: "", 
+  is_overtime: false  // NOVO
+});
+```
+
+**Checkbox no formulario:**
+```typescript
+import { Checkbox } from "@/components/ui/checkbox";
+import { Clock } from "lucide-react";
+
+<div className="flex items-start space-x-3">
+  <Checkbox
+    id="new-project-overtime"
+    checked={newProject.is_overtime}
+    onCheckedChange={(checked) => 
+      setNewProject({ ...newProject, is_overtime: checked === true })
+    }
+  />
+  <div className="grid gap-1.5 leading-none">
+    <Label htmlFor="new-project-overtime" className="flex items-center gap-2">
+      <Clock className="h-4 w-4" />
+      Projeto de Hora-Extra
+    </Label>
+    <p className="text-sm text-muted-foreground">
+      Executado fora do horario comercial
+    </p>
+  </div>
+</div>
+```
+
+**Badge na lista de projetos:**
+```typescript
+import { Badge } from "@/components/ui/badge";
+
+{project.is_overtime && (
+  <Badge variant="outline" className="gap-1 text-xs">
+    <Clock className="h-3 w-3" />
+    Hora-Extra
+  </Badge>
+)}
 ```
 
 ---
 
-## 8. Regras de Acesso
+## 5. Uso Futuro
 
-| Role | Ver | Criar | Editar | Excluir |
-|------|-----|-------|--------|---------|
-| Super Admin | Sim | Sim | Sim | Sim |
-| Tenant Admin | Sim | Sim | Sim | Sim |
-| Otimizzo Analyst | Sim | Nao | Nao | Nao |
-| Viewer | Sim | Nao | Nao | Nao |
-| Cliente | Sim (proprio) | Nao | Nao | Nao |
+O campo `is_overtime` sera utilizado nos lancamentos de horas para:
+- Filtrar projetos disponiveis por tipo
+- Gerar relatorios separados de horas normais vs hora-extra
+- Aplicar regras de calculo diferenciadas
 
 ---
 
-## Resultado Final
+## 6. Resultado Visual
 
-Ao abrir um cliente para edicao, o usuario vera 4 abas:
-1. **Informacoes Basicas** - Dados gerais do cliente
-2. **Contrato** - Usuarios, datas, relatorio mensal
-3. **SLAs** - Tempos de SLA por prioridade
-4. **Projetos** - Lista de projetos com nome, descricao e status ativo
+### Card Normal
+```text
+┌────────────────────────────────────────────────────────────┐
+│  📁 Projeto Alpha                                          │
+│  Sistema de gestao                    [Ativo ●] [✏️] [🗑️]  │
+└────────────────────────────────────────────────────────────┘
+```
+
+### Card Hora-Extra
+```text
+┌────────────────────────────────────────────────────────────┐
+│  📁 Projeto Beta        [⏰ Hora-Extra]                     │
+│  Suporte emergencial              [Ativo ●] [✏️] [🗑️]      │
+└────────────────────────────────────────────────────────────┘
+```
 
