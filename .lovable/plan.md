@@ -1,150 +1,122 @@
 
 
-# Plano: Reorganizar Configurações com Grupo "Serviços"
+# Plano: Restaurar Aba de Produtos nas Configuracoes
 
-## Objetivo
+## Problema Identificado
 
-Criar uma nova estrutura de navegação na tela de Configurações do Sistema, agrupando as abas "Engines", "Filas" e "Categorias" sob um novo item chamado **"Serviços"**.
+Durante a reorganizacao das abas de Configuracoes do Sistema, o conteudo da aba **"Produtos"** foi acidentalmente removido. 
 
----
+O arquivo `SystemSettings.tsx` possui:
+- `TabsTrigger value="products"` na linha 484 (botao da aba existe)
+- **Mas nao possui** o `TabsContent value="products"` correspondente
 
-## Estrutura Atual vs. Proposta
-
-### Antes (7 abas em linha)
-```text
-┌──────┬─────────┬──────────┬───────┬────────────┬───────┬───────────┐
-│Geral │ Engines │ Produtos │ Filas │ Categorias │ Times │ Segmentos │
-└──────┴─────────┴──────────┴───────┴────────────┴───────┴───────────┘
-```
-
-### Depois (5 abas principais + subnavegação)
-```text
-┌──────┬──────────┬──────────┬───────┬───────────┐
-│Geral │ Serviços │ Produtos │ Times │ Segmentos │
-└──────┴──────────┴──────────┴───────┴───────────┘
-
-Ao clicar em "Serviços":
-┌─────────────────────────────────────────────────────────────────┐
-│  Serviços                                                       │
-│  ───────────────────────────────────────────────────────────    │
-│  ┌─────────┐ ┌───────┐ ┌────────────┐                           │
-│  │ Engines │ │ Filas │ │ Categorias │                           │
-│  └─────────┘ └───────┘ └────────────┘                           │
-│                                                                 │
-│  [Conteúdo da sub-aba selecionada]                              │
-└─────────────────────────────────────────────────────────────────┘
-```
+A estrutura atual vai direto de `</TabsContent>` de Servicos (linha 924) para `TabsContent value="teams"` (linha 927), pulando a aba de Produtos.
 
 ---
 
-## Arquivos a Modificar
+## Solucao
 
-| Arquivo | Ação | Descrição |
+Adicionar o `TabsContent value="products"` com a tabela de gerenciamento de produtos de aplicacao, seguindo o mesmo padrao das outras abas.
+
+---
+
+## Arquivo a Modificar
+
+| Arquivo | Acao | Descricao |
 |---------|------|-----------|
-| `src/pages/SystemSettings.tsx` | Modificar | Reestruturar abas com Tabs aninhadas |
+| `src/pages/SystemSettings.tsx` | Modificar | Adicionar TabsContent de Produtos entre Servicos e Times |
 
 ---
 
-## Detalhes da Implementação
+## Conteudo a Adicionar
 
-### 1. Reduzir para 5 abas principais
-
-```typescript
-<TabsList className="grid w-full max-w-4xl grid-cols-5">
-  <TabsTrigger value="general">Geral</TabsTrigger>
-  <TabsTrigger value="services">Serviços</TabsTrigger>  {/* NOVO */}
-  <TabsTrigger value="products">Produtos</TabsTrigger>
-  <TabsTrigger value="teams">Times</TabsTrigger>
-  <TabsTrigger value="segments">Segmentos</TabsTrigger>
-</TabsList>
-```
-
-### 2. Criar sub-navegação dentro de "Serviços"
+O conteudo da aba de Produtos deve ser inserido entre a linha 924 (fechamento de Servicos) e linha 927 (inicio de Times):
 
 ```typescript
-<TabsContent value="services" className="mt-6">
-  <Tabs defaultValue="engines">
-    <TabsList className="mb-4">
-      <TabsTrigger value="engines" className="gap-2">
-        <Database className="h-4 w-4" />
-        Engines
-      </TabsTrigger>
-      <TabsTrigger value="queues" className="gap-2">
-        <ListOrdered className="h-4 w-4" />
-        Filas
-      </TabsTrigger>
-      <TabsTrigger value="categories" className="gap-2">
-        <Tag className="h-4 w-4" />
-        Categorias
-      </TabsTrigger>
-    </TabsList>
+{/* Products Tab */}
+<TabsContent value="products" className="mt-6">
+  <div className="flex justify-between items-center mb-4">
+    <h2 className="text-lg font-semibold">Produtos de Aplicacao</h2>
+    {!isReadOnly && (
+      <Button
+        onClick={() => {
+          setSelectedProduct(null);
+          setProductDialogOpen(true);
+        }}
+      >
+        <Plus className="h-4 w-4 mr-2" />
+        Novo Produto
+      </Button>
+    )}
+  </div>
 
-    <TabsContent value="engines">
-      {/* Conteúdo de Engines (já existente) */}
-    </TabsContent>
-    
-    <TabsContent value="queues">
-      {/* Conteúdo de Filas (já existente) */}
-    </TabsContent>
-    
-    <TabsContent value="categories">
-      {/* Conteúdo de Categorias (já existente) */}
-    </TabsContent>
-  </Tabs>
+  <div className="border rounded-lg">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>Nome</TableHead>
+          <TableHead>Descricao</TableHead>
+          <TableHead className="w-[100px]">Status</TableHead>
+          <TableHead className="w-[120px]">Acoes</TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {productsLoading ? (
+          // Skeleton loading
+        ) : products?.length === 0 ? (
+          // Empty state
+        ) : (
+          products?.map((product) => (
+            // Linha clicavel com nome, descricao, status e acoes
+          ))
+        )}
+      </TableBody>
+    </Table>
+  </div>
 </TabsContent>
 ```
 
 ---
 
-## Ícone para "Serviços"
+## Funcionalidades da Aba de Produtos
 
-Utilizarei o ícone `Server` do Lucide para representar "Serviços", pois sugere infraestrutura e backend.
+A aba tera as mesmas funcionalidades das outras abas:
 
-```typescript
-import { Server } from "lucide-react";
-
-<TabsTrigger value="services" className="gap-2">
-  <Server className="h-4 w-4" />
-  Serviços
-</TabsTrigger>
-```
+| Funcionalidade | Descricao |
+|----------------|-----------|
+| Listar produtos | Tabela com nome, descricao e status |
+| Criar produto | Botao "Novo Produto" abre `AppProductDialog` |
+| Editar produto | Clique na linha abre dialog de edicao |
+| Ativar/Desativar | Menu dropdown com toggle de status |
+| Excluir produto | Menu dropdown com opcao de remover |
 
 ---
 
-## Resultado Visual
+## Estados e Dialogs Ja Existentes
+
+Os estados e mutations necessarios ja estao no arquivo:
+
+- `productDialogOpen` / `setProductDialogOpen` (linha 68)
+- `selectedProduct` / `setSelectedProduct` (linha 72)
+- `deleteProductId` / `setDeleteProductId` (linha 76)
+- `toggleProductMutation` (linha 303)
+- `deleteProductMutation` (linha 340)
+- `products` / `productsLoading` (linha 162)
+- `AppProductDialog` importado (linha 35)
+
+---
+
+## Resultado Esperado
+
+Apos a correcao, a aba "Produtos" exibira:
 
 ```text
-Configurações do Sistema
-─────────────────────────────────────────────────────────
-
-  ┌──────┐  ┌──────────┐  ┌──────────┐  ┌───────┐  ┌───────────┐
-  │ Geral│  │ Serviços │  │ Produtos │  │ Times │  │ Segmentos │
-  └──────┘  └──────────┘  └──────────┘  └───────┘  └───────────┘
-            ▼ (selecionado)
-
-  ┌─────────┐  ┌───────┐  ┌────────────┐
-  │ Engines │  │ Filas │  │ Categorias │
-  └─────────┘  └───────┘  └────────────┘
-       ▲
-  (selecionado)
-
-  ┌─────────────────────────────────────────────────────────────┐
-  │ Engines de Banco de Dados                     [Novo Engine] │
-  ├─────────────────────────────────────────────────────────────┤
-  │ Nome          │ Descrição      │ Status  │ Ações            │
-  ├───────────────┼────────────────┼─────────┼──────────────────┤
-  │ PostgreSQL    │ ...            │ Ativo   │ [...]            │
-  │ MySQL         │ ...            │ Ativo   │ [...]            │
-  │ MongoDB       │ ...            │ Ativo   │ [...]            │
-  └─────────────────────────────────────────────────────────────┘
+Produtos de Aplicacao                        [Novo Produto]
+─────────────────────────────────────────────────────────────
+Nome         │ Descricao           │ Status │ Acoes
+─────────────┼─────────────────────┼────────┼───────────────
+ContaDia     │ Sistema contabil    │ Ativo  │ [...]
+RH Express   │ Gestao de RH        │ Ativo  │ [...]
+─────────────────────────────────────────────────────────────
 ```
-
----
-
-## Benefícios
-
-1. **Organização lógica**: Agrupa configurações relacionadas a serviços de suporte
-2. **Menos abas principais**: De 7 para 5, mais limpo visualmente
-3. **Escalabilidade**: Facilita adicionar mais sub-itens a "Serviços" no futuro
-4. **Navegação intuitiva**: Sub-abas dentro do contexto de Serviços
 
