@@ -3,7 +3,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 
 export interface AnalystHours {
-  analyst_id: string;
+  analyst_id: string | null;
   analyst_name: string;
   hours: number;
 }
@@ -92,6 +92,15 @@ const TICKET_TYPE_LABELS: Record<string, string> = {
   service_request: "Service Request",
 };
 
+// Calculate ticket lifetime hours from created_at to resolved_at (or now if not resolved)
+const calculateTicketHours = (createdAt: string, resolvedAt: string | null): number => {
+  const start = new Date(createdAt);
+  const end = resolvedAt ? new Date(resolvedAt) : new Date();
+  const diffMs = end.getTime() - start.getTime();
+  // Return hours with 1 decimal place
+  return Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+};
+
 export function useClientHoursData(
   period: PeriodFilter,
   clientId?: string,
@@ -103,53 +112,55 @@ export function useClientHoursData(
       const { startDate, endDate } = getPeriodDates(period);
 
       let query = supabase
-        .from("ticket_time_logs")
+        .from("tickets")
         .select(`
           id,
-          hours,
-          logged_at,
+          created_at,
+          resolved_at,
+          client_id,
           analyst_id,
-          profiles!ticket_time_logs_analyst_id_fkey(full_name),
-          tickets!inner(
-            client_id,
-            queue_id,
-            team_id,
-            ticket_type,
-            segment,
-            clients(name),
-            queues(name),
-            teams(name)
-          )
+          queue_id,
+          team_id,
+          ticket_type,
+          segment,
+          status,
+          clients(name),
+          queues(name),
+          teams(name),
+          profiles!tickets_analyst_id_fkey(full_name)
         `)
-        .gte("logged_at", startDate)
-        .lte("logged_at", `${endDate}T23:59:59`);
+        .gte("created_at", startDate)
+        .lte("created_at", `${endDate}T23:59:59`);
+
+      // Apply client filter directly in the query if provided
+      if (clientId) {
+        query = query.eq("client_id", clientId);
+      }
+
+      // Apply segment filter directly in the query if provided
+      if (segment) {
+        query = query.eq("segment", segment);
+      }
 
       const { data, error } = await query;
 
       if (error) throw error;
 
-      // Filter by client and segment in memory (Supabase nested filters are limited)
-      let filteredData = data || [];
+      const tickets = data || [];
 
-      if (clientId) {
-        filteredData = filteredData.filter(
-          (log: any) => log.tickets?.client_id === clientId
-        );
-      }
-
-      if (segment) {
-        filteredData = filteredData.filter(
-          (log: any) => log.tickets?.segment === segment
-        );
-      }
+      // Calculate hours for each ticket and create enriched data
+      const ticketsWithHours = tickets.map((ticket: any) => ({
+        ...ticket,
+        hours: calculateTicketHours(ticket.created_at, ticket.resolved_at),
+      }));
 
       // Aggregate by analyst
-      const analystMap = new Map<string, { name: string; hours: number }>();
-      filteredData.forEach((log: any) => {
-        const analystId = log.analyst_id;
-        const analystName = log.profiles?.full_name || "Desconhecido";
+      const analystMap = new Map<string | null, { name: string; hours: number }>();
+      ticketsWithHours.forEach((ticket: any) => {
+        const analystId = ticket.analyst_id || null;
+        const analystName = ticket.profiles?.full_name || "Não Atribuído";
         const existing = analystMap.get(analystId) || { name: analystName, hours: 0 };
-        existing.hours += Number(log.hours) || 0;
+        existing.hours += ticket.hours;
         analystMap.set(analystId, existing);
       });
 
@@ -163,11 +174,11 @@ export function useClientHoursData(
 
       // Aggregate by queue
       const queueMap = new Map<string | null, { name: string; hours: number }>();
-      filteredData.forEach((log: any) => {
-        const queueId = log.tickets?.queue_id || null;
-        const queueName = log.tickets?.queues?.name || "Sem Fila";
+      ticketsWithHours.forEach((ticket: any) => {
+        const queueId = ticket.queue_id || null;
+        const queueName = ticket.queues?.name || "Sem Fila";
         const existing = queueMap.get(queueId) || { name: queueName, hours: 0 };
-        existing.hours += Number(log.hours) || 0;
+        existing.hours += ticket.hours;
         queueMap.set(queueId, existing);
       });
 
@@ -181,11 +192,11 @@ export function useClientHoursData(
 
       // Aggregate by team
       const teamMap = new Map<string | null, { name: string; hours: number }>();
-      filteredData.forEach((log: any) => {
-        const teamId = log.tickets?.team_id || null;
-        const teamName = log.tickets?.teams?.name || "Sem Time";
+      ticketsWithHours.forEach((ticket: any) => {
+        const teamId = ticket.team_id || null;
+        const teamName = ticket.teams?.name || "Sem Time";
         const existing = teamMap.get(teamId) || { name: teamName, hours: 0 };
-        existing.hours += Number(log.hours) || 0;
+        existing.hours += ticket.hours;
         teamMap.set(teamId, existing);
       });
 
@@ -199,10 +210,10 @@ export function useClientHoursData(
 
       // Aggregate by ticket type
       const typeMap = new Map<string, number>();
-      filteredData.forEach((log: any) => {
-        const ticketType = log.tickets?.ticket_type || "unknown";
+      ticketsWithHours.forEach((ticket: any) => {
+        const ticketType = ticket.ticket_type || "unknown";
         const existing = typeMap.get(ticketType) || 0;
-        typeMap.set(ticketType, existing + (Number(log.hours) || 0));
+        typeMap.set(ticketType, existing + ticket.hours);
       });
 
       const byType: TypeHours[] = Array.from(typeMap.entries())
@@ -216,24 +227,23 @@ export function useClientHoursData(
       // Aggregate by client
       const clientMap = new Map<
         string,
-        { name: string; hours: number; entries: number; analysts: Map<string, number> }
+        { name: string; hours: number; entries: number; analysts: Map<string | null, number> }
       >();
-      filteredData.forEach((log: any) => {
-        const cId = log.tickets?.client_id;
-        const cName = log.tickets?.clients?.name || "Desconhecido";
-        const analystId = log.analyst_id;
-        const hours = Number(log.hours) || 0;
+      ticketsWithHours.forEach((ticket: any) => {
+        const cId = ticket.client_id;
+        const cName = ticket.clients?.name || "Desconhecido";
+        const analystId = ticket.analyst_id || null;
 
         if (!clientMap.has(cId)) {
           clientMap.set(cId, { name: cName, hours: 0, entries: 0, analysts: new Map() });
         }
 
         const client = clientMap.get(cId)!;
-        client.hours += hours;
+        client.hours += ticket.hours;
         client.entries += 1;
 
         const analystHours = client.analysts.get(analystId) || 0;
-        client.analysts.set(analystId, analystHours + hours);
+        client.analysts.set(analystId, analystHours + ticket.hours);
       });
 
       const byClient: ClientHoursSummary[] = Array.from(clientMap.entries())
@@ -249,10 +259,10 @@ export function useClientHoursData(
           });
 
           // Get analyst name
-          const topAnalystLog = filteredData.find(
-            (log: any) => log.analyst_id === topAnalystId
+          const topAnalystTicket = ticketsWithHours.find(
+            (ticket: any) => ticket.analyst_id === topAnalystId
           );
-          const topAnalystName = topAnalystLog?.profiles?.full_name?.split(" ")[0] || null;
+          const topAnalystName = topAnalystTicket?.profiles?.full_name?.split(" ")[0] || null;
 
           return {
             client_id,
@@ -269,12 +279,16 @@ export function useClientHoursData(
         .sort((a, b) => b.total_hours - a.total_hours);
 
       // Overall stats
-      const totalHours = filteredData.reduce(
-        (sum: number, log: any) => sum + (Number(log.hours) || 0),
+      const totalHours = ticketsWithHours.reduce(
+        (sum: number, ticket: any) => sum + ticket.hours,
         0
       );
-      const totalEntries = filteredData.length;
-      const uniqueAnalysts = new Set(filteredData.map((log: any) => log.analyst_id)).size;
+      const totalEntries = ticketsWithHours.length;
+      const uniqueAnalysts = new Set(
+        ticketsWithHours
+          .map((ticket: any) => ticket.analyst_id)
+          .filter((id: any) => id !== null)
+      ).size;
 
       return {
         byAnalyst,
