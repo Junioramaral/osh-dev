@@ -468,30 +468,22 @@ export default function SystemSettings() {
       <div className="space-y-6">
         <div>
           <h1 className="text-2xl font-bold">Configurações do Sistema</h1>
-          <p className="text-muted-foreground">Gerencie engines de banco, produtos de aplicação, filas, categorias, times e segmentos</p>
+          <p className="text-muted-foreground">Gerencie serviços, produtos, times e segmentos</p>
         </div>
 
         <Tabs defaultValue="general" className="w-full">
-          <TabsList className="grid w-full max-w-6xl grid-cols-7">
+          <TabsList className="grid w-full max-w-4xl grid-cols-5">
             <TabsTrigger value="general" className="gap-2">
               <Settings2 className="h-4 w-4" />
               Geral
             </TabsTrigger>
-            <TabsTrigger value="engines" className="gap-2">
-              <Database className="h-4 w-4" />
-              Engines
+            <TabsTrigger value="services" className="gap-2">
+              <Server className="h-4 w-4" />
+              Serviços
             </TabsTrigger>
             <TabsTrigger value="products" className="gap-2">
               <Package className="h-4 w-4" />
               Produtos
-            </TabsTrigger>
-            <TabsTrigger value="queues" className="gap-2">
-              <ListOrdered className="h-4 w-4" />
-              Filas
-            </TabsTrigger>
-            <TabsTrigger value="categories" className="gap-2">
-              <Tag className="h-4 w-4" />
-              Categorias
             </TabsTrigger>
             <TabsTrigger value="teams" className="gap-2">
               <Users className="h-4 w-4" />
@@ -555,468 +547,380 @@ export default function SystemSettings() {
             </Card>
           </TabsContent>
 
-          {/* Database Engines Tab */}
-          <TabsContent value="engines" className="mt-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Engines de Banco de Dados</h2>
-              {!isReadOnly && (
-                <Button
-                  onClick={() => {
-                    setSelectedEngine(null);
-                    setEngineDialogOpen(true);
-                  }}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Novo Engine
-                </Button>
-              )}
-            </div>
+          {/* Services Tab with Nested Tabs */}
+          <TabsContent value="services" className="mt-6">
+            <Tabs defaultValue="engines">
+              <TabsList className="mb-4">
+                <TabsTrigger value="engines" className="gap-2">
+                  <Database className="h-4 w-4" />
+                  Engines
+                </TabsTrigger>
+                <TabsTrigger value="queues" className="gap-2">
+                  <ListOrdered className="h-4 w-4" />
+                  Filas
+                </TabsTrigger>
+                <TabsTrigger value="categories" className="gap-2">
+                  <Tag className="h-4 w-4" />
+                  Categorias
+                </TabsTrigger>
+              </TabsList>
 
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {enginesLoading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : engines?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        Nenhum engine cadastrado
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    engines?.map((engine) => (
-                      <TableRow 
-                        key={engine.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => {
-                          setSelectedEngine(engine);
-                          setEngineDialogOpen(true);
-                        }}
-                      >
-                        <TableCell className="font-medium">{engine.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {engine.description || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={engine.is_active ? "default" : "secondary"}>
-                            {engine.is_active ? "Ativo" : "Inativo"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleEngineMutation.mutate({ id: engine.id, is_active: !engine.is_active });
-                                }}
-                              >
-                                {engine.is_active ? (
-                                  <>
-                                    <ToggleLeft className="h-4 w-4 mr-2" />
-                                    Desativar
-                                  </>
-                                ) : (
-                                  <>
-                                    <ToggleRight className="h-4 w-4 mr-2" />
-                                    Ativar
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteEngineId(engine.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
+              {/* Engines Sub-Tab */}
+              <TabsContent value="engines">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Engines de Banco de Dados</h2>
+                  {!isReadOnly && (
+                    <Button
+                      onClick={() => {
+                        setSelectedEngine(null);
+                        setEngineDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Novo Engine
+                    </Button>
                   )}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
+                </div>
 
-          {/* Application Products Tab */}
-          <TabsContent value="products" className="mt-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Produtos de Aplicação</h2>
-              <Button
-                onClick={() => {
-                  setSelectedProduct(null);
-                  setProductDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Produto
-              </Button>
-            </div>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="w-[100px]">Status</TableHead>
+                        <TableHead className="w-[120px]">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {enginesLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : engines?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            Nenhum engine cadastrado
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        engines?.map((engine) => (
+                          <TableRow 
+                            key={engine.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setSelectedEngine(engine);
+                              setEngineDialogOpen(true);
+                            }}
+                          >
+                            <TableCell className="font-medium">{engine.name}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {engine.description || "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={engine.is_active ? "default" : "secondary"}>
+                                {engine.is_active ? "Ativo" : "Inativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleEngineMutation.mutate({ id: engine.id, is_active: !engine.is_active });
+                                    }}
+                                  >
+                                    {engine.is_active ? (
+                                      <>
+                                        <ToggleLeft className="h-4 w-4 mr-2" />
+                                        Desativar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ToggleRight className="h-4 w-4 mr-2" />
+                                        Ativar
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteEngineId(engine.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remover
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
 
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {productsLoading ? (
-                    Array.from({ length: 3 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : products?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        Nenhum produto cadastrado
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    products?.map((product) => (
-                      <TableRow 
-                        key={product.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => {
-                          setSelectedProduct(product);
-                          setProductDialogOpen(true);
-                        }}
-                      >
-                        <TableCell className="font-medium">{product.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {product.description || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={product.is_active ? "default" : "secondary"}>
-                            {product.is_active ? "Ativo" : "Inativo"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleProductMutation.mutate({ id: product.id, is_active: !product.is_active });
-                                }}
-                              >
-                                {product.is_active ? (
-                                  <>
-                                    <ToggleLeft className="h-4 w-4 mr-2" />
-                                    Desativar
-                                  </>
-                                ) : (
-                                  <>
-                                    <ToggleRight className="h-4 w-4 mr-2" />
-                                    Ativar
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteProductId(product.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
+              {/* Queues Sub-Tab */}
+              <TabsContent value="queues">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Filas de Atendimento</h2>
+                  <Button
+                    onClick={() => {
+                      setSelectedQueue(null);
+                      setQueueDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Fila
+                  </Button>
+                </div>
 
-          {/* Queues Tab */}
-          <TabsContent value="queues" className="mt-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Filas de Atendimento</h2>
-              <Button
-                onClick={() => {
-                  setSelectedQueue(null);
-                  setQueueDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Fila
-              </Button>
-            </div>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Descrição</TableHead>
+                        <TableHead className="w-[100px]">Status</TableHead>
+                        <TableHead className="w-[120px]">Ações</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {queuesLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-24" /></TableCell>
+                            <TableCell><Skeleton className="h-4 w-48" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : queues?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
+                            Nenhuma fila cadastrada
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        queues?.map((queue) => (
+                          <TableRow 
+                            key={queue.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setSelectedQueue(queue);
+                              setQueueDialogOpen(true);
+                            }}
+                          >
+                            <TableCell className="font-medium">{queue.name}</TableCell>
+                            <TableCell className="text-muted-foreground">
+                              {queue.description || "-"}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={queue.is_active ? "default" : "secondary"}>
+                                {queue.is_active ? "Ativo" : "Inativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleQueueMutation.mutate({ id: queue.id, is_active: !queue.is_active });
+                                    }}
+                                  >
+                                    {queue.is_active ? (
+                                      <>
+                                        <ToggleLeft className="h-4 w-4 mr-2" />
+                                        Desativar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ToggleRight className="h-4 w-4 mr-2" />
+                                        Ativar
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteQueueId(queue.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remover
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
 
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {queuesLoading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-4 w-24" /></TableCell>
-                        <TableCell><Skeleton className="h-4 w-48" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
-                      </TableRow>
-                    ))
-                  ) : queues?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} className="text-center text-muted-foreground py-8">
-                        Nenhuma fila cadastrada
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    queues?.map((queue) => (
-                      <TableRow 
-                        key={queue.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => {
-                          setSelectedQueue(queue);
-                          setQueueDialogOpen(true);
-                        }}
-                      >
-                        <TableCell className="font-medium">{queue.name}</TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {queue.description || "-"}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={queue.is_active ? "default" : "secondary"}>
-                            {queue.is_active ? "Ativo" : "Inativo"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleQueueMutation.mutate({ id: queue.id, is_active: !queue.is_active });
-                                }}
-                              >
-                                {queue.is_active ? (
-                                  <>
-                                    <ToggleLeft className="h-4 w-4 mr-2" />
-                                    Desativar
-                                  </>
-                                ) : (
-                                  <>
-                                    <ToggleRight className="h-4 w-4 mr-2" />
-                                    Ativar
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteQueueId(queue.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
-          </TabsContent>
+              {/* Categories Sub-Tab */}
+              <TabsContent value="categories">
+                <div className="flex justify-between items-center mb-4">
+                  <h2 className="text-lg font-semibold">Categorias de Ticket</h2>
+                  <Button
+                    onClick={() => {
+                      setSelectedCategory(null);
+                      setCategoryDialogOpen(true);
+                    }}
+                  >
+                    <Plus className="h-4 w-4 mr-2" />
+                    Nova Categoria
+                  </Button>
+                </div>
 
-          {/* Categories Tab */}
-          <TabsContent value="categories" className="mt-6">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg font-semibold">Categorias de Ticket</h2>
-              <Button
-                onClick={() => {
-                  setSelectedCategory(null);
-                  setCategoryDialogOpen(true);
-                }}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                Nova Categoria
-              </Button>
-            </div>
-
-            <div className="border rounded-lg">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Segmento</TableHead>
-                    <TableHead className="w-[130px]">Subcategorias</TableHead>
-                    <TableHead className="w-[100px]">Status</TableHead>
-                    <TableHead className="w-[120px]">Ações</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {categoriesLoading ? (
-                    Array.from({ length: 5 }).map((_, i) => (
-                      <TableRow key={i}>
-                        <TableCell><Skeleton className="h-4 w-32" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-6 w-16" /></TableCell>
-                        <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                <div className="border rounded-lg">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Nome</TableHead>
+                        <TableHead>Segmento</TableHead>
+                        <TableHead className="w-[130px]">Subcategorias</TableHead>
+                        <TableHead className="w-[100px]">Status</TableHead>
+                        <TableHead className="w-[120px]">Ações</TableHead>
                       </TableRow>
-                    ))
-                  ) : categories?.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
-                        Nenhuma categoria cadastrada
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    categories?.map((category) => (
-                      <TableRow 
-                        key={category.id}
-                        className="cursor-pointer hover:bg-muted/50"
-                        onClick={() => {
-                          setSelectedCategory(category);
-                          setCategoryDialogOpen(true);
-                        }}
-                      >
-                        <TableCell className="font-medium">{category.name}</TableCell>
-                        <TableCell>
-                          {category.segment === null ? (
-                            <Badge variant="outline">Ambos</Badge>
-                          ) : category.segment === "DB" ? (
-                            <Badge variant="secondary" className="bg-blue-100 text-blue-800">
-                              <Database className="h-3 w-3 mr-1" />
-                              DB
-                            </Badge>
-                          ) : (
-                            <Badge variant="secondary" className="bg-green-100 text-green-800">
-                              <Package className="h-3 w-3 mr-1" />
-                              APP
-                            </Badge>
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant="outline">
-                            {category.subcategoryCount} {category.subcategoryCount === 1 ? "subcategoria" : "subcategorias"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <Badge variant={category.is_active ? "default" : "secondary"}>
-                            {category.is_active ? "Ativo" : "Inativo"}
-                          </Badge>
-                        </TableCell>
-                        <TableCell>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon">
-                                <MoreHorizontal className="h-4 w-4" />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedCategoryForSubcategories({ id: category.id, name: category.name });
-                                  setSubcategoryDialogOpen(true);
-                                }}
-                              >
-                                <Layers className="h-4 w-4 mr-2" />
-                                Subcategorias
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  toggleCategoryMutation.mutate({ id: category.id, is_active: !category.is_active });
-                                }}
-                              >
-                                {category.is_active ? (
-                                  <>
-                                    <ToggleLeft className="h-4 w-4 mr-2" />
-                                    Desativar
-                                  </>
-                                ) : (
-                                  <>
-                                    <ToggleRight className="h-4 w-4 mr-2" />
-                                    Ativar
-                                  </>
-                                )}
-                              </DropdownMenuItem>
-                              <DropdownMenuSeparator />
-                              <DropdownMenuItem
-                                className="text-destructive focus:text-destructive"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setDeleteCategoryId(category.id);
-                                }}
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Remover
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </div>
+                    </TableHeader>
+                    <TableBody>
+                      {categoriesLoading ? (
+                        Array.from({ length: 5 }).map((_, i) => (
+                          <TableRow key={i}>
+                            <TableCell><Skeleton className="h-4 w-32" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-6 w-16" /></TableCell>
+                            <TableCell><Skeleton className="h-8 w-20" /></TableCell>
+                          </TableRow>
+                        ))
+                      ) : categories?.length === 0 ? (
+                        <TableRow>
+                          <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
+                            Nenhuma categoria cadastrada
+                          </TableCell>
+                        </TableRow>
+                      ) : (
+                        categories?.map((category) => (
+                          <TableRow 
+                            key={category.id}
+                            className="cursor-pointer hover:bg-muted/50"
+                            onClick={() => {
+                              setSelectedCategory(category);
+                              setCategoryDialogOpen(true);
+                            }}
+                          >
+                            <TableCell className="font-medium">{category.name}</TableCell>
+                            <TableCell>
+                              {category.segment === null ? (
+                                <Badge variant="outline">Ambos</Badge>
+                              ) : category.segment === "DB" ? (
+                                <Badge variant="secondary" className="bg-blue-100 text-blue-800">
+                                  <Database className="h-3 w-3 mr-1" />
+                                  DB
+                                </Badge>
+                              ) : (
+                                <Badge variant="secondary" className="bg-green-100 text-green-800">
+                                  <Package className="h-3 w-3 mr-1" />
+                                  APP
+                                </Badge>
+                              )}
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="outline">
+                                {category.subcategoryCount} {category.subcategoryCount === 1 ? "subcategoria" : "subcategorias"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant={category.is_active ? "default" : "secondary"}>
+                                {category.is_active ? "Ativo" : "Inativo"}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <DropdownMenu>
+                                <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
+                                  <Button variant="ghost" size="icon">
+                                    <MoreHorizontal className="h-4 w-4" />
+                                  </Button>
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end">
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setSelectedCategoryForSubcategories({ id: category.id, name: category.name });
+                                      setSubcategoryDialogOpen(true);
+                                    }}
+                                  >
+                                    <Layers className="h-4 w-4 mr-2" />
+                                    Subcategorias
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      toggleCategoryMutation.mutate({ id: category.id, is_active: !category.is_active });
+                                    }}
+                                  >
+                                    {category.is_active ? (
+                                      <>
+                                        <ToggleLeft className="h-4 w-4 mr-2" />
+                                        Desativar
+                                      </>
+                                    ) : (
+                                      <>
+                                        <ToggleRight className="h-4 w-4 mr-2" />
+                                        Ativar
+                                      </>
+                                    )}
+                                  </DropdownMenuItem>
+                                  <DropdownMenuSeparator />
+                                  <DropdownMenuItem
+                                    className="text-destructive focus:text-destructive"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      setDeleteCategoryId(category.id);
+                                    }}
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Remover
+                                  </DropdownMenuItem>
+                                </DropdownMenuContent>
+                              </DropdownMenu>
+                            </TableCell>
+                          </TableRow>
+                        ))
+                      )}
+                    </TableBody>
+                  </Table>
+                </div>
+              </TabsContent>
+            </Tabs>
           </TabsContent>
 
           {/* Teams Tab */}
