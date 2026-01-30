@@ -1,132 +1,118 @@
 
-# Plano: Ajustar Tipos de Ticket
 
-## Resumo da Análise
+# Plano: Redirecionar para Login Quando Sessão Expira
 
-Ao analisar o sistema, identifiquei todos os pontos onde o tipo de ticket é definido ou exibido:
+## Problema Identificado
 
-### Pontos de Alteração Identificados
+Quando o token JWT expira no Supabase (após o timeout de inatividade configurado), a interface permanece na mesma tela em vez de redirecionar para `/auth`. Isso acontece porque:
 
-| Local | Arquivo | Tipo de Alteração |
-|-------|---------|-------------------|
-| Banco de Dados | Migration SQL | Adicionar "problema" e "service_request" ao ENUM `ticket_type` |
-| Types TypeScript | `src/integrations/supabase/types.ts` | Atualizar tipagem (será regenerado automaticamente após migration) |
-| Formulário de Criação | `src/components/tickets/NewTicketDialog.tsx` | Atualizar schema Zod + opções do Select |
-| Exibição de Detalhes | `src/components/tickets/TicketDetails.tsx` | Usar função de formatação para labels legíveis |
-| Utilitários | `src/lib/ticketUtils.tsx` | Adicionar função `getTicketTypeLabel()` |
+1. O `AppLayout` não verifica se o usuário está deslogado (`user === null`)
+2. O `AuthContext` não dispara redirecionamento automático quando a sessão expira
+
+## Solucao Proposta
+
+Implementar duas camadas de proteção:
+
+1. **Verificação no AppLayout** - Redirecionar para `/auth` quando não há usuário autenticado
+2. **Listener no AuthContext** - Detectar quando sessão expira e fazer logout automático
 
 ---
 
-## Alterações Detalhadas
+## Alteracoes Detalhadas
 
-### 1. Migration SQL (Novo arquivo)
+### 1. `src/components/layout/AppLayout.tsx`
 
-Criar migration para alterar o ENUM `ticket_type`:
-
-```sql
--- Adicionar novos valores ao ENUM ticket_type
-ALTER TYPE public.ticket_type ADD VALUE IF NOT EXISTS 'problema';
-ALTER TYPE public.ticket_type ADD VALUE IF NOT EXISTS 'service_request';
-```
-
-Os valores atuais são: `incidente`, `duvida`, `solicitacao`
-
-Os novos valores serão:
-- `incidente` - Incidente (mantido)
-- `duvida` - Dúvida (mantido)
-- `problema` - Problema (novo)
-- `service_request` - Service Request (substitui "solicitacao" como novo padrão, mas mantém o antigo para compatibilidade)
-
-### 2. `src/lib/ticketUtils.tsx`
-
-Adicionar função para formatação de labels:
+Adicionar verificação se o usuário está autenticado antes de renderizar o layout:
 
 ```typescript
-export const getTicketTypeLabel = (type: string): string => {
-  switch (type) {
-    case 'incidente':
-      return 'Incidente';
-    case 'duvida':
-      return 'Dúvida';
-    case 'problema':
-      return 'Problema';
-    case 'service_request':
-      return 'Service Request';
-    case 'solicitacao':
-      return 'Service Request'; // Manter compatibilidade com dados antigos
-    default:
-      return type;
+// Após verificar mustChangePassword e loading
+// Adicionar verificação de usuário não autenticado
+
+if (!user) {
+  console.log('[AppLayout] No authenticated user, redirecting to /auth');
+  return <Navigate to="/auth" replace />;
+}
+```
+
+Esta verificação garante que:
+- Se a sessão expirar e `onAuthStateChange` disparar com `session = null`
+- O estado `user` será atualizado para `null`
+- O AppLayout detectará isso e redirecionará automaticamente
+
+### 2. `src/contexts/AuthContext.tsx`
+
+Melhorar o listener `onAuthStateChange` para tratar eventos de logout/expiração:
+
+```typescript
+const { data: { subscription } } = supabase.auth.onAuthStateChange(
+  async (event, session) => {
+    console.log('[AuthContext] Auth event:', event);
+    
+    // Tratar eventos de logout/expiração
+    if (event === 'SIGNED_OUT' || event === 'TOKEN_REFRESHED' && !session) {
+      console.log('[AuthContext] Session ended, clearing state');
+      setUser(null);
+      setSession(null);
+      setProfile(null);
+      setRoles([]);
+      setMustChangePassword(false);
+      setLoading(false);
+      // Navegação será tratada pelo AppLayout
+      return;
+    }
+    
+    // ... resto do código existente
   }
-};
+);
 ```
 
-### 3. `src/components/tickets/NewTicketDialog.tsx`
+---
 
-**Schema Zod (linha 38):**
-```typescript
-// De:
-ticket_type: z.enum(["incidente", "duvida", "solicitacao"]),
+## Fluxo Após Implementação
 
-// Para:
-ticket_type: z.enum(["incidente", "duvida", "problema", "service_request"]),
-```
-
-**Select Options (linhas 700-703):**
-```typescript
-// De:
-<SelectItem value="incidente">Incidente</SelectItem>
-<SelectItem value="duvida">Dúvida</SelectItem>
-<SelectItem value="solicitacao">Solicitação</SelectItem>
-
-// Para:
-<SelectItem value="incidente">Incidente</SelectItem>
-<SelectItem value="problema">Problema</SelectItem>
-<SelectItem value="duvida">Dúvida</SelectItem>
-<SelectItem value="service_request">Service Request</SelectItem>
-```
-
-### 4. `src/components/tickets/TicketDetails.tsx`
-
-Usar a função de formatação para exibir o label correto:
-
-```typescript
-// Importar
-import { getTicketTypeLabel } from "@/lib/ticketUtils";
-
-// Linha 79 - De:
-<InfoRow label="Tipo" value={ticket.ticket_type} />
-
-// Para:
-<InfoRow label="Tipo" value={getTicketTypeLabel(ticket.ticket_type)} />
-```
-
-Também renomear o título do card de "Detalhes do Incidente" para "Detalhes do Ticket":
-
-```typescript
-// Linha 74 - De:
-Detalhes do Incidente
-
-// Para:
-Detalhes do Ticket
+```text
+┌─────────────────────────────────────────────────────────────┐
+│                    Sessão Ativa                             │
+│                         │                                   │
+│                         ▼                                   │
+│              Usuário fica inativo                           │
+│                         │                                   │
+│                         ▼                                   │
+│           Token JWT expira no Supabase                      │
+│                         │                                   │
+│                         ▼                                   │
+│         onAuthStateChange dispara com session=null          │
+│                         │                                   │
+│                         ▼                                   │
+│            AuthContext atualiza user=null                   │
+│                         │                                   │
+│                         ▼                                   │
+│         AppLayout detecta user=null                         │
+│                         │                                   │
+│                         ▼                                   │
+│           Navigate para /auth (tela de login)               │
+└─────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Ação |
-|---------|------|
-| `supabase/migrations/XXXXXXXX_add_ticket_types.sql` | Criar nova migration |
-| `src/lib/ticketUtils.tsx` | Adicionar função `getTicketTypeLabel()` |
-| `src/components/tickets/NewTicketDialog.tsx` | Atualizar schema e opções do Select |
-| `src/components/tickets/TicketDetails.tsx` | Usar formatação e renomear título do card |
+| Arquivo | Alteração |
+|---------|-----------|
+| `src/components/layout/AppLayout.tsx` | Adicionar verificação `!user` com redirect para `/auth` |
+| `src/contexts/AuthContext.tsx` | Melhorar tratamento de eventos `SIGNED_OUT` no listener |
 
 ---
 
 ## Notas Técnicas
 
-1. **Compatibilidade**: O valor `solicitacao` será mantido no banco para não quebrar tickets existentes. A função `getTicketTypeLabel()` traduz tanto `solicitacao` quanto `service_request` para "Service Request"
+1. **Ordem das verificações no AppLayout**: A verificação de `!user` deve vir após `loading` para não redirecionar durante o carregamento inicial
 
-2. **Ordem no Select**: Os tipos serão ordenados logicamente: Incidente, Problema, Dúvida, Service Request (do mais urgente para menos urgente)
+2. **Eventos do Supabase**: O `onAuthStateChange` dispara com eventos como:
+   - `SIGNED_IN` - Login bem sucedido
+   - `SIGNED_OUT` - Logout ou sessão expirada
+   - `TOKEN_REFRESHED` - Token renovado (pode ser `null` se falhar)
 
-3. **Regeneração de Types**: Após a migration, o arquivo `types.ts` será automaticamente regenerado pelo Supabase, incluindo os novos valores do ENUM
+3. **Comportamento esperado**: Quando a sessão expira, o usuário verá a tela de login automaticamente, sem ficar "preso" em uma tela não funcional
+
