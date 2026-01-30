@@ -21,8 +21,9 @@ import {
 } from "@/components/ui/select";
 import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
+import { TimeLogDialog } from "./TimeLogDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
@@ -44,7 +45,11 @@ function InfoRow({ label, value }: { label: string; value: any }) {
 export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showFAQDialog, setShowFAQDialog] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
-  const { profile, isViewer } = useAuth();
+  const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
+  const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
+  
+  // Apenas analistas Otimizzo/SuperAdmin podem registrar horas (não clientes, não viewers)
+  const canLogTime = (isOtimizzoUser || isSuperAdmin) && !isViewer;
   const { resolveTicketWithReason, updateTicketStatus } = useTicketActions();
   
   const slaStatus = calculateSLAStatus(ticket);
@@ -176,6 +181,18 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             </>
           )}
 
+          {/* Log Time Button - visible for Otimizzo/SuperAdmin even on resolved tickets */}
+          {canLogTime && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowTimeLogDialog(true)}
+            >
+              <Timer className="h-4 w-4 mr-2" />
+              Registrar Horas
+            </Button>
+          )}
+
           {/* Viewer read-only message */}
           {isViewer && !isResolved && (
             <p className="text-xs text-purple-600 dark:text-purple-400 text-center">
@@ -197,6 +214,17 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         }}
         onConfirm={handleResolveConfirm}
         isLoading={resolveTicketWithReason.isPending}
+      />
+
+      {/* Time Log Dialog */}
+      <TimeLogDialog
+        open={showTimeLogDialog}
+        onOpenChange={setShowTimeLogDialog}
+        ticket={{
+          id: ticket.id,
+          ticket_number: ticket.ticket_number,
+          title: ticket.title,
+        }}
       />
 
       {/* CSAT Rating Card */}
