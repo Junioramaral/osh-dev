@@ -1,169 +1,89 @@
 
 
-# Plano: Adicionar Campo "Hora-Extra" nos Projetos
+# Plano: Remover Botoes Redundantes na Aba de Projetos
 
-## Objetivo
+## Problema Identificado
 
-Adicionar um campo booleano que indica se o projeto e de hora-extra (executado fora do horario comercial). Esse campo sera utilizado posteriormente nos lancamentos de horas pelos analistas.
+Na tela de clientes, quando o usuario esta na aba "Projetos", existem dois conjuntos de botoes:
 
----
+1. **Botoes do projeto**: "Cancelar" e "Salvar" (para criar/editar projetos individuais)
+2. **Botoes do dialog**: "Cancelar" e "Salvar Alteracoes" (para salvar dados do cliente)
 
-## 1. Alteracao no Banco de Dados
-
-Adicionar a coluna `is_overtime` na tabela `client_projects`:
-
-```sql
-ALTER TABLE public.client_projects 
-ADD COLUMN is_overtime boolean DEFAULT false;
-
-COMMENT ON COLUMN public.client_projects.is_overtime IS 
-'Indica se o projeto deve ser executado fora do horario comercial (hora-extra)';
-```
+Os botoes do dialog sao redundantes na aba Projetos porque:
+- Projetos sao salvos individualmente diretamente no banco
+- Nao ha dados do cliente a salvar quando esta na aba de projetos
 
 ---
 
-## 2. Arquivos a Modificar
+## Solucao Proposta
 
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/hooks/useClientProjects.ts` | Adicionar `is_overtime` na interface e mutations |
-| `src/components/clients/ClientProjectsTab.tsx` | Adicionar checkbox no formulario e exibicao na lista |
+Ocultar os botoes do footer do dialog quando a aba "Projetos" estiver selecionada.
 
 ---
 
-## 3. Interface do Usuario
+## Alteracoes
 
-### Formulario de Novo Projeto
+### Arquivo: `src/components/clients/ClientDialog.tsx`
 
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  Nome *                                                         │
-│  [____________________________]                                 │
-│                                                                 │
-│  Descricao                                                      │
-│  [____________________________]                                 │
-│                                                                 │
-│  [✓] Projeto de Hora-Extra                                      │
-│      Executado fora do horario comercial                        │
-│                                                                 │
-│                              [Cancelar] [Salvar]                │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-### Card do Projeto na Lista
-
-```text
-┌─────────────────────────────────────────────────────────────────┐
-│  📁 Projeto Alpha                           ⏰ Hora-Extra       │
-│  Descricao do projeto                                           │
-│                                    [Ativo ●]  [✏️] [🗑️]         │
-└─────────────────────────────────────────────────────────────────┘
-```
-
-O badge "Hora-Extra" aparece com icone de relogio (Clock) quando `is_overtime = true`.
-
----
-
-## 4. Detalhes da Implementacao
-
-### 4.1 Hook (`useClientProjects.ts`)
-
+1. Adicionar estado para rastrear a aba ativa:
 ```typescript
-export interface ClientProject {
-  id: string;
-  client_id: string;
-  name: string;
-  description: string | null;
-  is_active: boolean;
-  is_overtime: boolean;  // NOVO
-  created_at: string;
-  updated_at: string;
-}
-
-// Mutation de create
-mutationFn: async (project: { 
-  client_id: string; 
-  name: string; 
-  description?: string; 
-  is_active?: boolean;
-  is_overtime?: boolean;  // NOVO
-})
+const [activeTab, setActiveTab] = useState("basic");
 ```
 
-### 4.2 Componente (`ClientProjectsTab.tsx`)
-
-**Estado para novo projeto:**
+2. Modificar o componente Tabs para usar estado controlado:
 ```typescript
-const [newProject, setNewProject] = useState({ 
-  name: "", 
-  description: "", 
-  is_overtime: false  // NOVO
-});
+<Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
 ```
 
-**Checkbox no formulario:**
+3. Ocultar os botoes quando estiver na aba de projetos:
 ```typescript
-import { Checkbox } from "@/components/ui/checkbox";
-import { Clock } from "lucide-react";
-
-<div className="flex items-start space-x-3">
-  <Checkbox
-    id="new-project-overtime"
-    checked={newProject.is_overtime}
-    onCheckedChange={(checked) => 
-      setNewProject({ ...newProject, is_overtime: checked === true })
-    }
-  />
-  <div className="grid gap-1.5 leading-none">
-    <Label htmlFor="new-project-overtime" className="flex items-center gap-2">
-      <Clock className="h-4 w-4" />
-      Projeto de Hora-Extra
-    </Label>
-    <p className="text-sm text-muted-foreground">
-      Executado fora do horario comercial
-    </p>
+{activeTab !== "projects" && (
+  <div className="flex justify-end gap-2">
+    <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+      Cancelar
+    </Button>
+    <Button type="submit" disabled={isLoading}>
+      {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+      {mode === "create" ? "Criar Cliente" : "Salvar Alteracoes"}
+    </Button>
   </div>
-</div>
-```
-
-**Badge na lista de projetos:**
-```typescript
-import { Badge } from "@/components/ui/badge";
-
-{project.is_overtime && (
-  <Badge variant="outline" className="gap-1 text-xs">
-    <Clock className="h-3 w-3" />
-    Hora-Extra
-  </Badge>
 )}
 ```
 
 ---
 
-## 5. Uso Futuro
+## Comportamento Esperado
 
-O campo `is_overtime` sera utilizado nos lancamentos de horas para:
-- Filtrar projetos disponiveis por tipo
-- Gerar relatorios separados de horas normais vs hora-extra
-- Aplicar regras de calculo diferenciadas
+| Aba Selecionada | Botoes Visiveis |
+|-----------------|-----------------|
+| Informacoes Basicas | Cancelar + Salvar Alteracoes |
+| Contrato | Cancelar + Salvar Alteracoes |
+| SLAs | Cancelar + Salvar Alteracoes |
+| Projetos | Nenhum (projetos tem seus proprios botoes) |
 
 ---
 
-## 6. Resultado Visual
+## Resultado Visual
 
-### Card Normal
+### Antes (Aba Projetos)
 ```text
-┌────────────────────────────────────────────────────────────┐
-│  📁 Projeto Alpha                                          │
-│  Sistema de gestao                    [Ativo ●] [✏️] [🗑️]  │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  [Novo Projeto] [Cancelar] [Salvar]             │
+│                                                 │
+│  Projeto LEXIS-HE     [Ativo] [Editar] [Excluir]│
+│                                                 │
+│           [Cancelar] [Salvar Alteracoes]  <-- REDUNDANTE
+└─────────────────────────────────────────────────┘
 ```
 
-### Card Hora-Extra
+### Depois (Aba Projetos)
 ```text
-┌────────────────────────────────────────────────────────────┐
-│  📁 Projeto Beta        [⏰ Hora-Extra]                     │
-│  Suporte emergencial              [Ativo ●] [✏️] [🗑️]      │
-└────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────┐
+│  [Novo Projeto] [Cancelar] [Salvar]             │
+│                                                 │
+│  Projeto LEXIS-HE     [Ativo] [Editar] [Excluir]│
+│                                                 │
+│                                   <-- LIMPO!    │
+└─────────────────────────────────────────────────┘
 ```
 
