@@ -1,222 +1,159 @@
 
-# Plano: Relatório de Horas por Cliente
 
-## Resumo
+# Plano: Corrigir Relatório de Horas para Usar Tempo de Vida dos Tickets
 
-Criar um novo relatório para visualizar as horas trabalhadas por cliente, com gráficos mostrando a distribuição por analista, fila, time e tipo de ticket.
+## Problema Identificado
 
-## Estrutura de Dados Existente
+O relatório atual busca dados da tabela `ticket_time_logs`, que está **vazia** (0 registros). O usuário precisa que as horas sejam calculadas a partir do **Tempo de Vida** dos tickets, ou seja, a diferença entre a data de criação (`created_at`) e a data de resolução (`resolved_at`).
 
-A tabela `ticket_time_logs` já está disponível com:
-| Coluna | Tipo | Descrição |
-|--------|------|-----------|
-| id | uuid | Identificador único |
-| ticket_id | uuid | FK para tickets |
-| analyst_id | uuid | FK para profiles |
-| hours | numeric | Horas trabalhadas |
-| logged_at | timestamp | Data/hora do registro |
-| description | text | Descrição do trabalho |
+## Solucao Proposta
 
-A partir do `ticket_id` podemos acessar: `client_id`, `queue_id`, `team_id`, `ticket_type`, `priority`, `category`.
+Modificar o hook `useClientHoursData.ts` para:
+1. Buscar dados diretamente da tabela `tickets` (não mais de `ticket_time_logs`)
+2. Calcular as horas automaticamente como: `(resolved_at - created_at)` em horas
+3. Para tickets não resolvidos, usar a data atual como referência
 
 ---
 
-## Arquivos a Criar
+## Alteracoes Detalhadas
 
-### 1. `src/hooks/useClientHoursData.ts`
+### Arquivo: `src/hooks/useClientHoursData.ts`
 
-Hook para buscar e processar dados de horas por cliente.
+**Mudanca principal:**
+- **De:** Query na tabela `ticket_time_logs`
+- **Para:** Query direta na tabela `tickets`
 
-**Dados retornados:**
+**Nova lógica de cálculo:**
 ```typescript
-interface ClientHoursData {
-  client_id: string;
-  client_name: string;
-  total_hours: number;
-  by_analyst: { analyst_name: string; hours: number }[];
-  by_queue: { queue_name: string; hours: number }[];
-  by_team: { team_name: string; hours: number }[];
-  by_type: { type_name: string; hours: number }[];
-  overall: {
-    total_hours: number;
-    total_entries: number;
-    avg_hours_per_entry: number;
-  };
-}
+// Calcular horas de vida do ticket
+const calculateTicketHours = (createdAt: string, resolvedAt: string | null): number => {
+  const start = new Date(createdAt);
+  const end = resolvedAt ? new Date(resolvedAt) : new Date();
+  const diffMs = end.getTime() - start.getTime();
+  return diffMs / (1000 * 60 * 60); // Converter para horas
+};
 ```
 
-**Query principal:**
+**Nova query:**
 ```typescript
 supabase
-  .from("ticket_time_logs")
+  .from("tickets")
   .select(`
     id,
-    hours,
-    logged_at,
+    created_at,
+    resolved_at,
+    client_id,
     analyst_id,
-    profiles!ticket_time_logs_analyst_id_fkey(full_name),
-    tickets!inner(
-      client_id,
-      queue_id,
-      team_id,
-      ticket_type,
-      priority,
-      category,
-      clients(name),
-      queues(name),
-      teams(name)
-    )
+    queue_id,
+    team_id,
+    ticket_type,
+    segment,
+    status,
+    clients(name),
+    queues(name),
+    teams(name),
+    profiles!tickets_analyst_id_fkey(full_name)
   `)
-  .gte("logged_at", startDate)
-  .lte("logged_at", endDate)
+  .gte("created_at", startDate)
+  .lte("created_at", endDate + "T23:59:59")
 ```
-
-### 2. `src/components/reports/ClientHoursReport.tsx`
-
-Componente do relatório seguindo o padrão existente.
-
-**Estrutura:**
-- Header com botão voltar e exportar PDF
-- Filtros: Período, Cliente (opcional), Segmento
-- Cards de resumo: Total de horas, Média por ticket, Número de registros
-- Gráficos:
-  - **Por Analista**: BarChart horizontal mostrando horas por analista
-  - **Por Fila**: PieChart com distribuição de horas por fila
-  - **Por Time**: BarChart com horas por time
-  - **Por Tipo de Ticket**: BarChart com horas por tipo (Incidente, Problema, etc.)
-- Tabela detalhada por cliente
 
 ---
 
-## Gráficos Planejados
+## Campos a Agregar
+
+Para cada ticket, as horas serão calculadas e agregadas por:
+
+| Dimensao | Fonte | Agrupamento |
+|----------|-------|-------------|
+| Por Cliente | `tickets.client_id` -> `clients.name` | Soma das horas de todos os tickets do cliente |
+| Por Analista | `tickets.analyst_id` -> `profiles.full_name` | Soma das horas dos tickets atribuídos ao analista |
+| Por Fila | `tickets.queue_id` -> `queues.name` | Soma das horas dos tickets na fila |
+| Por Time | `tickets.team_id` -> `teams.name` | Soma das horas dos tickets do time |
+| Por Tipo | `tickets.ticket_type` | Soma das horas por tipo (Incidente, Problema, etc.) |
+
+---
+
+## Exemplo de Cálculo
 
 ```text
-┌────────────────────────────────────────────────────────────┐
-│                 RESUMO GERAL                               │
-│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐   │
-│  │ Total    │  │ Média/   │  │ Registros│  │ Analistas│   │
-│  │ 127.5h   │  │ Ticket   │  │ 48       │  │ 5        │   │
-│  └──────────┘  └──────────┘  └──────────┘  └──────────┘   │
-└────────────────────────────────────────────────────────────┘
+Ticket #00000001:
+  - Criado: 2025-11-26 13:32:34
+  - Resolvido: 2025-12-16 17:46:39
+  - Tempo de Vida: ~484 horas (20.2 dias)
+  - Cliente: Cliente X
+  - Analista: João
+  - Fila: Suporte N1
+  - Time: Time DB
+  - Tipo: Incidente
 
-┌────────────────────────────────────────────────────────────┐
-│           HORAS POR ANALISTA (BarChart Horizontal)         │
-│                                                            │
-│  João     ████████████████████████████ 45.5h               │
-│  Maria    ██████████████████ 32.0h                         │
-│  Pedro    █████████████ 25.0h                              │
-│  Ana      ██████████ 15.0h                                 │
-│  Carlos   ██████ 10.0h                                     │
-└────────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────┐
-│           HORAS POR FILA (PieChart)                        │
-│                                                            │
-│               ┌───────────┐                                │
-│            ╱              ╲      Suporte N1: 35%           │
-│          ╱                  ╲    Suporte N2: 28%           │
-│         │                    │   Suporte N3: 22%           │
-│          ╲                  ╱    Desenvolvimento: 15%      │
-│            ╲              ╱                                │
-│               └───────────┘                                │
-└────────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────┐
-│           HORAS POR TIME (BarChart Vertical)               │
-│                                                            │
-│   80h │                                                    │
-│   60h │    ▓▓▓                                             │
-│   40h │    ▓▓▓     ▓▓▓                                     │
-│   20h │    ▓▓▓     ▓▓▓     ▓▓▓     ▓▓▓                     │
-│       └────────────────────────────────                    │
-│          Time DB  Time APP Time Suporte                    │
-└────────────────────────────────────────────────────────────┘
-
-┌────────────────────────────────────────────────────────────┐
-│        HORAS POR TIPO DE TICKET (BarChart Vertical)        │
-│                                                            │
-│   50h │    ▓▓▓                                             │
-│   40h │    ▓▓▓     ▓▓▓                                     │
-│   30h │    ▓▓▓     ▓▓▓     ▓▓▓                             │
-│   20h │    ▓▓▓     ▓▓▓     ▓▓▓     ▓▓▓                     │
-│       └────────────────────────────────                    │
-│        Incidente Problema Dúvida  Service Req              │
-└────────────────────────────────────────────────────────────┘
-```
-
----
-
-## Alteração no Reports.tsx
-
-Adicionar o novo tipo de relatório na lista:
-
-```typescript
-{
-  id: "client-hours" as const,
-  title: "Horas por Cliente",
-  description: "Total de horas trabalhadas por cliente, analista, fila, time e tipo",
-  icon: Clock,
-  highlight: false,
-  internalOnly: true, // Apenas usuários internos
-}
+Este ticket contribui com 484h para:
+  - Total do Cliente X
+  - Total do Analista João
+  - Total da Fila Suporte N1
+  - Total do Time DB
+  - Total de Incidentes
 ```
 
 ---
 
 ## Arquivos a Modificar
 
-| Arquivo | Ação |
+| Arquivo | Acao |
 |---------|------|
-| `src/hooks/useClientHoursData.ts` | Criar novo hook |
-| `src/components/reports/ClientHoursReport.tsx` | Criar novo componente |
-| `src/pages/Reports.tsx` | Adicionar novo tipo de relatório |
+| `src/hooks/useClientHoursData.ts` | Reescrever para buscar tickets diretamente e calcular horas de vida |
+| `src/components/reports/ClientHoursReport.tsx` | Ajustar labels (de "Registros" para "Tickets") |
 
 ---
 
-## Funcionalidades
+## Detalhes da Implementacao
 
-1. **Filtros disponíveis:**
-   - Período (Mês Atual, Mês Anterior, Últimos 3 meses, Últimos 6 meses)
-   - Cliente específico (dropdown com todos os clientes)
-   - Segmento (Todos, DB, APP)
+### 1. Nova funcao de calculo de horas
 
-2. **Cards de resumo:**
-   - Total de Horas
-   - Média de Horas por Registro
-   - Total de Registros
-   - Analistas Ativos
+```typescript
+const calculateTicketHours = (createdAt: string, resolvedAt: string | null): number => {
+  const start = new Date(createdAt);
+  const end = resolvedAt ? new Date(resolvedAt) : new Date();
+  const diffMs = end.getTime() - start.getTime();
+  // Retornar horas com 1 casa decimal
+  return Math.round((diffMs / (1000 * 60 * 60)) * 10) / 10;
+};
+```
 
-3. **Gráficos:**
-   - Horas por Analista (BarChart horizontal - mostra primeiro nome)
-   - Distribuição por Fila (PieChart)
-   - Horas por Time (BarChart vertical)
-   - Horas por Tipo de Ticket (BarChart vertical)
+### 2. Filtros de periodo
 
-4. **Tabela detalhada:**
-   - Cliente | Total Horas | Registros | Média/Registro | Principal Analista
+O filtro de período será aplicado à data de criação do ticket (`created_at`), mantendo a mesma lógica:
+- Mês Atual: tickets criados no mês atual
+- Mês Anterior: tickets criados no mês anterior
+- Últimos 3 meses: tickets criados nos últimos 3 meses
+- Últimos 6 meses: tickets criados nos últimos 6 meses
 
-5. **Exportação PDF:**
-   - Segue padrão existente com `window.print()`
-   - Nome do arquivo: `Horas_Cliente_[Periodo].pdf`
+### 3. Tratamento de tickets sem analista
+
+Para tickets sem analista atribuído (`analyst_id = null`), será criada uma categoria "Não Atribuído" nos gráficos.
 
 ---
 
-## Notas Técnicas
+## Resultado Esperado
 
-1. **Relacionamentos no Supabase:**
-   - `ticket_time_logs.analyst_id` -> `profiles.id`
-   - `ticket_time_logs.ticket_id` -> `tickets.id`
-   - `tickets.client_id` -> `clients.id`
-   - `tickets.queue_id` -> `queues.id`
-   - `tickets.team_id` -> `teams.id`
+Após a implementação, o relatório mostrará:
 
-2. **Formatação de horas:**
-   - Exibir com uma casa decimal (ex: "45.5h")
-   - Converter para dias quando > 24h (ex: "2d 5.5h")
+1. **Cards de Resumo:**
+   - Total de Horas (soma do tempo de vida de todos os tickets)
+   - Média de Horas por Ticket
+   - Total de Tickets
+   - Analistas Únicos
 
-3. **Labels de tipos de ticket:**
-   - Usar função existente `getTicketTypeLabel()` de `src/lib/ticketUtils.tsx`
+2. **Gráficos:**
+   - Horas por Analista (com "Não Atribuído" quando aplicável)
+   - Horas por Fila (com "Sem Fila" quando aplicável)
+   - Horas por Time (com "Sem Time" quando aplicável)
+   - Horas por Tipo de Ticket
 
-4. **Permissões:**
-   - Relatório marcado como `internalOnly: true`
-   - Apenas usuários Otimizzo/SuperAdmin podem visualizar
+3. **Tabela de Clientes:**
+   - Nome do cliente
+   - Total de horas consumidas
+   - Quantidade de tickets
+   - Média de horas por ticket
+   - Principal analista
+
