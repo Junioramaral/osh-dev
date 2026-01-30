@@ -9,6 +9,18 @@ interface AddTimeLogParams {
   description?: string;
 }
 
+interface UpdateTimeLogParams {
+  logId: string;
+  ticketId: string;
+  hours: number;
+  description?: string;
+}
+
+interface DeleteTimeLogParams {
+  logId: string;
+  ticketId: string;
+}
+
 export function useTimeLogMutations() {
   const queryClient = useQueryClient();
   const { profile } = useAuth();
@@ -42,5 +54,50 @@ export function useTimeLogMutations() {
     },
   });
 
-  return { addTimeLog };
+  const updateTimeLog = useMutation({
+    mutationFn: async ({ logId, hours, description }: UpdateTimeLogParams) => {
+      const { error } = await supabase
+        .from("ticket_time_logs")
+        .update({
+          hours,
+          description: description || null,
+        })
+        .eq("id", logId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success("Horas atualizadas com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["ticket-time-logs", variables.ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history", variables.ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-timeline", variables.ticketId] });
+    },
+    onError: (error) => {
+      console.error("Erro ao atualizar horas:", error);
+      toast.error("Erro ao atualizar horas. Tente novamente.");
+    },
+  });
+
+  const deleteTimeLog = useMutation({
+    mutationFn: async ({ logId }: DeleteTimeLogParams) => {
+      const { error } = await supabase
+        .from("ticket_time_logs")
+        .delete()
+        .eq("id", logId);
+
+      if (error) throw error;
+    },
+    onSuccess: (_, variables) => {
+      toast.success("Registro de horas excluído!");
+      queryClient.invalidateQueries({ queryKey: ["ticket-time-logs", variables.ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history", variables.ticketId] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-timeline", variables.ticketId] });
+    },
+    onError: (error) => {
+      console.error("Erro ao excluir horas:", error);
+      toast.error("Erro ao excluir registro. Tente novamente.");
+    },
+  });
+
+  return { addTimeLog, updateTimeLog, deleteTimeLog };
 }

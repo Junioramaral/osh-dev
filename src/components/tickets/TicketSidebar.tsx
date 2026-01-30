@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -25,6 +25,7 @@ import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer } from "l
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
+import { useTicketTimeLogs } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -47,6 +48,15 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
   const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
+  const { data: timeLogs } = useTicketTimeLogs(ticket.id);
+  
+  // Calculate total hours
+  const totalHours = useMemo(() => {
+    if (!timeLogs || timeLogs.length === 0) return 0;
+    return timeLogs.reduce((sum, log) => sum + Number(log.hours), 0);
+  }, [timeLogs]);
+
+  const totalLogs = timeLogs?.length || 0;
   
   // Apenas analistas Otimizzo/SuperAdmin podem registrar horas (não clientes, não viewers)
   const canLogTime = (isOtimizzoUser || isSuperAdmin) && !isViewer;
@@ -201,6 +211,30 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Hours Summary Card - visible for Otimizzo/SuperAdmin */}
+      {(isOtimizzoUser || isSuperAdmin) && (
+        <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Clock className="h-4 w-4 text-orange-500" />
+              Horas Trabalhadas
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Total</span>
+              <span className="text-lg font-bold text-orange-600 dark:text-orange-400">
+                {totalHours.toFixed(1)}h
+              </span>
+            </div>
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Registros</span>
+              <span className="text-sm font-medium">{totalLogs}</span>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Resolve Dialog */}
       <TicketResolveDialog
