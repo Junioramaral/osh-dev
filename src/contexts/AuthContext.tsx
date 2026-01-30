@@ -28,6 +28,7 @@ interface AuthContextType {
   mustChangePassword: boolean;
   hasRole: (role: string) => boolean;
   isSuperAdmin: boolean;
+  isTenantAdmin: boolean;
   isViewer: boolean;
   isAnalyst: boolean;
   isOtimizzoUser: boolean;
@@ -153,6 +154,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 
   const hasRole = (role: string) => roles.some(r => r.role === role);
   const isSuperAdmin = hasRole('super_admin');
+  const isTenantAdmin = hasRole('tenant_admin');
   const isViewer = hasRole('viewer');
   const isAnalyst = hasRole('analyst_db') || hasRole('analyst_app');
   const isOtimizzoUser = roles.some(r => r.tenant_id === '00000000-0000-0000-0000-000000000001');
@@ -244,6 +246,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
       mustChangePassword,
       hasRole,
       isSuperAdmin,
+      isTenantAdmin,
       isViewer,
       isAnalyst,
       isOtimizzoUser,
@@ -275,6 +278,7 @@ export const useAuth = () => {
       mustChangePassword: false,
       hasRole: () => false,
       isSuperAdmin: false,
+      isTenantAdmin: false,
       isViewer: false,
       isAnalyst: false,
       isOtimizzoUser: false,

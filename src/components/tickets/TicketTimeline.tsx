@@ -1,14 +1,25 @@
+import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
-import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity, Pencil, Trash2, AlertTriangle } from "lucide-react";
 import { useTicketHistory, useTicketComments, useTicketTimeLogs } from "@/hooks/useTicketDetail";
 import { useMemo } from "react";
 import { formatSmartDate } from "@/lib/dateUtils";
+import { useAuth } from "@/contexts/AuthContext";
+import { getTimeLogPermissions } from "@/lib/timeLogPermissions";
+import { TimeLogEditDialog } from "./TimeLogEditDialog";
+import { TimeLogDeleteDialog } from "./TimeLogDeleteDialog";
+
 interface TimelineItemProps {
   event: any;
+  ticketId: string;
+  onEdit?: (log: any) => void;
+  onDelete?: (log: any) => void;
+  permissions?: { canEdit: boolean; canDelete: boolean; reason?: string };
 }
 
-function TimelineItem({ event }: TimelineItemProps) {
+function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: TimelineItemProps) {
   const getIcon = () => {
     switch (event.type) {
       case 'created': return <Plus className="h-4 w-4" />;
@@ -38,8 +49,13 @@ function TimelineItem({ event }: TimelineItemProps) {
   const getBgColor = () => {
     if (event.type === 'resolved' || event.type === 'first_response') return 'bg-green-100 border-green-500';
     if (event.type === 'commented') return 'bg-blue-100 border-blue-500';
+    if (event.type === 'time_logged') return 'bg-orange-100 border-orange-500';
     return 'bg-background border-border';
   };
+
+  const isTimeLog = event.type === 'time_logged';
+  const showActions = isTimeLog && permissions && (permissions.canEdit || permissions.canDelete);
+  const showReasonMessage = isTimeLog && permissions && !permissions.canEdit && !permissions.canDelete && permissions.reason;
   
   return (
     <div className="relative flex gap-4 items-start">
@@ -67,6 +83,42 @@ function TimelineItem({ event }: TimelineItemProps) {
             {event.description}
           </Card>
         )}
+        
+        {/* Actions for time logs */}
+        {showActions && (
+          <div className="flex items-center gap-2 mt-2">
+            {permissions.canEdit && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs"
+                onClick={() => onEdit?.(event)}
+              >
+                <Pencil className="h-3 w-3 mr-1" />
+                Editar
+              </Button>
+            )}
+            {permissions.canDelete && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-7 px-2 text-xs text-destructive hover:text-destructive"
+                onClick={() => onDelete?.(event)}
+              >
+                <Trash2 className="h-3 w-3 mr-1" />
+                Excluir
+              </Button>
+            )}
+          </div>
+        )}
+        
+        {/* Reason message when cannot edit */}
+        {showReasonMessage && (
+          <div className="flex items-center gap-1 mt-2 text-xs text-amber-600 dark:text-amber-400">
+            <AlertTriangle className="h-3 w-3" />
+            {permissions.reason}
+          </div>
+        )}
       </div>
     </div>
   );
@@ -80,6 +132,10 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
   const { data: history } = useTicketHistory(ticketId);
   const { data: comments } = useTicketComments(ticketId);
   const { data: timeLogs } = useTicketTimeLogs(ticketId);
+  const { profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser } = useAuth();
+  
+  const [editLog, setEditLog] = useState<any>(null);
+  const [deleteLog, setDeleteLog] = useState<any>(null);
   
   const events = useMemo(() => {
     const allEvents: any[] = [
@@ -92,20 +148,78 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
       new Date(b.created_at || b.logged_at).getTime() - new Date(a.created_at || a.logged_at).getTime()
     );
   }, [history, comments, timeLogs]);
+
+  const getPermissionsForLog = (log: any) => {
+    if (log.type !== 'time_logged') return undefined;
+    
+    // Only show actions for Otimizzo users (analysts can only edit their own)
+    if (!isOtimizzoUser && !isSuperAdmin) return { canEdit: false, canDelete: false };
+    
+    return getTimeLogPermissions(
+      { analyst_id: log.analyst_id, logged_at: log.logged_at },
+      profile?.id,
+      isSuperAdmin,
+      isTenantAdmin,
+      isViewer
+    );
+  };
+
+  const handleEdit = (log: any) => {
+    setEditLog({
+      id: log.id,
+      hours: log.hours,
+      description: log.description,
+      logged_at: log.logged_at,
+      ticketId,
+    });
+  };
+
+  const handleDelete = (log: any) => {
+    setDeleteLog({
+      id: log.id,
+      hours: log.hours,
+      description: log.description,
+      logged_at: log.logged_at,
+      ticketId,
+    });
+  };
   
   return (
-    <ScrollArea className="h-[600px]">
-      <div className="relative space-y-4 p-6">
-        <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border" />
-        
-        {events.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">Nenhum evento registrado</p>
-        ) : (
-          events.map((event, index) => (
-            <TimelineItem key={event.id || index} event={event} />
-          ))
-        )}
-      </div>
-    </ScrollArea>
+    <>
+      <ScrollArea className="h-[600px]">
+        <div className="relative space-y-4 p-6">
+          <div className="absolute left-8 top-0 bottom-0 w-0.5 bg-border" />
+          
+          {events.length === 0 ? (
+            <p className="text-center text-muted-foreground py-8">Nenhum evento registrado</p>
+          ) : (
+            events.map((event, index) => (
+              <TimelineItem 
+                key={event.id || index} 
+                event={event}
+                ticketId={ticketId}
+                onEdit={handleEdit}
+                onDelete={handleDelete}
+                permissions={getPermissionsForLog(event)}
+              />
+            ))
+          )}
+        </div>
+      </ScrollArea>
+
+      {/* Edit Dialog */}
+      <TimeLogEditDialog
+        open={!!editLog}
+        onOpenChange={(open) => !open && setEditLog(null)}
+        log={editLog}
+      />
+
+      {/* Delete Dialog */}
+      <TimeLogDeleteDialog
+        open={!!deleteLog}
+        onOpenChange={(open) => !open && setDeleteLog(null)}
+        log={deleteLog}
+      />
+    </>
   );
 }
