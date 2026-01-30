@@ -75,15 +75,15 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
 
   const { data, isLoading } = useAnalystHoursManagementData(
     period,
-    clientId || undefined,
-    analystId || undefined,
-    segment ? (segment as "DB" | "APP") : null,
+    clientId && clientId !== "__all__" ? clientId : undefined,
+    analystId && analystId !== "__all__" ? analystId : undefined,
+    segment && segment !== "__all__" ? (segment as "DB" | "APP") : null,
     onlyWithoutLogs
   );
 
   const handlePrint = () => {
     const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period;
-    const clientName = clientId 
+    const clientName = clientId && clientId !== "__all__"
       ? clients?.find(c => c.id === clientId)?.name || "Cliente"
       : "Todos_Clientes";
     const sanitizedClient = clientName.replace(/[^a-zA-Z0-9]/g, "_");
@@ -150,12 +150,12 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Cliente</label>
-              <Select value={clientId} onValueChange={setClientId}>
+              <Select value={clientId || "__all__"} onValueChange={setClientId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="__all__">Todos</SelectItem>
                   {clients?.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
@@ -167,12 +167,12 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Analista</label>
-              <Select value={analystId} onValueChange={setAnalystId}>
+              <Select value={analystId || "__all__"} onValueChange={setAnalystId}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="__all__">Todos</SelectItem>
                   {analysts?.map((analyst) => (
                     <SelectItem key={analyst.id} value={analyst.id}>
                       {analyst.full_name}
@@ -184,12 +184,12 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Segmento</label>
-              <Select value={segment} onValueChange={setSegment}>
+              <Select value={segment || "__all__"} onValueChange={setSegment}>
                 <SelectTrigger>
                   <SelectValue placeholder="Todos" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="">Todos</SelectItem>
+                  <SelectItem value="__all__">Todos</SelectItem>
                   <SelectItem value="DB">Database</SelectItem>
                   <SelectItem value="APP">Aplicação</SelectItem>
                 </SelectContent>
@@ -220,7 +220,7 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
             title="Gestão de Horas dos Analistas"
             subtitle="Comparativo de Horas de Vida vs Horas Registradas"
             periodLabel={PERIOD_OPTIONS.find(p => p.value === period)?.label || ""}
-            clientName={clientId ? clients?.find(c => c.id === clientId)?.name : undefined}
+            clientName={clientId && clientId !== "__all__" ? clients?.find(c => c.id === clientId)?.name : undefined}
           />
         </div>
 
