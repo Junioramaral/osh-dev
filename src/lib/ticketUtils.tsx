@@ -181,3 +181,19 @@ export const getStatusLabel = (status: string) => {
       return status;
   }
 };
+
+export const getTicketTypeLabel = (type: string): string => {
+  switch (type) {
+    case 'incidente':
+      return 'Incidente';
+    case 'duvida':
+      return 'Dúvida';
+    case 'problema':
+      return 'Problema';
+    case 'service_request':
+    case 'solicitacao':
+      return 'Service Request';
+    default:
+      return type;
+  }
+};

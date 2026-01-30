@@ -35,7 +35,7 @@ const ticketSchema = z.object({
   client_id: z.string().uuid("Selecione um cliente"),
   title: z.string().min(1, "Título é obrigatório").max(100, "Máximo 100 caracteres"),
   queue_id: z.string().uuid().optional().nullable(),
-  ticket_type: z.enum(["incidente", "duvida", "solicitacao"]),
+  ticket_type: z.enum(["incidente", "duvida", "problema", "service_request"]),
   priority: z.enum(["P1", "P2", "P3", "P4"]),
   category: z.string().min(1, "Categoria é obrigatória"),
   subcategory: z.string().optional(),
@@ -698,8 +698,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="incidente">Incidente</SelectItem>
+                  <SelectItem value="problema">Problema</SelectItem>
                   <SelectItem value="duvida">Dúvida</SelectItem>
-                  <SelectItem value="solicitacao">Solicitação</SelectItem>
+                  <SelectItem value="service_request">Service Request</SelectItem>
                 </SelectContent>
               </Select>
             </div>
