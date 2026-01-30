@@ -258,6 +258,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
           id: ticket.id,
           ticket_number: ticket.ticket_number,
           title: ticket.title,
+          client_id: ticket.client_id,
         }}
       />
 

@@ -126,9 +126,10 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
 
 interface TicketTimelineProps {
   ticketId: string;
+  clientId: string;
 }
 
-export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
+export default function TicketTimeline({ ticketId, clientId }: TicketTimelineProps) {
   const { data: history } = useTicketHistory(ticketId);
   const { data: comments } = useTicketComments(ticketId);
   const { data: timeLogs } = useTicketTimeLogs(ticketId);
@@ -171,6 +172,11 @@ export default function TicketTimeline({ ticketId }: TicketTimelineProps) {
       description: log.description,
       logged_at: log.logged_at,
       ticketId,
+      clientId,
+      project_id: log.project_id,
+      work_date: log.work_date,
+      start_time: log.start_time,
+      end_time: log.end_time,
     });
   };
 
