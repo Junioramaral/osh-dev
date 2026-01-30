@@ -8,6 +8,7 @@ export interface ClientProject {
   name: string;
   description: string | null;
   is_active: boolean;
+  is_overtime: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -32,7 +33,7 @@ export const useCreateClientProject = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async (project: { client_id: string; name: string; description?: string; is_active?: boolean }) => {
+    mutationFn: async (project: { client_id: string; name: string; description?: string; is_active?: boolean; is_overtime?: boolean }) => {
       const { data, error } = await supabase
         .from("client_projects")
         .insert({
@@ -40,6 +41,7 @@ export const useCreateClientProject = () => {
           name: project.name,
           description: project.description || null,
           is_active: project.is_active ?? true,
+          is_overtime: project.is_overtime ?? false,
         } as any)
         .select()
         .single();
@@ -61,7 +63,7 @@ export const useUpdateClientProject = () => {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: async ({ id, client_id, ...data }: { id: string; client_id: string; name?: string; description?: string; is_active?: boolean }) => {
+    mutationFn: async ({ id, client_id, ...data }: { id: string; client_id: string; name?: string; description?: string; is_active?: boolean; is_overtime?: boolean }) => {
       const { error } = await supabase
         .from("client_projects")
         .update(data as any)
