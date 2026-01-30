@@ -158,6 +158,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
   const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
+  const [activeTab, setActiveTab] = useState("basic");
 
   const { data: appProducts } = useQuery({
     queryKey: ["application_products"],
@@ -287,7 +288,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
-            <Tabs defaultValue="basic" className="w-full">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
               <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
                 <TabsTrigger value="contract">Contrato</TabsTrigger>
@@ -682,15 +683,17 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
               </TabsContent>
             </Tabs>
 
-            <div className="flex justify-end gap-2">
-              <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
-                Cancelar
-              </Button>
-              <Button type="submit" disabled={isLoading}>
-                {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                {mode === "create" ? "Criar Cliente" : "Salvar Alterações"}
-              </Button>
-            </div>
+            {activeTab !== "projects" && (
+              <div className="flex justify-end gap-2">
+                <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+                  Cancelar
+                </Button>
+                <Button type="submit" disabled={isLoading}>
+                  {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  {mode === "create" ? "Criar Cliente" : "Salvar Alterações"}
+                </Button>
+              </div>
+            )}
           </form>
         </Form>
       </DialogContent>
