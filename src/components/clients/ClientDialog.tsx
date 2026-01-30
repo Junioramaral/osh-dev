@@ -12,7 +12,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Database, Package, Mail } from "lucide-react";
+import { Loader2, Database, Package, Mail, FolderKanban } from "lucide-react";
+import ClientProjectsTab from "./ClientProjectsTab";
 
 // Ícones SVG específicos para cada engine de banco de dados
 const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
@@ -287,10 +288,14 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Tabs defaultValue="basic" className="w-full">
-              <TabsList className="grid w-full grid-cols-3">
+              <TabsList className="grid w-full grid-cols-4">
                 <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
                 <TabsTrigger value="contract">Contrato</TabsTrigger>
                 <TabsTrigger value="sla">SLAs</TabsTrigger>
+                <TabsTrigger value="projects">
+                  <FolderKanban className="h-4 w-4 mr-1" />
+                  Projetos
+                </TabsTrigger>
               </TabsList>
 
               <TabsContent value="basic" className="space-y-4">
@@ -670,6 +675,10 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                     </div>
                   ))}
                 </div>
+              </TabsContent>
+
+              <TabsContent value="projects" className="space-y-4">
+                <ClientProjectsTab clientId={client?.id} mode={mode} />
               </TabsContent>
             </Tabs>
 
