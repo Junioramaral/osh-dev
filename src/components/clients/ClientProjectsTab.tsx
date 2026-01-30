@@ -6,7 +6,9 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Pencil, Trash2, FolderKanban, Save, X } from "lucide-react";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
+import { Plus, Pencil, Trash2, FolderKanban, Save, X, Clock } from "lucide-react";
 import { useClientProjects, useCreateClientProject, useUpdateClientProject, useDeleteClientProject, ClientProject } from "@/hooks/useClientProjects";
 import {
   AlertDialog,
@@ -31,9 +33,9 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
   const deleteProject = useDeleteClientProject();
 
   const [showNewForm, setShowNewForm] = useState(false);
-  const [newProject, setNewProject] = useState({ name: "", description: "" });
+  const [newProject, setNewProject] = useState({ name: "", description: "", is_overtime: false });
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingData, setEditingData] = useState({ name: "", description: "" });
+  const [editingData, setEditingData] = useState({ name: "", description: "", is_overtime: false });
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [projectToDelete, setProjectToDelete] = useState<ClientProject | null>(null);
 
@@ -56,8 +58,9 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
       name: newProject.name.trim(),
       description: newProject.description.trim() || undefined,
       is_active: true,
+      is_overtime: newProject.is_overtime,
     });
-    setNewProject({ name: "", description: "" });
+    setNewProject({ name: "", description: "", is_overtime: false });
     setShowNewForm(false);
   };
 
@@ -68,6 +71,7 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
       client_id: clientId,
       name: editingData.name.trim(),
       description: editingData.description.trim() || undefined,
+      is_overtime: editingData.is_overtime,
     });
     setEditingId(null);
   };
@@ -90,12 +94,12 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
 
   const startEdit = (project: ClientProject) => {
     setEditingId(project.id);
-    setEditingData({ name: project.name, description: project.description || "" });
+    setEditingData({ name: project.name, description: project.description || "", is_overtime: project.is_overtime ?? false });
   };
 
   const cancelEdit = () => {
     setEditingId(null);
-    setEditingData({ name: "", description: "" });
+    setEditingData({ name: "", description: "", is_overtime: false });
   };
 
   return (
@@ -133,8 +137,24 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
                 rows={2}
               />
             </div>
+            <div className="flex items-start space-x-3 pt-2">
+              <Checkbox
+                id="new-project-overtime"
+                checked={newProject.is_overtime}
+                onCheckedChange={(checked) => setNewProject({ ...newProject, is_overtime: checked === true })}
+              />
+              <div className="grid gap-1.5 leading-none">
+                <Label htmlFor="new-project-overtime" className="flex items-center gap-2 cursor-pointer">
+                  <Clock className="h-4 w-4" />
+                  Projeto de Hora-Extra
+                </Label>
+                <p className="text-sm text-muted-foreground">
+                  Executado fora do horário comercial
+                </p>
+              </div>
+            </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setShowNewForm(false); setNewProject({ name: "", description: "" }); }}>
+              <Button variant="outline" size="sm" onClick={() => { setShowNewForm(false); setNewProject({ name: "", description: "", is_overtime: false }); }}>
                 <X className="h-4 w-4 mr-1" />
                 Cancelar
               </Button>
@@ -181,6 +201,22 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
                         rows={2}
                       />
                     </div>
+                    <div className="flex items-start space-x-3 pt-2">
+                      <Checkbox
+                        id={`edit-project-overtime-${project.id}`}
+                        checked={editingData.is_overtime}
+                        onCheckedChange={(checked) => setEditingData({ ...editingData, is_overtime: checked === true })}
+                      />
+                      <div className="grid gap-1.5 leading-none">
+                        <Label htmlFor={`edit-project-overtime-${project.id}`} className="flex items-center gap-2 cursor-pointer">
+                          <Clock className="h-4 w-4" />
+                          Projeto de Hora-Extra
+                        </Label>
+                        <p className="text-sm text-muted-foreground">
+                          Executado fora do horário comercial
+                        </p>
+                      </div>
+                    </div>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={cancelEdit}>
                         <X className="h-4 w-4 mr-1" />
@@ -195,9 +231,15 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
                 ) : (
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <FolderKanban className="h-4 w-4 text-primary flex-shrink-0" />
                         <h4 className="font-medium truncate">{project.name}</h4>
+                        {project.is_overtime && (
+                          <Badge variant="outline" className="gap-1 text-xs">
+                            <Clock className="h-3 w-3" />
+                            Hora-Extra
+                          </Badge>
+                        )}
                       </div>
                       {project.description && (
                         <p className="text-sm text-muted-foreground mt-1">{project.description}</p>
