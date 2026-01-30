@@ -263,7 +263,29 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    throw new Error('useAuth must be used within an AuthProvider');
+    // Retornar um objeto de contexto "vazio" para evitar erro durante transições de navegação
+    // Isso permite que componentes sejam renderizados brevemente sem provider
+    // enquanto a navegação para /auth acontece
+    return {
+      user: null,
+      session: null,
+      profile: null,
+      roles: [],
+      loading: true,
+      mustChangePassword: false,
+      hasRole: () => false,
+      isSuperAdmin: false,
+      isViewer: false,
+      isAnalyst: false,
+      isOtimizzoUser: false,
+      tenantId: null,
+      signIn: async () => ({ error: new Error('Not initialized') }),
+      signUp: async () => ({ error: new Error('Not initialized') }),
+      signOut: async () => {},
+      clearMustChangePassword: () => {},
+      resetPassword: async () => ({ error: new Error('Not initialized') }),
+      updatePassword: async () => ({ error: new Error('Not initialized') }),
+    } as AuthContextType;
   }
   return context;
 };
