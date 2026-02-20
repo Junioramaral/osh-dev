@@ -27,6 +27,7 @@ import SystemSettings from "./pages/SystemSettings";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
 import RFCExecution from "./pages/RFCExecution";
+import ClientRFCPortal from "./pages/ClientRFCPortal";
 
 const queryClient = new QueryClient();
 
@@ -60,6 +61,7 @@ const App = () => (
             <Route path="/admin/permissions" element={<UserPermissions />} />
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/rfc-execution" element={<RFCExecution />} />
+            <Route path="/minhas-rfcs" element={<ClientRFCPortal />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

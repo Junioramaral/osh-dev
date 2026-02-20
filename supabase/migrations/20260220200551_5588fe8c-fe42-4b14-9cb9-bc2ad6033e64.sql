@@ -1,0 +1,1 @@
+ALTER TABLE public.rfc_steps ADD COLUMN IF NOT EXISTS concluded_at timestamp with time zone;
