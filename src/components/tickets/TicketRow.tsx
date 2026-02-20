@@ -76,8 +76,18 @@ export function TicketRow({ ticket, isSelected, onToggleSelect, showClientColumn
       <TableCell className="text-muted-foreground">
         {age}
       </TableCell>
-      <TableCell className="max-w-md truncate">
-        {ticket.title}
+      <TableCell className="max-w-md">
+        <div className="flex items-center gap-2">
+          {ticket.record_type === 'rfc' && (
+            <Badge
+              variant="outline"
+              className="border-violet-400 bg-violet-50 text-violet-700 dark:border-violet-500 dark:bg-violet-950 dark:text-violet-300 shrink-0 font-bold text-xs"
+            >
+              RFC
+            </Badge>
+          )}
+          <span className="truncate">{ticket.title}</span>
+        </div>
       </TableCell>
       {showClientColumn && (
         <TableCell>

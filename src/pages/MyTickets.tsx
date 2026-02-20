@@ -29,6 +29,7 @@ export default function MyTickets() {
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
   const [showAssignTeamDialog, setShowAssignTeamDialog] = useState(false);
@@ -319,7 +320,8 @@ export default function MyTickets() {
       teamFilter === "all" || 
       (teamFilter === "none" && !ticket.team_id) || 
       ticket.team_id === teamFilter;
-    return matchesSearch && matchesStatus && matchesSegment && matchesTeam;
+    const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
+    return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesType;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
@@ -430,6 +432,16 @@ export default function MyTickets() {
               </SelectContent>
             </Select>
           )}
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="ticket">Suporte</SelectItem>
+              <SelectItem value="rfc">RFC</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
 
         {isLoading ? (

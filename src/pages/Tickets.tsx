@@ -35,6 +35,7 @@ export default function Tickets() {
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [queueFilter, setQueueFilter] = useState<string>("all");
+  const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
@@ -393,7 +394,8 @@ export default function Tickets() {
       queueFilter === "all" || 
       (queueFilter === "none" && !ticket.queue_id) || 
       ticket.queue_id === queueFilter;
-    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue;
+    const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
@@ -477,6 +479,16 @@ export default function Tickets() {
               <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
               <SelectItem value="resolvido">Resolvido</SelectItem>
               <SelectItem value="fechado">Fechado</SelectItem>
+            </SelectContent>
+          </Select>
+          <Select value={typeFilter} onValueChange={setTypeFilter}>
+            <SelectTrigger className="w-[160px]">
+              <SelectValue placeholder="Tipo" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todos os tipos</SelectItem>
+              <SelectItem value="ticket">Suporte</SelectItem>
+              <SelectItem value="rfc">RFC</SelectItem>
             </SelectContent>
           </Select>
           <Select value={segmentFilter} onValueChange={setSegmentFilter}>
