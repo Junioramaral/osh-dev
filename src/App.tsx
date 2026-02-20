@@ -26,6 +26,7 @@ import UserPermissions from "./pages/UserPermissions";
 import SystemSettings from "./pages/SystemSettings";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
+import RFCExecution from "./pages/RFCExecution";
 
 const queryClient = new QueryClient();
 
@@ -58,6 +59,7 @@ const App = () => (
             <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
             <Route path="/admin/permissions" element={<UserPermissions />} />
             <Route path="/system-settings" element={<SystemSettings />} />
+            <Route path="/rfc-execution" element={<RFCExecution />} />
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>

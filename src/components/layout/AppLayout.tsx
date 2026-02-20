@@ -25,6 +25,7 @@ import {
   Settings,
   FileBarChart,
   Star,
+  ClipboardCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -73,6 +74,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     { name: "Satisfação (CSAT)", href: "/csat", icon: Star, show: isSuperAdmin || isOtimizzoUser || isViewer },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
     { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isSuperAdmin || isOtimizzoUser || isViewer },
+    { name: "Execução RFC", href: "/rfc-execution", icon: ClipboardCheck, show: isOtimizzoUser || isSuperAdmin },
   ].filter(item => item.show);
 
   const adminNav = [
