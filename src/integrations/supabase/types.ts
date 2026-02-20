@@ -708,6 +708,44 @@ export type Database = {
           },
         ]
       }
+      rfc_steps: {
+        Row: {
+          created_at: string | null
+          descricao: string
+          id: string
+          ordem: number
+          status_concluido: boolean
+          ticket_id: string
+          updated_at: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          descricao: string
+          id?: string
+          ordem?: number
+          status_concluido?: boolean
+          ticket_id: string
+          updated_at?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          descricao?: string
+          id?: string
+          ordem?: number
+          status_concluido?: boolean
+          ticket_id?: string
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "rfc_steps_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       segments: {
         Row: {
           code: string
@@ -1148,6 +1186,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["ticket_priority"]
           problem_faced: string
           queue_id: string | null
+          record_type: string
           reproduction_steps: string | null
           resolved_at: string | null
           resolved_by: string | null
@@ -1209,6 +1248,7 @@ export type Database = {
           priority: Database["public"]["Enums"]["ticket_priority"]
           problem_faced: string
           queue_id?: string | null
+          record_type?: string
           reproduction_steps?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -1270,6 +1310,7 @@ export type Database = {
           priority?: Database["public"]["Enums"]["ticket_priority"]
           problem_faced?: string
           queue_id?: string | null
+          record_type?: string
           reproduction_steps?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
@@ -1477,6 +1518,7 @@ export type Database = {
         | "aguardando_cliente"
         | "resolvido"
         | "fechado"
+        | "aguardando_aprovacao"
       ticket_type:
         | "incidente"
         | "duvida"
@@ -1637,6 +1679,7 @@ export const Constants = {
         "aguardando_cliente",
         "resolvido",
         "fechado",
+        "aguardando_aprovacao",
       ],
       ticket_type: [
         "incidente",
