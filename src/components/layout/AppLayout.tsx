@@ -27,6 +27,7 @@ import {
   Star,
   ClipboardCheck,
   ClipboardList,
+  ShieldCheck,
 } from "lucide-react";
 import { NavLink } from "@/components/NavLink";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
@@ -76,6 +77,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
     { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isSuperAdmin || isOtimizzoUser || isViewer },
     { name: "Execução RFC", href: "/rfc-execution", icon: ClipboardCheck, show: isOtimizzoUser || isSuperAdmin },
+    { name: "Aprovação RFC", href: "/rfc-aprovacao", icon: ShieldCheck, show: isOtimizzoUser || isSuperAdmin },
     { name: "Minhas RFCs", href: "/minhas-rfcs", icon: ClipboardList, show: !isOtimizzoUser && !isSuperAdmin && !isViewer },
   ].filter(item => item.show);
 
