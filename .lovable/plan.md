@@ -1,106 +1,140 @@
 
-# Filtro de Segmentos por Cliente na Abertura de Ticket
+# Reordenação dos Campos no Formulário de Novo Ticket
 
-## Diagnostico do Problema
+## Objetivo
 
-O codigo ja possui a infraestrutura para filtrar segmentos por cliente (linhas 160-163 do `NewTicketDialog.tsx`). Porem existem dois problemas que podem fazer com que o cliente veja segmentos que nao sao seus:
+Reorganizar a ordem dos campos no formulário `NewTicketDialog.tsx` de acordo com o perfil do usuário:
 
-**Problema 1: `tenantId` pode ser nulo no carregamento inicial**
-- O `tenantId` vem de `roles` no `AuthContext`, que carrega assincronamente
-- Se `tenantId === null`, a query `currentTenant` fica desabilitada e `clientSegmentCodes` retorna `[]`
-- Com array vazio, o filtro `allSegments?.filter(s => clientSegmentCodes.includes(s.code))` retorna `[]` (nenhum segmento)
-- O campo exibe vazio ou estado indefinido ate os roles carregarem
+**Fluxo para usuário Otimizzo (dono do sistema):**
+1. Cliente
+2. Segmento
+3. Tipo + Prioridade + Categoria
+4. (resto permanece igual)
 
-**Problema 2: `profile.client_id` nao e usado como fallback**
-- A memoria de arquitetura documenta que `profile.client_id` deve ser o indicador primario para deteccao de usuario-cliente, pois carrega antes dos roles
-- O codigo atual usa apenas `tenantId` (derivado de roles), ignorando `profile.client_id`
+**Fluxo para usuário Cliente:**
+1. Segmento
+2. Tipo + Prioridade + Categoria
+3. (resto permanece igual)
 
-**Comportamento esperado:**
-- Cliente Lexisflow (so tem segmento `DB`): mostrar apenas "Banco de Dados" como campo desabilitado
-- Cliente com DB + APP: mostrar dropdown com as duas opcoes
-- Usuario Otimizzo abrindo ticket para cliente: filtrar segmentos do cliente selecionado (ja funciona)
+---
 
-## Solucao
+## Diagnóstico do Código Atual
 
-Usar `profile?.client_id` como fonte primaria do `clientId` para usuarios cliente, com `tenantId` como fallback. Assim a query `currentTenant` e habilitada imediatamente quando o perfil carrega, sem esperar os roles.
-
-## Arquivo a Modificar
-
-| Arquivo | Alteracao |
-|---------|-----------|
-| `src/components/tickets/NewTicketDialog.tsx` | Usar `profile.client_id` como fallback para `tenantId` na query de tenant atual |
-
-## Mudancas Tecnicas
-
-### Estado atual (problema)
-```typescript
-const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
-// ...
-const { data: currentTenant } = useQuery({
-  queryKey: ["current-tenant", tenantId],
-  queryFn: async () => { /* ... */ },
-  enabled: !!tenantId,  // <-- so habilita quando roles carregam
-});
-```
-
-### Solucao proposta
-```typescript
-const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
-
-// Usar profile.client_id como fonte primaria (carrega antes dos roles)
-const effectiveTenantId = tenantId || profile?.client_id || null;
-
-const { data: currentTenant } = useQuery({
-  queryKey: ["current-tenant", effectiveTenantId],
-  queryFn: async () => {
-    if (!effectiveTenantId) return null;
-    const { data, error } = await supabase
-      .from("clients")
-      .select("id, name, segments, tenant_type, db_engines, app_product_ids")
-      .eq("id", effectiveTenantId)
-      .single();
-    if (error) throw error;
-    return data;
-  },
-  enabled: !!effectiveTenantId,  // <-- habilita quando profile carrega (mais rapido)
-});
-```
-
-### Propagacao do `effectiveTenantId`
-Tambem substituir `tenantId` por `effectiveTenantId` nos seguintes pontos dentro do componente:
-- `defaultValues.client_id: effectiveTenantId || ""`
-- No `useEffect` de inicializacao do segmento: `client_id: effectiveTenantId || ""`
-
-## Fluxo Corrigido
+A ordem atual no JSX (linhas 592–743 do `NewTicketDialog.tsx`) é:
 
 ```text
-Usuario cliente abre dialog
-         |
-         v
-profile.client_id disponivel (rapido)
-         |
-         v
-Query currentTenant habilitada imediatamente
-         |
-         v
-currentTenant.segments = ["DB"] (ex: Lexisflow)
-         |
-         v
-availableSegments = [{ code: "DB", display_name: "Banco de Dados" }]
-         |
-         v
-hasOnlyOneSegment = true
-         |
-         v
-Campo exibido como texto fixo "Banco de Dados" (nao editavel)
-         |
-         v
-Ticket criado com segment = "DB"
+1. Segmento (único ou dropdown)          ← linhas 594–624
+2. Grid com: Cliente (Otimizzo)          ← linhas 627–651
+3. FAQ Selector                          ← linhas 653–661
+4. Título                                ← linhas 663–667
+5. Fila (só Otimizzo)                    ← linhas 669–695
+6. Tipo + Prioridade + Categoria (grid)  ← linhas 696–743
+7. Subcategoria                          ← linhas 745–762
+8. Campos DB/APP específicos...
 ```
 
-## O que NAO muda
+O problema é que **Cliente** aparece depois de **Segmento**, quando deveria ser o primeiro campo para o usuário Otimizzo.
 
-- A logica de filtragem de segmentos ja existente (linhas 160-163) esta correta
-- A exibicao de campo desabilitado quando ha apenas 1 segmento (linhas 590-603) esta correta
-- A logica para usuarios Otimizzo (que escolhem o cliente e filtram seus segmentos) permanece inalterada
-- Nenhuma alteracao de banco de dados necessaria
+---
+
+## Mudanças Necessárias
+
+### Arquivo a Modificar
+`src/components/tickets/NewTicketDialog.tsx` — apenas o bloco JSX (a partir da linha 592), sem tocar na lógica de estado, queries ou handlers.
+
+### Nova Ordem JSX
+
+```text
+Para Otimizzo:
+1. Cliente                               ← mover para antes do Segmento
+2. Segmento (condicional: só exibir após cliente selecionado)
+3. FAQ Selector
+4. Título
+5. Fila (só Otimizzo)
+6. Tipo + Prioridade + Categoria (grid)
+7. Subcategoria
+8. Campos DB/APP...
+
+Para Cliente:
+1. Segmento
+2. FAQ Selector
+3. Título
+4. Tipo + Prioridade + Categoria (grid)
+5. Subcategoria
+6. Campos DB/APP...
+```
+
+### Detalhe: Segmento condicional para Otimizzo
+
+Para o usuário Otimizzo, o campo Segmento deve aparecer após a seleção do cliente (pois os segmentos disponíveis dependem do cliente escolhido). Assim, o Segmento só é exibido quando `selectedClientId` está preenchido:
+
+```tsx
+{/* Para Otimizzo: Cliente primeiro */}
+{isOtimizzoTenant && (
+  <div className="space-y-2">
+    <Label>Cliente *</Label>
+    <Select ...>...</Select>
+  </div>
+)}
+
+{/* Segmento: sempre visível para cliente, visível após escolher cliente para Otimizzo */}
+{(!isOtimizzoTenant || selectedClientId) && (
+  /* bloco do segmento atual */
+)}
+
+{/* FAQ Selector */}
+{selectedClientId && <FAQSelector ... />}
+
+{/* Título */}
+<div>...</div>
+
+{/* Fila (só Otimizzo) */}
+{isOtimizzoUser && ...}
+
+{/* Tipo + Prioridade + Categoria */}
+<div className="grid grid-cols-3 gap-4">...</div>
+```
+
+---
+
+## O que NÃO muda
+
+- Toda a lógica de estado (`segment`, `effectiveTenantId`, `isOtimizzoTenant`)
+- Todas as queries de dados (clientes, segmentos, categorias, instâncias)
+- Os handlers (`handleSegmentChange`, `handleCategoryChange`)
+- Os `useEffect`s de auto-seleção e limpeza de campos
+- Os campos técnicos DB/APP (Engine, Instância, Ambiente, etc.)
+- Os campos de descrição (Título, Motivo, Problema, etc.)
+- A lógica de submit e upload
+
+---
+
+## Impacto Visual
+
+### Antes (Otimizzo)
+```text
+[Segmento         ]
+[Cliente          ]
+[FAQ Selector     ]
+[Título           ]
+[Fila             ]
+[Tipo] [Prior.] [Cat.]
+```
+
+### Depois (Otimizzo)
+```text
+[Cliente          ]
+[Segmento         ]  ← aparece após cliente selecionado
+[FAQ Selector     ]
+[Título           ]
+[Fila             ]
+[Tipo] [Prior.] [Cat.]
+```
+
+### Antes e Depois (Cliente - sem mudança de conteúdo, só confirmação que está correto)
+```text
+[Segmento fixo ou dropdown]
+[FAQ Selector              ]
+[Título                    ]
+[Tipo] [Prior.] [Cat.]
+```
