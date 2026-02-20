@@ -1,162 +1,127 @@
 
-# Portal do Cliente: Acompanhamento de RFCs
+# Badge RFC na Listagem de Tickets
 
-## Visão Geral
+## Objetivo
 
-Será criada uma nova página exclusiva para clientes (`/minhas-rfcs`) com uma interface de acompanhamento read-only das RFCs associadas ao tenant do cliente. O cliente verá um status em destaque, uma timeline vertical com os passos e indicação visual de progresso — tudo somente leitura.
+Diferenciar visualmente os registros do tipo RFC dos tickets de suporte normais nas páginas `/tickets` e `/meus-tickets`, sem adicionar uma nova coluna e sem quebrar o layout existente.
 
 ---
 
-## Problema de Dados: Falta de `concluded_at` em `rfc_steps`
+## Estratégia: Badge Inline na Coluna "Título"
 
-Atualmente, a tabela `rfc_steps` tem apenas `status_concluido boolean`. Para exibir "data/hora da conclusão" no timeline do cliente, precisamos de uma coluna `concluded_at` que registra o momento exato em que um passo foi marcado como concluído.
+A abordagem mais limpa é inserir o badge `RFC` diretamente na célula de **Título**, ao lado do texto. Isso não altera o número de colunas, não precisa de cabeçalho novo e funciona em todas as resoluções de tela.
 
-### Migration necessária
+O campo `record_type` já é retornado pelo `SELECT *` das queries em `Tickets.tsx` e `MyTickets.tsx` — nenhuma alteração de query é necessária.
 
-```sql
-ALTER TABLE public.rfc_steps
-ADD COLUMN IF NOT EXISTS concluded_at timestamp with time zone;
+### Aparência visual
+
+```
+Número   Título
+------   -------
+000042   [RFC]  Migração Oracle → PostgreSQL
+000041           Erro ao conectar no banco de dados
+000039   [RFC]  Atualização de certificados SSL
 ```
 
-A lógica de preenchimento: quando o técnico marcar `status_concluido = true`, o código em `RFCExecution.tsx` deverá também enviar `concluded_at = now()`. Quando desmarcar, `concluded_at = null`.
+O badge RFC terá cor roxa/violeta — distinta de todos os outros badges já existentes:
+- Status: azul, roxo, amarelo, verde, cinza
+- Prioridade: vermelho, laranja, amarelo, azul
+- Time: azul (DB) / verde (APP)
+- Fila: roxo mais escuro
+
+Usaremos uma tonalidade **violeta** (`violet`) que ainda não está em uso, garantindo diferenciação imediata.
 
 ---
 
-## Arquivos a criar
+## Filtro por Tipo (Bônus)
 
-### `src/pages/ClientRFCPortal.tsx`
-
-Página principal do portal de RFCs do cliente. Layout em duas colunas no desktop (lista à esquerda, detalhe à direita), coluna única no mobile.
-
-**Comportamento da lista (coluna esquerda):**
-- Query em `tickets` com filtros `record_type = 'rfc'` — a RLS já garante que o cliente só vê seus próprios tickets (sem necessidade de filtro adicional de `client_id`)
-- Exibe card por RFC com: número, título, status atual (badge colorido), segmento
-- Ordena por `created_at DESC`
-
-**Badge de status grande (painel direito, no topo):**
-
-| Status do ticket | Texto do badge | Cor |
-|---|---|---|
-| `aguardando_aprovacao` | Aguardando Aprovação | Amarelo/Âmbar |
-| `aprovado` | Manutenção Aprovada — Em Breve | Azul |
-| `em_atendimento` / `novo` | Sua manutenção está em andamento | Verde |
-| `resolvido` | Manutenção Concluída | Verde escuro |
-| `fechado` | RFC Encerrada | Cinza |
-
-**Timeline vertical de passos:**
-- Busca `rfc_steps` pelo `ticket_id` selecionado, ordenado por `ordem`
-- Passos com `status_concluido = true`: ícone `CheckCircle2` verde + data/hora de `concluded_at` formatada em pt-BR
-- Passos com `status_concluido = false`: círculo cinza + texto "Pendente"
-- Nenhuma interação de edição — todos os checkboxes são `disabled`
-
-**Barra de progresso:** calculada com `completedCount / totalCount`, exibida com `<Progress />` acima da timeline
+Além do badge visual, será adicionado um filtro "Tipo" (`all` | `ticket` | `rfc`) nos selects de ambas as páginas, para que o usuário possa ver apenas RFCs ou apenas tickets de suporte.
 
 ---
 
-## Sidebar: Novo link para clientes
+## Arquivos a modificar
 
-Em `AppLayout.tsx`, dentro de `operationalNav`, adicionar:
+### 1. `src/components/tickets/TicketRow.tsx`
 
-```typescript
-{ 
-  name: "Minhas RFCs", 
-  href: "/minhas-rfcs", 
-  icon: ClipboardList,         // lucide-react
-  show: !isOtimizzoUser && !isSuperAdmin && !isViewer  // apenas clientes
-}
-```
+Único ponto de renderização das linhas — alteração se aplica automaticamente a `/tickets` e `/meus-tickets`.
 
-A lógica `!isOtimizzoUser && !isSuperAdmin && !isViewer` garante que apenas usuários do tipo cliente veem este link.
-
----
-
-## Rota no App.tsx
+**Mudança:** Na `TableCell` do título, adicionar o badge `RFC` antes do texto quando `ticket.record_type === 'rfc'`:
 
 ```tsx
-<Route path="/minhas-rfcs" element={<ClientRFCPortal />} />
+<TableCell className="max-w-md">
+  <div className="flex items-center gap-2">
+    {ticket.record_type === 'rfc' && (
+      <Badge
+        variant="outline"
+        className="border-violet-400 bg-violet-50 text-violet-700 dark:border-violet-500 dark:bg-violet-950 dark:text-violet-300 shrink-0 font-bold text-xs"
+      >
+        RFC
+      </Badge>
+    )}
+    <span className="truncate">{ticket.title}</span>
+  </div>
+</TableCell>
 ```
 
----
+O `truncate` é movido para o `<span>` interno em vez da célula, para não cortar o badge.
 
-## Atualização em `RFCExecution.tsx`
+### 2. `src/pages/Tickets.tsx`
 
-O `toggleStep` existente precisa ser atualizado para também gravar `concluded_at` quando marcar como concluído:
+Adicionar filtro por tipo de registro:
 
+**Estado:**
 ```typescript
-// Ao marcar como concluído:
-concluded_at: !currentValue ? new Date().toISOString() : null
+const [typeFilter, setTypeFilter] = useState<string>("all");
 ```
+
+**No filtro `filteredTickets`:**
+```typescript
+const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
+return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType;
+```
+
+**No JSX dos filtros** (ao lado do filtro de Segmento):
+```tsx
+<Select value={typeFilter} onValueChange={setTypeFilter}>
+  <SelectTrigger className="w-[160px]">
+    <SelectValue placeholder="Tipo" />
+  </SelectTrigger>
+  <SelectContent>
+    <SelectItem value="all">Todos os tipos</SelectItem>
+    <SelectItem value="ticket">Suporte</SelectItem>
+    <SelectItem value="rfc">RFC</SelectItem>
+  </SelectContent>
+</Select>
+```
+
+### 3. `src/pages/MyTickets.tsx`
+
+Mesma adição de filtro por tipo — idêntica à de `Tickets.tsx`.
 
 ---
 
-## Estrutura Visual da Timeline
+## O que NÃO muda
 
-```
-┌─────────────────────────────────────────────────────┐
-│  🟢  Sua manutenção está em andamento               │   ← Badge grande
-│       RFC #00000042 · Banco de Dados                │
-└─────────────────────────────────────────────────────┘
-
-  Progresso: 2 / 5 passos (40%)
-  ████████░░░░░░░░░░░░░
-
-  ──────── Passos de Execução ────────
-
-  ●  1. Fazer backup completo                         ← ✅ Concluído
-     ✓  Concluído em 20/02/2026 às 14:32
-
-  ●  2. Instalar PostgreSQL                           ← ✅ Concluído
-     ✓  Concluído em 20/02/2026 às 15:10
-
-  ○  3. Migrar schema                                 ← ⏳ Pendente
-     Aguardando execução
-
-  ○  4. Migrar dados
-     Aguardando execução
-
-  ○  5. Validar integridade
-     Aguardando execução
-```
-
-Cada item da timeline é um `div` com uma linha vertical conectando os passos, sem componente de checklist interativo.
-
----
-
-## RLS: Sem mudanças necessárias
-
-A RLS existente já cobre o cenário do cliente:
-- `tickets`: política `Client users can view their tickets` limita SELECT ao `client_id = get_user_tenant_id(auth.uid())`
-- `rfc_steps`: política `Client view own rfc_steps` limita SELECT via JOIN com a tabela tickets
+- Número de colunas da tabela
+- Headers da tabela
+- Queries de dados (o campo `record_type` já é retornado pelo `SELECT *`)
+- Componentes de ações em massa
+- RLS e permissões
+- Qualquer outra página do sistema
 
 ---
 
 ## Sequência de Implementação
 
 ```text
-1. Migration SQL
-   └─ Adiciona coluna concluded_at em rfc_steps
+1. TicketRow.tsx
+   └─ Badge RFC inline na coluna Título
 
-2. Atualiza RFCExecution.tsx
-   └─ toggleStep agora salva concluded_at ao marcar/desmarcar
+2. Tickets.tsx
+   └─ Estado typeFilter
+   └─ Lógica de filtro matchesType
+   └─ Select de tipo no painel de filtros
 
-3. Cria ClientRFCPortal.tsx
-   └─ Lista de RFCs do cliente (somente leitura)
-   └─ Badge de status dinâmico
-   └─ Barra de progresso
-   └─ Timeline vertical com check verde e data/hora
-
-4. Atualiza App.tsx
-   └─ Adiciona rota /minhas-rfcs
-
-5. Atualiza AppLayout.tsx
-   └─ Adiciona "Minhas RFCs" para usuários clientes (!isOtimizzoUser && !isSuperAdmin && !isViewer)
+3. MyTickets.tsx
+   └─ Mesmas alterações de Tickets.tsx
 ```
-
----
-
-## O que NÃO muda
-
-- A tela de Execução de RFC (`/rfc-execution`) para o time técnico
-- O formulário de criação de RFC (`NewTicketDialog`)
-- As políticas RLS existentes
-- Todas as outras páginas e funcionalidades
