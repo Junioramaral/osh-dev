@@ -710,6 +710,7 @@ export type Database = {
       }
       rfc_steps: {
         Row: {
+          concluded_at: string | null
           created_at: string | null
           descricao: string
           id: string
@@ -719,6 +720,7 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
+          concluded_at?: string | null
           created_at?: string | null
           descricao: string
           id?: string
@@ -728,6 +730,7 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
+          concluded_at?: string | null
           created_at?: string | null
           descricao?: string
           id?: string

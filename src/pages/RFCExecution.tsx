@@ -29,6 +29,7 @@ type RFCStep = {
   descricao: string;
   ordem: number;
   status_concluido: boolean;
+  concluded_at: string | null;
   ticket_id: string;
 };
 
@@ -90,7 +91,11 @@ const RFCExecution = () => {
 
     const { error } = await supabase
       .from("rfc_steps")
-      .update({ status_concluido: !currentValue, updated_at: new Date().toISOString() })
+      .update({
+        status_concluido: !currentValue,
+        updated_at: new Date().toISOString(),
+        concluded_at: !currentValue ? new Date().toISOString() : null,
+      })
       .eq("id", stepId);
 
     if (error) {
