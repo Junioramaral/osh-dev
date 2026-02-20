@@ -1,140 +1,89 @@
 
-# Reordenação dos Campos no Formulário de Novo Ticket
+# Reordenação: Tipo, Prioridade e Categoria logo após Segmento
 
-## Objetivo
+## Problema Identificado
 
-Reorganizar a ordem dos campos no formulário `NewTicketDialog.tsx` de acordo com o perfil do usuário:
-
-**Fluxo para usuário Otimizzo (dono do sistema):**
-1. Cliente
-2. Segmento
-3. Tipo + Prioridade + Categoria
-4. (resto permanece igual)
-
-**Fluxo para usuário Cliente:**
-1. Segmento
-2. Tipo + Prioridade + Categoria
-3. (resto permanece igual)
-
----
-
-## Diagnóstico do Código Atual
-
-A ordem atual no JSX (linhas 592–743 do `NewTicketDialog.tsx`) é:
+A ordem atual no JSX (após a última edição) está assim:
 
 ```text
-1. Segmento (único ou dropdown)          ← linhas 594–624
-2. Grid com: Cliente (Otimizzo)          ← linhas 627–651
-3. FAQ Selector                          ← linhas 653–661
-4. Título                                ← linhas 663–667
-5. Fila (só Otimizzo)                    ← linhas 669–695
-6. Tipo + Prioridade + Categoria (grid)  ← linhas 696–743
-7. Subcategoria                          ← linhas 745–762
-8. Campos DB/APP específicos...
+1. Cliente (Otimizzo)
+2. Segmento
+3. FAQ Selector
+4. Título
+5. Fila (Otimizzo)
+6. Tipo + Prioridade + Categoria   ← ERRADO: deveria ser logo após Segmento
+7. Subcategoria
+8. Campos DB/APP...
 ```
 
-O problema é que **Cliente** aparece depois de **Segmento**, quando deveria ser o primeiro campo para o usuário Otimizzo.
+O pedido é que **Tipo, Prioridade e Categoria** fiquem imediatamente após o **Segmento**, para ambos os perfis.
 
----
-
-## Mudanças Necessárias
-
-### Arquivo a Modificar
-`src/components/tickets/NewTicketDialog.tsx` — apenas o bloco JSX (a partir da linha 592), sem tocar na lógica de estado, queries ou handlers.
-
-### Nova Ordem JSX
+## Ordem Correta Desejada
 
 ```text
 Para Otimizzo:
-1. Cliente                               ← mover para antes do Segmento
-2. Segmento (condicional: só exibir após cliente selecionado)
-3. FAQ Selector
-4. Título
-5. Fila (só Otimizzo)
-6. Tipo + Prioridade + Categoria (grid)
+1. Cliente
+2. Segmento
+3. Tipo + Prioridade + Categoria   ← mover para cá
+4. FAQ Selector
+5. Título
+6. Fila
 7. Subcategoria
 8. Campos DB/APP...
 
 Para Cliente:
 1. Segmento
-2. FAQ Selector
-3. Título
-4. Tipo + Prioridade + Categoria (grid)
+2. Tipo + Prioridade + Categoria   ← mover para cá
+3. FAQ Selector
+4. Título
 5. Subcategoria
 6. Campos DB/APP...
 ```
 
-### Detalhe: Segmento condicional para Otimizzo
+## Arquivo a Modificar
 
-Para o usuário Otimizzo, o campo Segmento deve aparecer após a seleção do cliente (pois os segmentos disponíveis dependem do cliente escolhido). Assim, o Segmento só é exibido quando `selectedClientId` está preenchido:
+`src/components/tickets/NewTicketDialog.tsx` — apenas reposicionamento do bloco JSX entre as linhas 695–742 (grid `grid-cols-3` com Tipo, Prioridade, Categoria), movendo-o para imediatamente após o bloco do Segmento (linha 650).
 
+## Mudança Técnica
+
+Recortar o bloco `<div className="grid grid-cols-3 gap-4">` (Tipo + Prioridade + Categoria) das linhas 695–742 e inserir logo após o fechamento do bloco de Segmento (após a linha 650), antes do FAQ Selector.
+
+### Bloco a mover (atual nas linhas 695–742):
 ```tsx
-{/* Para Otimizzo: Cliente primeiro */}
-{isOtimizzoTenant && (
-  <div className="space-y-2">
-    <Label>Cliente *</Label>
-    <Select ...>...</Select>
-  </div>
-)}
-
-{/* Segmento: sempre visível para cliente, visível após escolher cliente para Otimizzo */}
-{(!isOtimizzoTenant || selectedClientId) && (
-  /* bloco do segmento atual */
-)}
-
-{/* FAQ Selector */}
-{selectedClientId && <FAQSelector ... />}
-
-{/* Título */}
-<div>...</div>
-
-{/* Fila (só Otimizzo) */}
-{isOtimizzoUser && ...}
-
-{/* Tipo + Prioridade + Categoria */}
-<div className="grid grid-cols-3 gap-4">...</div>
+<div className="grid grid-cols-3 gap-4">
+  {/* Tipo */}
+  {/* Prioridade */}
+  {/* Categoria */}
+</div>
 ```
 
----
+### Nova posição (após linha 650, antes do FAQ Selector):
+```tsx
+{/* 2. Segmento */}
+{...segmento...}
+
+{/* 3. Tipo + Prioridade + Categoria */}
+<div className="grid grid-cols-3 gap-4">
+  ...
+</div>
+
+{/* 4. FAQ Selector */}
+{selectedClientId && <FAQSelector ... />}
+
+{/* 5. Título */}
+<div className="space-y-2">...</div>
+
+{/* 6. Fila (só Otimizzo) */}
+{isOtimizzoUser && ...}
+
+{/* 7. Subcategoria */}
+{selectedCategoryId && ...}
+```
 
 ## O que NÃO muda
 
-- Toda a lógica de estado (`segment`, `effectiveTenantId`, `isOtimizzoTenant`)
-- Todas as queries de dados (clientes, segmentos, categorias, instâncias)
-- Os handlers (`handleSegmentChange`, `handleCategoryChange`)
-- Os `useEffect`s de auto-seleção e limpeza de campos
-- Os campos técnicos DB/APP (Engine, Instância, Ambiente, etc.)
-- Os campos de descrição (Título, Motivo, Problema, etc.)
-- A lógica de submit e upload
-
----
-
-## Impacto Visual
-
-### Antes (Otimizzo)
-```text
-[Segmento         ]
-[Cliente          ]
-[FAQ Selector     ]
-[Título           ]
-[Fila             ]
-[Tipo] [Prior.] [Cat.]
-```
-
-### Depois (Otimizzo)
-```text
-[Cliente          ]
-[Segmento         ]  ← aparece após cliente selecionado
-[FAQ Selector     ]
-[Título           ]
-[Fila             ]
-[Tipo] [Prior.] [Cat.]
-```
-
-### Antes e Depois (Cliente - sem mudança de conteúdo, só confirmação que está correto)
-```text
-[Segmento fixo ou dropdown]
-[FAQ Selector              ]
-[Título                    ]
-[Tipo] [Prior.] [Cat.]
-```
+- Nenhuma lógica de estado, handlers ou queries
+- Nenhum campo é removido ou alterado
+- Subcategoria permanece após Categoria (dependente dela)
+- Campos técnicos DB/APP continuam na mesma posição
+- Campos Título e Fila permanecem na sequência após o novo bloco de Tipo/Prioridade/Categoria
