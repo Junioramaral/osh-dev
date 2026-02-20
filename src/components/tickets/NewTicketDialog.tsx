@@ -92,11 +92,14 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const [uploadFiles, setUploadFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
+  // Usar profile.client_id como fonte primária (carrega antes dos roles)
+  const effectiveTenantId = tenantId || profile?.client_id || null;
+
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
     defaultValues: {
       segment: "DB",
-      client_id: tenantId || "",
+      client_id: effectiveTenantId || "",
       frequency: "pontual",
       business_impact: "medio",
       ticket_type: "incidente",
@@ -112,21 +115,22 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const selectedAppProductId = watch("app_product_id");
 
   // Fetch current tenant data to get segments
+  // Usar effectiveTenantId para habilitar a query assim que profile carregar (antes dos roles)
   const { data: currentTenant } = useQuery({
-    queryKey: ["current-tenant", tenantId],
+    queryKey: ["current-tenant", effectiveTenantId],
     queryFn: async () => {
-      if (!tenantId) return null;
+      if (!effectiveTenantId) return null;
       
       const { data, error } = await supabase
         .from("clients")
         .select("id, name, segments, tenant_type, db_engines, app_product_ids")
-        .eq("id", tenantId)
+        .eq("id", effectiveTenantId)
         .single();
       
       if (error) throw error;
       return data;
     },
-    enabled: !!tenantId,
+    enabled: !!effectiveTenantId,
   });
 
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
@@ -172,7 +176,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       // Reset form with correct initial values
       reset({
         segment: initialSegment,
-        client_id: tenantId || "",
+        client_id: effectiveTenantId || "",
         frequency: "pontual",
         business_impact: "medio",
         ticket_type: "incidente",
@@ -180,7 +184,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       });
     }
-  }, [currentTenant, availableSegments, segment, reset, tenantId]);
+  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId]);
 
   // Fetch clients
   const { data: clients } = useQuery({
