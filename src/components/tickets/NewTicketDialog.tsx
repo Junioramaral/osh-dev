@@ -590,67 +590,66 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         </DialogHeader>
 
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Segment Selection */}
-          {hasOnlyOneSegment ? (
+          {/* 1. Cliente (apenas para Otimizzo) */}
+          {isOtimizzoTenant && (
             <div className="space-y-2">
-              <Label>Segmento *</Label>
-              <div className="flex items-center gap-2">
-                <Input 
-                  value={availableSegments[0]?.display_name || ""}
-                  disabled
-                  className="bg-muted cursor-not-allowed"
-                />
-                <p className="text-xs text-muted-foreground">
-                  (Segmento único disponível)
-                </p>
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              <Label>Segmento *</Label>
-              <Select value={segment || ""} onValueChange={handleSegmentChange}>
+              <Label htmlFor="client_id">Cliente *</Label>
+              <Select
+                value={watch("client_id")}
+                onValueChange={(value) => setValue("client_id", value)}
+                disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione o segmento" />
+                  <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {availableSegments.map((seg) => (
-                    <SelectItem key={seg.id} value={seg.code}>
-                      {seg.display_name}
+                  {clients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
             </div>
           )}
 
-          {/* Common Fields */}
-          <div className="grid grid-cols-2 gap-4">
-            {isOtimizzoTenant && (
+          {/* 2. Segmento — sempre visível para cliente; para Otimizzo só após escolher cliente */}
+          {(!isOtimizzoTenant || selectedClientId) && (
+            hasOnlyOneSegment ? (
               <div className="space-y-2">
-                <Label htmlFor="client_id">Cliente *</Label>
-                <Select
-                  value={watch("client_id")}
-                  onValueChange={(value) => setValue("client_id", value)}
-                  disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
-                >
+                <Label>Segmento *</Label>
+                <div className="flex items-center gap-2">
+                  <Input 
+                    value={availableSegments[0]?.display_name || ""}
+                    disabled
+                    className="bg-muted cursor-not-allowed"
+                  />
+                  <p className="text-xs text-muted-foreground">
+                    (Segmento único disponível)
+                  </p>
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Segmento *</Label>
+                <Select value={segment || ""} onValueChange={handleSegmentChange}>
                   <SelectTrigger>
-                    <SelectValue placeholder="Selecione o cliente" />
+                    <SelectValue placeholder="Selecione o segmento" />
                   </SelectTrigger>
                   <SelectContent>
-                    {clients?.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
+                    {availableSegments.map((seg) => (
+                      <SelectItem key={seg.id} value={seg.code}>
+                        {seg.display_name}
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
-                {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
               </div>
-            )}
+            )
+          )}
 
-          </div>
-
-          {/* FAQ Selector - aparece após selecionar cliente */}
+          {/* 3. FAQ Selector - aparece após selecionar cliente */}
           {selectedClientId && (
             <FAQSelector
               clientId={selectedClientId}
