@@ -45,6 +45,13 @@ type RFCStep = {
   status_concluido: boolean;
 };
 
+const segmentBadge = (segment: string) =>
+  segment === "DB" ? (
+    <Badge variant="secondary" className="font-mono text-xs">DB</Badge>
+  ) : (
+    <Badge variant="outline" className="font-mono text-xs">APP</Badge>
+  );
+
 const RFCApproval = () => {
   const { user, profile } = useAuth();
   const [selectedRfcId, setSelectedRfcId] = useState<string | null>(null);
@@ -155,245 +162,6 @@ const RFCApproval = () => {
     setIsActing(false);
   };
 
-  const segmentBadge = (segment: string) =>
-    segment === "DB" ? (
-      <Badge variant="secondary" className="font-mono text-xs">DB</Badge>
-    ) : (
-      <Badge variant="outline" className="font-mono text-xs">APP</Badge>
-    );
-
-  // --- List Panel ---
-  const ListPanel = () => (
-    <div className={`flex flex-col h-full ${showDetails ? "hidden md:flex" : "flex"}`}>
-      <div className="p-4 border-b border-border">
-        <div className="flex items-center gap-2">
-          <ShieldCheck className="w-5 h-5 text-primary" />
-          <h2 className="font-semibold text-foreground">Aguardando Aprovação</h2>
-          {rfcs.length > 0 && (
-            <Badge variant="secondary" className="ml-auto">{rfcs.length}</Badge>
-          )}
-        </div>
-      </div>
-      <ScrollArea className="flex-1">
-        {rfcsLoading ? (
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-          </div>
-        ) : rfcs.length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
-            <ClipboardList className="w-10 h-10 text-muted-foreground mb-3" />
-            <p className="text-sm font-medium text-muted-foreground">Nenhuma RFC pendente</p>
-            <p className="text-xs text-muted-foreground mt-1">RFCs enviadas para aprovação aparecerão aqui.</p>
-          </div>
-        ) : (
-          <div className="p-2 space-y-1">
-            {rfcs.map((rfc) => (
-              <button
-                key={rfc.id}
-                onClick={() => handleSelectRfc(rfc.id)}
-                className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-accent ${
-                  selectedRfcId === rfc.id
-                    ? "bg-accent border-primary/30"
-                    : "bg-card border-border"
-                }`}
-              >
-                <div className="flex items-start justify-between gap-2 mb-1">
-                  <span className="text-xs font-mono text-muted-foreground">#{rfc.ticket_number}</span>
-                  {segmentBadge(rfc.segment)}
-                </div>
-                <p className="text-sm font-medium text-foreground line-clamp-2 mb-1">{rfc.title}</p>
-                <div className="flex items-center justify-between">
-                  <p className="text-xs text-muted-foreground">{rfc.clients?.name ?? "—"}</p>
-                  <p className="text-xs text-muted-foreground">
-                    {format(new Date(rfc.created_at), "dd/MM/yy", { locale: ptBR })}
-                  </p>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </ScrollArea>
-    </div>
-  );
-
-  // --- Detail Panel ---
-  const DetailPanel = () => (
-    <div className={`flex flex-col h-full ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
-      {!selectedRfc ? (
-        <div className="flex flex-col items-center justify-center h-full text-center px-8">
-          <ShieldCheck className="w-12 h-12 text-muted-foreground mb-4" />
-          <p className="text-base font-medium text-muted-foreground">Selecione uma RFC</p>
-          <p className="text-sm text-muted-foreground mt-1">
-            Clique em uma RFC da lista para revisar os passos e tomar uma decisão.
-          </p>
-        </div>
-      ) : (
-        <div className="flex flex-col h-full">
-          {/* Mobile back button */}
-          <div className="md:hidden p-3 border-b border-border">
-            <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
-              <ArrowLeft className="w-4 h-4" />
-              Voltar à lista
-            </Button>
-          </div>
-
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-4">
-              {/* Header */}
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <span className="text-xs font-mono text-muted-foreground">#{selectedRfc.ticket_number}</span>
-                  {segmentBadge(selectedRfc.segment)}
-                  <Badge variant="outline" className="text-xs border-yellow-500/40 text-yellow-600 dark:text-yellow-400">
-                    Aguardando Aprovação
-                  </Badge>
-                </div>
-                <h3 className="text-base font-semibold text-foreground leading-snug">{selectedRfc.title}</h3>
-                <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
-                  <span className="flex items-center gap-1">
-                    <Building2 className="w-3.5 h-3.5" />
-                    {selectedRfc.clients?.name ?? "—"}
-                  </span>
-                  <span className="flex items-center gap-1">
-                    <Calendar className="w-3.5 h-3.5" />
-                    {format(new Date(selectedRfc.created_at), "dd/MM/yyyy", { locale: ptBR })}
-                  </span>
-                </div>
-              </div>
-
-              <Separator />
-
-              {/* Steps */}
-              <div className="space-y-2">
-                <p className="text-sm font-medium text-foreground flex items-center gap-2">
-                  <Tag className="w-4 h-4" />
-                  Passos da RFC
-                  {steps.length > 0 && (
-                    <span className="text-xs text-muted-foreground font-normal">({steps.length} passo{steps.length !== 1 ? "s" : ""})</span>
-                  )}
-                </p>
-                {stepsLoading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
-                  </div>
-                ) : steps.length === 0 ? (
-                  <p className="text-sm text-muted-foreground py-4 text-center">
-                    Nenhum passo cadastrado para esta RFC.
-                  </p>
-                ) : (
-                  <div className="space-y-2">
-                    {steps.map((step) => {
-                      const isStepExpanded = expandedStepId === step.id;
-                      const hasDetails = !!(step.procedimento || step.scripts);
-                      return (
-                        <div
-                          key={step.id}
-                          className="rounded-lg border border-border bg-card"
-                        >
-                          {/* Header row */}
-                          <div
-                            className={`flex items-start gap-3 p-3 ${hasDetails ? "cursor-pointer hover:bg-muted/30 transition-colors" : ""}`}
-                            onClick={() => hasDetails && setExpandedStepId(isStepExpanded ? null : step.id)}
-                          >
-                            <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 mt-0.5">
-                              {step.ordem + 1}
-                            </div>
-                            <span className="text-sm text-foreground leading-snug flex-1">
-                              {step.descricao}
-                            </span>
-                            {hasDetails && (
-                              <span className="shrink-0 text-muted-foreground">
-                                {isStepExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
-                              </span>
-                            )}
-                          </div>
-                          {/* Expanded detail (read-only) */}
-                          {isStepExpanded && hasDetails && (
-                            <div className="border-t border-border px-3 pb-3 pt-3 space-y-3 bg-muted/20">
-                              {step.procedimento && (
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Procedimento Detalhado
-                                  </p>
-                                  <p className="text-sm text-foreground whitespace-pre-wrap">{step.procedimento}</p>
-                                </div>
-                              )}
-                              {step.scripts && (
-                                <div className="space-y-1">
-                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
-                                    Scripts / Comandos
-                                  </p>
-                                  <pre className="text-sm font-mono p-3 rounded-md bg-zinc-900 text-green-400 overflow-x-auto whitespace-pre-wrap">
-                                    {step.scripts}
-                                  </pre>
-                                </div>
-                              )}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-
-              <Separator />
-
-              {/* Decision section */}
-              <div className="space-y-3 pb-2">
-                <p className="text-sm font-semibold text-foreground">Decisão do Gestor</p>
-                <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-muted-foreground">
-                    Comentário <span className="text-destructive">*</span>
-                  </label>
-                  <Textarea
-                    placeholder="Ex: RFC aprovada. Agendar janela de manutenção para..."
-                    value={comentario}
-                    onChange={(e) => setComentario(e.target.value)}
-                    rows={4}
-                    className="resize-none text-sm"
-                  />
-                  <p className="text-xs text-muted-foreground">
-                    O comentário é obrigatório para aprovar ou rejeitar.
-                  </p>
-                </div>
-                <div className="flex gap-2 justify-end pt-1">
-                  <Button
-                    variant="destructive"
-                    size="sm"
-                    disabled={!comentario.trim() || isActing}
-                    onClick={handleReject}
-                    className="gap-2"
-                  >
-                    {isActing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <XCircle className="w-4 h-4" />
-                    )}
-                    Rejeitar RFC
-                  </Button>
-                  <Button
-                    size="sm"
-                    disabled={!comentario.trim() || isActing}
-                    onClick={handleApprove}
-                    className="gap-2 bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {isActing ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <CheckCircle2 className="w-4 h-4" />
-                    )}
-                    Aprovar RFC
-                  </Button>
-                </div>
-              </div>
-            </div>
-          </ScrollArea>
-        </div>
-      )}
-    </div>
-  );
-
   return (
     <AppLayout>
       <div className="mb-6">
@@ -412,12 +180,233 @@ const RFCApproval = () => {
 
       <Card className="overflow-hidden">
         <div className="grid md:grid-cols-[300px_1fr] h-[calc(100vh-220px)] min-h-[500px]">
-          {/* Left: RFC List */}
+          {/* Left: RFC List — inline JSX (not a sub-component) */}
           <div className="border-r border-border">
-            <ListPanel />
+            <div className={`flex flex-col h-full ${showDetails ? "hidden md:flex" : "flex"}`}>
+              <div className="p-4 border-b border-border">
+                <div className="flex items-center gap-2">
+                  <ShieldCheck className="w-5 h-5 text-primary" />
+                  <h2 className="font-semibold text-foreground">Aguardando Aprovação</h2>
+                  {rfcs.length > 0 && (
+                    <Badge variant="secondary" className="ml-auto">{rfcs.length}</Badge>
+                  )}
+                </div>
+              </div>
+              <ScrollArea className="flex-1">
+                {rfcsLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                  </div>
+                ) : rfcs.length === 0 ? (
+                  <div className="flex flex-col items-center justify-center py-16 px-4 text-center">
+                    <ClipboardList className="w-10 h-10 text-muted-foreground mb-3" />
+                    <p className="text-sm font-medium text-muted-foreground">Nenhuma RFC pendente</p>
+                    <p className="text-xs text-muted-foreground mt-1">RFCs enviadas para aprovação aparecerão aqui.</p>
+                  </div>
+                ) : (
+                  <div className="p-2 space-y-1">
+                    {rfcs.map((rfc) => (
+                      <button
+                        key={rfc.id}
+                        onClick={() => handleSelectRfc(rfc.id)}
+                        className={`w-full text-left p-3 rounded-lg border transition-colors hover:bg-accent ${
+                          selectedRfcId === rfc.id
+                            ? "bg-accent border-primary/30"
+                            : "bg-card border-border"
+                        }`}
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-1">
+                          <span className="text-xs font-mono text-muted-foreground">#{rfc.ticket_number}</span>
+                          {segmentBadge(rfc.segment)}
+                        </div>
+                        <p className="text-sm font-medium text-foreground line-clamp-2 mb-1">{rfc.title}</p>
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs text-muted-foreground">{rfc.clients?.name ?? "—"}</p>
+                          <p className="text-xs text-muted-foreground">
+                            {format(new Date(rfc.created_at), "dd/MM/yy", { locale: ptBR })}
+                          </p>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </ScrollArea>
+            </div>
           </div>
-          {/* Right: Details + Decision */}
-          <DetailPanel />
+
+          {/* Right: Details + Decision — inline JSX (not a sub-component) */}
+          <div className={`flex flex-col h-full ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
+            {!selectedRfc ? (
+              <div className="flex flex-col items-center justify-center h-full text-center px-8">
+                <ShieldCheck className="w-12 h-12 text-muted-foreground mb-4" />
+                <p className="text-base font-medium text-muted-foreground">Selecione uma RFC</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Clique em uma RFC da lista para revisar os passos e tomar uma decisão.
+                </p>
+              </div>
+            ) : (
+              <div className="flex flex-col h-full">
+                {/* Mobile back button */}
+                <div className="md:hidden p-3 border-b border-border">
+                  <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
+                    <ArrowLeft className="w-4 h-4" />
+                    Voltar à lista
+                  </Button>
+                </div>
+
+                <ScrollArea className="flex-1">
+                  <div className="p-4 space-y-4">
+                    {/* Header */}
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="text-xs font-mono text-muted-foreground">#{selectedRfc.ticket_number}</span>
+                        {segmentBadge(selectedRfc.segment)}
+                        <Badge variant="outline" className="text-xs border-yellow-500/40 text-yellow-600 dark:text-yellow-400">
+                          Aguardando Aprovação
+                        </Badge>
+                      </div>
+                      <h3 className="text-base font-semibold text-foreground leading-snug">{selectedRfc.title}</h3>
+                      <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+                        <span className="flex items-center gap-1">
+                          <Building2 className="w-3.5 h-3.5" />
+                          {selectedRfc.clients?.name ?? "—"}
+                        </span>
+                        <span className="flex items-center gap-1">
+                          <Calendar className="w-3.5 h-3.5" />
+                          {format(new Date(selectedRfc.created_at), "dd/MM/yyyy", { locale: ptBR })}
+                        </span>
+                      </div>
+                    </div>
+
+                    <Separator />
+
+                    {/* Steps */}
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground flex items-center gap-2">
+                        <Tag className="w-4 h-4" />
+                        Passos da RFC
+                        {steps.length > 0 && (
+                          <span className="text-xs text-muted-foreground font-normal">({steps.length} passo{steps.length !== 1 ? "s" : ""})</span>
+                        )}
+                      </p>
+                      {stepsLoading ? (
+                        <div className="flex items-center justify-center py-8">
+                          <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
+                        </div>
+                      ) : steps.length === 0 ? (
+                        <p className="text-sm text-muted-foreground py-4 text-center">
+                          Nenhum passo cadastrado para esta RFC.
+                        </p>
+                      ) : (
+                        <div className="space-y-2">
+                          {steps.map((step) => {
+                            const isStepExpanded = expandedStepId === step.id;
+                            const hasDetails = !!(step.procedimento || step.scripts);
+                            return (
+                              <div
+                                key={step.id}
+                                className="rounded-lg border border-border bg-card"
+                              >
+                                <div
+                                  className={`flex items-start gap-3 p-3 ${hasDetails ? "cursor-pointer hover:bg-muted/30 transition-colors" : ""}`}
+                                  onClick={() => hasDetails && setExpandedStepId(isStepExpanded ? null : step.id)}
+                                >
+                                  <div className="flex items-center justify-center w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold shrink-0 mt-0.5">
+                                    {step.ordem + 1}
+                                  </div>
+                                  <span className="text-sm text-foreground leading-snug flex-1">
+                                    {step.descricao}
+                                  </span>
+                                  {hasDetails && (
+                                    <span className="shrink-0 text-muted-foreground">
+                                      {isStepExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                                    </span>
+                                  )}
+                                </div>
+                                {isStepExpanded && hasDetails && (
+                                  <div className="border-t border-border px-3 pb-3 pt-3 space-y-3 bg-muted/20">
+                                    {step.procedimento && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                          Procedimento Detalhado
+                                        </p>
+                                        <p className="text-sm text-foreground whitespace-pre-wrap">{step.procedimento}</p>
+                                      </div>
+                                    )}
+                                    {step.scripts && (
+                                      <div className="space-y-1">
+                                        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">
+                                          Scripts / Comandos
+                                        </p>
+                                        <pre className="text-sm font-mono p-3 rounded-md bg-zinc-900 text-green-400 overflow-x-auto whitespace-pre-wrap">
+                                          {step.scripts}
+                                        </pre>
+                                      </div>
+                                    )}
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    <Separator />
+
+                    {/* Decision section */}
+                    <div className="space-y-3 pb-2">
+                      <p className="text-sm font-semibold text-foreground">Decisão do Gestor</p>
+                      <div className="space-y-1.5">
+                        <label className="text-xs font-medium text-muted-foreground">
+                          Comentário <span className="text-destructive">*</span>
+                        </label>
+                        <Textarea
+                          placeholder="Ex: RFC aprovada. Agendar janela de manutenção para..."
+                          value={comentario}
+                          onChange={(e) => setComentario(e.target.value)}
+                          rows={4}
+                          className="resize-none text-sm"
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          O comentário é obrigatório para aprovar ou rejeitar.
+                        </p>
+                      </div>
+                      <div className="flex gap-2 justify-end pt-1">
+                        <Button
+                          variant="destructive"
+                          size="sm"
+                          disabled={!comentario.trim() || isActing}
+                          onClick={handleReject}
+                          className="gap-2"
+                        >
+                          {isActing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <XCircle className="w-4 h-4" />
+                          )}
+                          Rejeitar RFC
+                        </Button>
+                        <Button
+                          size="sm"
+                          disabled={!comentario.trim() || isActing}
+                          onClick={handleApprove}
+                          className="gap-2 bg-green-600 hover:bg-green-700 text-white"
+                        >
+                          {isActing ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <CheckCircle2 className="w-4 h-4" />
+                          )}
+                          Aprovar RFC
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </ScrollArea>
+              </div>
+            )}
+          </div>
         </div>
       </Card>
     </AppLayout>
