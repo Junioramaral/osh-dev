@@ -1,187 +1,208 @@
 
-# Refatoração: Suporte a Múltiplos Tipos de Registro (Ticket, RFC, MIR)
+# Tela de Execução de RFC
 
 ## Visão Geral
 
-O formulário "Novo Ticket" será transformado em um criador de registros multi-tipo. O usuário primeiro escolhe o **Tipo de Registro** (Suporte ou RFC) e o formulário se adapta dinamicamente. A estrutura do banco de dados também será expandida para suportar os novos tipos.
+Será criada uma nova página dedicada à execução de RFCs pelo time técnico, acessível via `/rfc-execution`. A tela lista todas as RFCs com status `aprovado`, e ao abrir uma RFC exibe um checklist interativo com barra de progresso em tempo real.
 
 ---
 
-## Impacto no Banco de Dados (3 migrações)
+## Estrutura de Arquivos
 
-### Migração 1 — Expandir o status do ticket para suportar RFC
+### Novos arquivos:
+- `src/pages/RFCExecution.tsx` — página principal com lista de RFCs aprovadas
+- `src/components/rfc/RFCExecutionCard.tsx` — card lateral de detalhes + checklist de uma RFC aberta
 
-Adicionar `aguardando_aprovacao` ao enum `ticket_status` para o fluxo de aprovação da RFC.
+### Arquivos a modificar:
+- `src/App.tsx` — adicionar rota `/rfc-execution`
+- `src/components/layout/AppLayout.tsx` — adicionar link de navegação "Execução RFC" (visível apenas para Otimizzo e Super Admin)
 
+---
+
+## Banco de Dados
+
+### Status `aprovado`
+
+O enum `ticket_status` atual precisa incluir o valor `aprovado`. Verificando a migration anterior, o enum tem: `novo`, `em_atendimento`, `aguardando_cliente`, `resolvido`, `fechado`, `aguardando_aprovacao`. O valor `aprovado` precisa ser adicionado.
+
+**Migration necessária:**
 ```sql
-ALTER TYPE ticket_status ADD VALUE IF NOT EXISTS 'aguardando_aprovacao';
+ALTER TYPE ticket_status ADD VALUE IF NOT EXISTS 'aprovado';
 ```
 
-### Migração 2 — Adicionar coluna `record_type` na tabela `tickets`
+### Atualização de `rfc_steps.status_concluido`
 
-Uma nova coluna `record_type` (texto, default `'suporte'`) para distinguir o tipo de registro. Não é um enum para facilitar a extensão futura com MIR sem nova migração.
+A tabela `rfc_steps` já existe com a coluna `status_concluido boolean`. A RLS atual permite que Otimizzo gerencie todos os steps (ALL), então o UPDATE funcionará corretamente.
 
-```sql
-ALTER TABLE public.tickets 
-ADD COLUMN IF NOT EXISTS record_type text NOT NULL DEFAULT 'suporte';
+---
 
--- Marcar os registros existentes como 'suporte'
-UPDATE public.tickets SET record_type = 'suporte' WHERE record_type IS NULL;
+## Página Principal: `RFCExecution.tsx`
+
+### Layout de duas colunas (lista + detalhes)
+
+```
+┌─────────────────────────┬──────────────────────────────────────┐
+│  RFCs Aprovadas (lista) │  Detalhes + Checklist da RFC         │
+│                         │                                       │
+│  [RFC-00000042]         │  ┌─────────────────────────────────┐ │
+│  Cliente: Acme Corp     │  │ Progresso: 2/5 (40%)            │ │
+│  Segmento: DB           │  │ ████████░░░░░░░░░░░░░           │ │
+│  Status: Aprovado       │  └─────────────────────────────────┘ │
+│                         │                                       │
+│  [RFC-00000039]         │  Cabeçalho:                          │
+│  ...                    │  Cliente: Acme Corp | Segmento: DB   │
+│                         │  Título: Migração Oracle → Postgres  │
+│                         │                                       │
+│                         │  Checklist:                          │
+│                         │  ☑ 1. Fazer backup completo          │
+│                         │  ☐ 2. Instalar PostgreSQL            │
+│                         │  ☐ 3. Migrar schema                  │
+│                         │  ☐ 4. Migrar dados                   │
+│                         │  ☐ 5. Validar integridade            │
+└─────────────────────────┴──────────────────────────────────────┘
 ```
 
-### Migração 3 — Criar tabela `rfc_steps`
+### Queries de dados
 
-Tabela para armazenar os passos dinâmicos de uma RFC.
+**Lista de RFCs aprovadas:**
+```typescript
+const { data: rfcs } = useQuery({
+  queryKey: ['rfc-approved-list'],
+  queryFn: async () => {
+    return supabase
+      .from('tickets')
+      .select(`
+        id, ticket_number, title, segment, status, created_at,
+        clients(name)
+      `)
+      .eq('record_type', 'rfc')
+      .eq('status', 'aprovado')
+      .order('created_at', { ascending: false });
+  }
+});
+```
 
-```sql
-CREATE TABLE IF NOT EXISTS public.rfc_steps (
-  id uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY,
-  ticket_id uuid NOT NULL REFERENCES public.tickets(id) ON DELETE CASCADE,
-  descricao text NOT NULL,
-  ordem integer NOT NULL DEFAULT 0,
-  status_concluido boolean NOT NULL DEFAULT false,
-  created_at timestamp with time zone DEFAULT now(),
-  updated_at timestamp with time zone DEFAULT now()
-);
-
--- RLS
-ALTER TABLE public.rfc_steps ENABLE ROW LEVEL SECURITY;
-
--- Otimizzo pode gerenciar todos os passos
-CREATE POLICY "Otimizzo manage rfc_steps" ON public.rfc_steps
-FOR ALL USING (is_otimizzo_user(auth.uid()))
-WITH CHECK (is_otimizzo_user(auth.uid()));
-
--- Super admins gerenciam tudo
-CREATE POLICY "Super admins manage rfc_steps" ON public.rfc_steps
-FOR ALL USING (is_super_admin(auth.uid()))
-WITH CHECK (is_super_admin(auth.uid()));
-
--- Clientes visualizam os passos dos seus tickets
-CREATE POLICY "Client view own rfc_steps" ON public.rfc_steps
-FOR SELECT USING (
-  EXISTS (
-    SELECT 1 FROM public.tickets t 
-    WHERE t.id = rfc_steps.ticket_id 
-    AND t.client_id = get_user_tenant_id(auth.uid())
-  )
-);
+**Passos da RFC selecionada:**
+```typescript
+const { data: steps } = useQuery({
+  queryKey: ['rfc-steps', selectedRfcId],
+  queryFn: async () => {
+    return supabase
+      .from('rfc_steps')
+      .select('*')
+      .eq('ticket_id', selectedRfcId)
+      .order('ordem');
+  },
+  enabled: !!selectedRfcId
+});
 ```
 
 ---
 
-## Novos Arquivos a Criar
+## Componente de Checklist: Lógica de Atualização em Tempo Real
 
-### `src/components/tickets/RFCStepBuilder.tsx`
+Quando o técnico marca/desmarca um checkbox, o sistema:
 
-Componente isolado que gerencia a lista de passos da RFC:
-- Input de texto + botão "Adicionar"
-- Lista de passos com botões de deletar e reordenar (setas ↑ ↓)
-- Recebe `steps` e `onStepsChange` como props
-- Interface local: `{ id: string, descricao: string, ordem: number }`
+1. Faz UPDATE otimista no estado local (UI atualiza imediatamente)
+2. Envia `UPDATE` para o Supabase em `rfc_steps` alterando `status_concluido`
+3. Invalida a query para recarregar caso haja inconsistência
 
-### `src/components/tickets/RFCFormSection.tsx`
-
-O formulário completo para criação de RFC, com:
-- Cliente (dropdown — igual ao do fluxo Suporte para Otimizzo)
-- Segmento (Radio buttons: Banco de Dados / Application)
-- `RFCStepBuilder` embutido
-- Rodapé com dois botões: **"Salvar Rascunho"** e **"Solicitar Aprovação de Especialista"**
+```typescript
+const toggleStep = async (stepId: string, currentValue: boolean) => {
+  // 1. Atualização otimista local
+  queryClient.setQueryData(['rfc-steps', selectedRfcId], (old) =>
+    old?.map(s => s.id === stepId ? { ...s, status_concluido: !currentValue } : s)
+  );
+  
+  // 2. Persistir no banco
+  await supabase
+    .from('rfc_steps')
+    .update({ status_concluido: !currentValue, updated_at: new Date().toISOString() })
+    .eq('id', stepId);
+  
+  // 3. Invalidar para garantir consistência
+  queryClient.invalidateQueries({ queryKey: ['rfc-steps', selectedRfcId] });
+};
+```
 
 ---
 
-## Arquivo Principal a Modificar: `NewTicketDialog.tsx`
+## Barra de Progresso
 
-### 1. Novo estado de seleção no topo
+Calculada dinamicamente a partir dos steps carregados:
 
-```tsx
-const [recordType, setRecordType] = useState<"suporte" | "rfc">("suporte");
+```typescript
+const completedCount = steps.filter(s => s.status_concluido).length;
+const totalCount = steps.length;
+const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
 ```
 
-### 2. Seletor de "Tipo de Registro" no topo do formulário
+Exibida com o componente `<Progress>` do shadcn/ui (já presente no projeto) e um texto `X/Y passos concluídos (Z%)`.
 
-Logo abaixo do `<DialogTitle>`, antes do `<form>`, adicionar um seletor com Tabs da shadcn/ui:
-
-```tsx
-<Tabs value={recordType} onValueChange={(v) => setRecordType(v as any)}>
-  <TabsList className="grid w-full grid-cols-2">
-    <TabsTrigger value="suporte">Suporte</TabsTrigger>
-    <TabsTrigger value="rfc">RFC (Interno)</TabsTrigger>
-  </TabsList>
-</Tabs>
-```
-
-### 3. Renderização condicional do formulário
-
-- Se `recordType === "suporte"`: renderiza o formulário atual completo (sem nenhuma alteração na lógica existente)
-- Se `recordType === "rfc"`: renderiza o `<RFCFormSection>`
+Quando todos os passos estiverem concluídos (100%), exibe um banner de sucesso verde com a mensagem "Todos os passos concluídos!" e um botão para marcar a RFC como "Concluída".
 
 ---
 
-## Fluxo de Submit da RFC
+## Navegação: Adicionar ao Sidebar
 
-### Rascunho
-1. Cria um ticket na tabela `tickets` com:
-   - `record_type: 'rfc'`
-   - `status: 'novo'`
-   - Campos obrigatórios mínimos: `client_id`, `segment`, `title`, `contact_name`, `contact_email`
-   - Campos do Suporte deixados com valores padrão
-2. Insere os passos na tabela `rfc_steps` com referência ao `ticket_id`
+Em `AppLayout.tsx`, dentro de `operationalNav`, adicionar:
 
-### Solicitar Aprovação
-1. Mesmo processo do rascunho, mas:
-   - `status: 'aguardando_aprovacao'`
-   - Salva no comentário do ticket quem solicitou (via `ticket_comments`)
+```typescript
+{ 
+  name: "Execução RFC", 
+  href: "/rfc-execution", 
+  icon: ClipboardCheck,    // lucide-react
+  show: isOtimizzoUser || isSuperAdmin 
+}
+```
+
+---
+
+## Detalhes do Cabeçalho da RFC
+
+Ao selecionar uma RFC, o painel direito exibe:
+
+| Campo | Valor |
+|---|---|
+| Número | ticket_number |
+| Título | title |
+| Cliente | clients.name |
+| Segmento | segment (badge colorido: DB = azul, APP = verde) |
+| Status | Aprovado (badge verde) |
+| Criado em | created_at formatado pt-BR |
+
+---
+
+## Comportamento no Mobile
+
+No mobile, a lista e os detalhes ocupam 100% da tela alternadamente. Ao clicar em uma RFC da lista, o painel de detalhes é exibido com um botão "← Voltar" para retornar à lista. Isso é implementado com um estado `selectedRfcId` e layout condicional usando as classes `hidden` / `block` do Tailwind.
 
 ---
 
 ## Sequência de Implementação
 
 ```text
-1. Migração SQL (3 partes em sequência)
-   └─ Adiciona ticket_status 'aguardando_aprovacao'
-   └─ Adiciona coluna record_type em tickets
-   └─ Cria tabela rfc_steps com RLS
+1. Migration SQL
+   └─ Adiciona 'aprovado' ao enum ticket_status
 
-2. Cria RFCStepBuilder.tsx
-   └─ Componente de lista de passos
+2. Cria RFCExecution.tsx
+   └─ Lista de RFCs aprovadas (coluna esquerda)
+   └─ Painel de detalhes + checklist (coluna direita)
+   └─ Lógica de toggle com atualização otimista
+   └─ Barra de progresso calculada dinamicamente
 
-3. Cria RFCFormSection.tsx  
-   └─ Formulário RFC usando RFCStepBuilder
+3. Modifica App.tsx
+   └─ Adiciona <Route path="/rfc-execution" element={<RFCExecution />} />
 
-4. Modifica NewTicketDialog.tsx
-   └─ Adiciona state recordType
-   └─ Adiciona seletor de Tabs no topo
-   └─ Renderização condicional do formulário
+4. Modifica AppLayout.tsx
+   └─ Adiciona "Execução RFC" na navegação (visível para Otimizzo/SuperAdmin)
 ```
 
 ---
 
 ## O que NÃO muda
 
-- Todo o formulário de Suporte existente (sem qualquer alteração)
-- Todas as queries, hooks, lógica de upload e estados do fluxo Suporte
-- A listagem de tickets, filtros e permissões existentes
-- Os campos obrigatórios atuais da tabela `tickets` continuam funcionando normalmente (a RFC preencherá valores padrão nesses campos quando necessário)
-
----
-
-## Campos Mínimos para RFC no INSERT
-
-Como a tabela `tickets` tem campos NOT NULL obrigatórios, a RFC os preencherá com:
-
-| Campo obrigatório | Valor na RFC |
-|---|---|
-| `title` | Título da RFC (campo no formulário) |
-| `contact_name` | `profile.full_name` |
-| `contact_email` | `user.email` |
-| `ticket_type` | `'service_request'` (default técnico) |
-| `priority` | `'P3'` (default) |
-| `category` | `'RFC'` (string literal) |
-| `opening_reason` | `'Criação de RFC'` (automático) |
-| `problem_faced` | Derivado da descrição |
-| `started_at` | `now()` |
-| `frequency` | `'pontual'` (default) |
-| `business_impact` | `'medio'` (default) |
-| `reproduction_steps` | Lista de passos como texto |
-| `record_type` | `'rfc'` |
+- Fluxo de criação de tickets (Suporte e RFC)
+- Tabela `rfc_steps` e suas políticas RLS
+- Todas as outras páginas e componentes existentes
+- Lógica de autenticação e permissões
