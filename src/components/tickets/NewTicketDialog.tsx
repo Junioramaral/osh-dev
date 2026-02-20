@@ -10,12 +10,14 @@ import { toast } from "@/hooks/use-toast";
 import { TicketCreatedDialog } from "./TicketCreatedDialog";
 import { FileUploadZone, FileWithPreview } from "./FileUploadZone";
 import FAQSelector from "./FAQSelector";
+import RFCFormSection from "./RFCFormSection";
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -86,6 +88,7 @@ interface NewTicketDialogProps {
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
   const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
   const queryClient = useQueryClient();
+  const [recordType, setRecordType] = useState<"suporte" | "rfc">("suporte");
   const [segment, setSegment] = useState<string | null>(null);
   const [showSuccessDialog, setShowSuccessDialog] = useState(false);
   const [createdTicket, setCreatedTicket] = useState<any>(null);
@@ -586,9 +589,32 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>Novo Ticket</DialogTitle>
+          <DialogTitle>Novo Registro</DialogTitle>
         </DialogHeader>
 
+        {/* Seletor de Tipo de Registro */}
+        <Tabs value={recordType} onValueChange={(v) => setRecordType(v as "suporte" | "rfc")}>
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="suporte">Suporte</TabsTrigger>
+            <TabsTrigger value="rfc">RFC (Interno)</TabsTrigger>
+          </TabsList>
+        </Tabs>
+
+        {/* Formulário RFC */}
+        {recordType === "rfc" && (
+          <RFCFormSection
+            onSuccess={(ticket) => {
+              setCreatedTicket(ticket);
+              setShowSuccessDialog(true);
+              queryClient.invalidateQueries({ queryKey: ["tickets"] });
+              onOpenChange(false);
+            }}
+            onCancel={() => onOpenChange(false)}
+          />
+        )}
+
+        {/* Formulário Suporte (fluxo existente) */}
+        {recordType === "suporte" && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
           {/* 1. Cliente (apenas para Otimizzo) */}
           {isOtimizzoTenant && (
@@ -1190,6 +1216,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             </Button>
           </div>
         </form>
+        )} {/* end recordType === "suporte" */}
       </DialogContent>
     </Dialog>
 
