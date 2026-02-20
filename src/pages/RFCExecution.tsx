@@ -3,13 +3,13 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import AppLayout from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Progress } from "@/components/ui/progress";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { ClipboardCheck, ArrowLeft, CheckCircle2, Loader2, Calendar, Building2, Tag } from "lucide-react";
+import { ClipboardCheck, ArrowLeft, CheckCircle2, Loader2, Calendar, Building2, Tag, ChevronDown, ChevronUp } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
@@ -27,6 +27,8 @@ type RFC = {
 type RFCStep = {
   id: string;
   descricao: string;
+  procedimento: string | null;
+  scripts: string | null;
   ordem: number;
   status_concluido: boolean;
   concluded_at: string | null;
@@ -36,6 +38,7 @@ type RFCStep = {
 const RFCExecution = () => {
   const [selectedRfcId, setSelectedRfcId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const queryClient = useQueryClient();
 
   const { data: rfcs = [], isLoading: rfcsLoading } = useQuery({
@@ -269,34 +272,68 @@ const RFCExecution = () => {
                   <p className="text-sm text-muted-foreground py-4 text-center">Nenhum passo cadastrado para esta RFC.</p>
                 ) : (
                   <div className="space-y-2">
-                    {steps.map((step) => (
-                      <label
-                        key={step.id}
-                        className={`flex items-start gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
-                          step.status_concluido
-                            ? "bg-muted/50 border-border"
-                            : "bg-card border-border hover:bg-accent/50"
-                        }`}
-                      >
-                        <Checkbox
-                          checked={step.status_concluido}
-                          onCheckedChange={() => toggleStep(step.id, step.status_concluido)}
-                          className="mt-0.5 shrink-0"
-                        />
-                        <div className="flex items-start gap-2 min-w-0">
-                          <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
-                            {String(step.ordem + 1).padStart(2, "0")}.
-                          </span>
-                          <span
-                            className={`text-sm leading-snug ${
-                              step.status_concluido ? "line-through text-muted-foreground" : "text-foreground"
-                            }`}
-                          >
-                            {step.descricao}
-                          </span>
+                    {steps.map((step) => {
+                      const isStepExpanded = expandedStepId === step.id;
+                      const hasDetails = !!(step.procedimento || step.scripts);
+                      return (
+                        <div
+                          key={step.id}
+                          className={`rounded-lg border transition-colors ${
+                            step.status_concluido ? "bg-muted/50 border-border" : "bg-card border-border"
+                          }`}
+                        >
+                          {/* Header row */}
+                          <div className="flex items-start gap-3 p-3">
+                            <Checkbox
+                              checked={step.status_concluido}
+                              onCheckedChange={() => toggleStep(step.id, step.status_concluido)}
+                              className="mt-0.5 shrink-0"
+                            />
+                            <div
+                              className="flex items-start gap-2 min-w-0 flex-1 cursor-pointer"
+                              onClick={() => hasDetails && setExpandedStepId(isStepExpanded ? null : step.id)}
+                            >
+                              <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
+                                {String(step.ordem + 1).padStart(2, "0")}.
+                              </span>
+                              <span
+                                className={`text-sm leading-snug flex-1 ${
+                                  step.status_concluido ? "line-through text-muted-foreground" : "text-foreground"
+                                }`}
+                              >
+                                {step.descricao}
+                              </span>
+                            </div>
+                            {hasDetails && (
+                              <button
+                                type="button"
+                                onClick={() => setExpandedStepId(isStepExpanded ? null : step.id)}
+                                className="shrink-0 text-muted-foreground hover:text-foreground transition-colors"
+                              >
+                                {isStepExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              </button>
+                            )}
+                          </div>
+                          {/* Expanded detail (read-only) */}
+                          {isStepExpanded && hasDetails && (
+                            <div className="border-t border-border px-3 pb-3 pt-3 space-y-3 bg-muted/20">
+                              {step.procedimento && (
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Procedimento Detalhado</p>
+                                  <p className="text-sm text-foreground whitespace-pre-wrap">{step.procedimento}</p>
+                                </div>
+                              )}
+                              {step.scripts && (
+                                <div className="space-y-1">
+                                  <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">Scripts / Comandos</p>
+                                  <pre className="text-sm font-mono p-3 rounded-md bg-zinc-900 text-green-400 overflow-x-auto whitespace-pre-wrap">{step.scripts}</pre>
+                                </div>
+                              )}
+                            </div>
+                          )}
                         </div>
-                      </label>
-                    ))}
+                      );
+                    })}
                   </div>
                 )}
               </div>

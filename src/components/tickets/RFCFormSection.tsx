@@ -110,6 +110,8 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
           ticket_id: ticket.id,
           descricao: s.descricao,
           ordem: s.ordem,
+          procedimento: s.procedimento || null,
+          scripts: s.scripts || null,
         }));
 
         const { error: stepsError } = await supabase

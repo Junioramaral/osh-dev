@@ -15,6 +15,8 @@ import {
   Clock,
   Loader2,
   Calendar,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -32,6 +34,8 @@ type RFC = {
 type RFCStep = {
   id: string;
   descricao: string;
+  procedimento: string | null;
+  scripts: string | null;
   ordem: number;
   status_concluido: boolean;
   concluded_at: string | null;
@@ -89,6 +93,7 @@ const getStatusConfig = (status: string): StatusConfig => {
 const ClientRFCPortal = () => {
   const [selectedRfcId, setSelectedRfcId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
 
   const { data: rfcs = [], isLoading: rfcsLoading } = useQuery({
     queryKey: ["client-rfc-list"],
@@ -269,6 +274,8 @@ const ClientRFCPortal = () => {
                     {steps.map((step, index) => {
                       const isLast = index === steps.length - 1;
                       const isDone = step.status_concluido;
+                      const isStepExpanded = expandedStepId === step.id;
+                      const hasProcedimento = !!step.procedimento;
 
                       return (
                         <div key={step.id} className="relative flex gap-4">
@@ -293,19 +300,30 @@ const ClientRFCPortal = () => {
                           </div>
 
                           {/* Content */}
-                          <div className={`flex-1 pb-6 ${isLast ? "pb-2" : ""}`}>
+                          <div className={`flex-1 ${isLast ? "pb-2" : "pb-6"}`}>
                             <div className="flex items-start gap-2">
                               <span className="text-xs font-mono text-muted-foreground shrink-0 mt-0.5">
                                 {String(step.ordem + 1).padStart(2, "0")}.
                               </span>
                               <div className="flex-1 min-w-0">
-                                <p
-                                  className={`text-sm font-medium leading-snug ${
-                                    isDone ? "text-muted-foreground line-through" : "text-foreground"
-                                  }`}
-                                >
-                                  {step.descricao}
-                                </p>
+                                <div className="flex items-start justify-between gap-2">
+                                  <p
+                                    className={`text-sm font-medium leading-snug ${
+                                      isDone ? "text-muted-foreground line-through" : "text-foreground"
+                                    }`}
+                                  >
+                                    {step.descricao}
+                                  </p>
+                                  {hasProcedimento && (
+                                    <button
+                                      type="button"
+                                      onClick={() => setExpandedStepId(isStepExpanded ? null : step.id)}
+                                      className="shrink-0 text-muted-foreground hover:text-foreground transition-colors mt-0.5"
+                                    >
+                                      {isStepExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                    </button>
+                                  )}
+                                </div>
                                 {isDone && step.concluded_at ? (
                                   <p className="text-xs text-green-600 mt-1 flex items-center gap-1">
                                     <CheckCircle2 className="w-3 h-3" />
@@ -318,6 +336,13 @@ const ClientRFCPortal = () => {
                                   <p className="text-xs text-green-600 mt-1">✓ Concluído</p>
                                 ) : (
                                   <p className="text-xs text-muted-foreground mt-1">Aguardando execução</p>
+                                )}
+                                {/* Expanded procedimento (read-only, no scripts for client) */}
+                                {isStepExpanded && hasProcedimento && (
+                                  <div className="mt-2 p-3 rounded-md bg-muted/60 border border-border">
+                                    <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide mb-1">Procedimento</p>
+                                    <p className="text-sm text-foreground whitespace-pre-wrap">{step.procedimento}</p>
+                                  </div>
                                 )}
                               </div>
                             </div>
