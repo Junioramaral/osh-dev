@@ -10,6 +10,22 @@ export const useRFCStepActions = (ticketId: string | null) => {
   const startStep = useCallback(async (stepId: string) => {
     if (!ticketId) return;
 
+    // Validate prerequisites
+    const { data: ticket } = await supabase
+      .from("tickets")
+      .select("analyst_id, team_id, status")
+      .eq("id", ticketId)
+      .single();
+
+    if (!ticket?.analyst_id || !ticket?.team_id) {
+      toast({ title: "Pré-requisitos não atendidos", description: "É necessário atribuir um analista e um time antes de iniciar a execução.", variant: "destructive" });
+      return;
+    }
+    if (ticket.status !== "aprovado") {
+      toast({ title: "Status inválido", description: "A RFC precisa estar com status 'Aprovado' para iniciar a execução.", variant: "destructive" });
+      return;
+    }
+
     const { data: { user } } = await supabase.auth.getUser();
 
     const { error } = await supabase
@@ -32,6 +48,22 @@ export const useRFCStepActions = (ticketId: string | null) => {
 
   const toggleStep = useCallback(async (stepId: string, currentValue: boolean) => {
     if (!ticketId) return;
+
+    // Validate prerequisites
+    const { data: ticket } = await supabase
+      .from("tickets")
+      .select("analyst_id, team_id, status")
+      .eq("id", ticketId)
+      .single();
+
+    if (!ticket?.analyst_id || !ticket?.team_id) {
+      toast({ title: "Pré-requisitos não atendidos", description: "É necessário atribuir um analista e um time antes de executar.", variant: "destructive" });
+      return;
+    }
+    if (ticket.status !== "aprovado") {
+      toast({ title: "Status inválido", description: "A RFC precisa estar com status 'Aprovado'.", variant: "destructive" });
+      return;
+    }
 
     const { data: { user } } = await supabase.auth.getUser();
 
