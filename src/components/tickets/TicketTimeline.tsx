@@ -2,7 +2,7 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity, Pencil, Trash2, AlertTriangle, Play, Timer } from "lucide-react";
+import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity, Pencil, Trash2, AlertTriangle, Play, Timer, ChevronDown, ChevronUp } from "lucide-react";
 import { useTicketHistory, useTicketComments, useTicketTimeLogs, useTicketRFCSteps } from "@/hooks/useTicketDetail";
 import { useMemo } from "react";
 import { formatSmartDate } from "@/lib/dateUtils";
@@ -20,6 +20,10 @@ interface TimelineItemProps {
 }
 
 function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: TimelineItemProps) {
+  const [expanded, setExpanded] = useState(false);
+  const isRFCEvent = event.type === 'rfc_step_started' || event.type === 'rfc_step_completed';
+  const hasObservacao = isRFCEvent && event.observacao;
+
   const getIcon = () => {
     switch (event.type) {
       case 'created': return <Plus className="h-4 w-4" />;
@@ -71,7 +75,19 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
       
       <div className="flex-1 pb-6">
         <div className="flex items-center justify-between">
-          <p className="font-medium text-sm">{getLabel()}</p>
+          <div className="flex items-center gap-1">
+            <p className="font-medium text-sm">{getLabel()}</p>
+            {hasObservacao && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                onClick={() => setExpanded(!expanded)}
+              >
+                {expanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+              </Button>
+            )}
+          </div>
           <span className="text-xs text-muted-foreground">
             {formatSmartDate(event.created_at || event.logged_at)}
           </span>
@@ -87,6 +103,12 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
         {event.description && (
           <Card className="mt-2 p-3 text-sm bg-muted/50">
             {event.description}
+          </Card>
+        )}
+        {hasObservacao && expanded && (
+          <Card className="mt-2 p-3 text-sm bg-muted/50">
+            <p className="text-xs font-medium text-muted-foreground mb-1">Observação:</p>
+            {event.observacao}
           </Card>
         )}
         
@@ -162,6 +184,7 @@ export default function TicketTimeline({ ticketId, clientId, recordType }: Ticke
             type: 'rfc_step_started',
             created_at: step.started_at,
             label: `Passo ${step.ordem + 1} iniciado: ${step.descricao}`,
+            observacao: step.observacao,
             profiles: step.started_by_name ? { full_name: step.started_by_name } : null,
           });
         }
@@ -181,6 +204,7 @@ export default function TicketTimeline({ ticketId, clientId, recordType }: Ticke
             type: 'rfc_step_completed',
             created_at: step.concluded_at,
             label: `Passo ${step.ordem + 1} concluído: ${step.descricao}${durationLabel}`,
+            observacao: step.observacao,
             profiles: step.concluded_by_name ? { full_name: step.concluded_by_name } : null,
           });
         }
