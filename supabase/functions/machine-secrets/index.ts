@@ -214,10 +214,18 @@ serve(async (req) => {
 
   } catch (error: any) {
     console.error('❌ Machine Secrets Error:', error.message);
+    const safeMessages: Record<string, string> = {
+      'Unauthorized': 'Unauthorized',
+      'Unauthorized - no role found': 'Unauthorized',
+      'Secret ID required': 'Secret ID required',
+      'Machine ID required for secret creation': 'Machine ID required',
+      'Invalid action': 'Invalid action',
+    };
+    const safeMsg = safeMessages[error.message] || 'An error occurred while processing your request';
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: safeMsg }),
       { 
-        status: 400,
+        status: error.message?.includes('Unauthorized') ? 401 : 400,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       }
     );

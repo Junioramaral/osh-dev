@@ -6,6 +6,20 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+async function timingSafeCompare(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const aHash = await crypto.subtle.digest("SHA-256", encoder.encode(a));
+  const bHash = await crypto.subtle.digest("SHA-256", encoder.encode(b));
+  const aArr = new Uint8Array(aHash);
+  const bArr = new Uint8Array(bHash);
+  if (aArr.length !== bArr.length) return false;
+  let result = 0;
+  for (let i = 0; i < aArr.length; i++) {
+    result |= aArr[i] ^ bArr[i];
+  }
+  return result === 0;
+}
+
 serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response(null, { headers: corsHeaders });
@@ -47,8 +61,9 @@ serve(async (req) => {
       );
     }
 
-    // Validate token
-    if (notification.acknowledgment_token !== token) {
+    // Validate token using timing-safe comparison
+    const tokenValid = await timingSafeCompare(notification.acknowledgment_token || "", token);
+    if (!tokenValid) {
       console.error("❌ Invalid token");
       return new Response(
         generateHtmlResponse(false, "Token inválido", appUrl),

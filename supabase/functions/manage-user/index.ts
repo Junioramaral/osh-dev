@@ -133,7 +133,7 @@ serve(async (req) => {
     if (result.error) {
       console.error(`[manage-user] Error in ${action}:`, result.error);
       return new Response(
-        JSON.stringify({ error: result.error.message }),
+        JSON.stringify({ error: `Failed to ${action.replace('_', ' ')}` }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -146,9 +146,8 @@ serve(async (req) => {
 
   } catch (error) {
     console.error("[manage-user] Unexpected error:", error);
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
     return new Response(
-      JSON.stringify({ error: errorMessage }),
+      JSON.stringify({ error: "An internal error occurred" }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
