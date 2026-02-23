@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useState, useCallback, useMemo } from "react";
 import { User, Session } from "@supabase/supabase-js";
 import { supabase } from "@/integrations/supabase/client";
 import { useNavigate } from "react-router-dom";
@@ -52,64 +52,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
   const [mustChangePassword, setMustChangePassword] = useState(false);
   const navigate = useNavigate();
 
-  useEffect(() => {
-    // Set up auth state listener
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        console.log('[AuthContext] Auth event:', event);
-        
-        // Tratar eventos de logout/expiração de sessão
-        if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
-          console.log('[AuthContext] Session ended, clearing state');
-          setUser(null);
-          setSession(null);
-          setProfile(null);
-          setRoles([]);
-          setMustChangePassword(false);
-          setLoading(false);
-          // Navegação será tratada pelo AppLayout
-          return;
-        }
-        
-        setSession(session);
-        setUser(session?.user ?? null);
-        
-        if (session?.user) {
-          // Check if user must change password
-          const mustChange = session.user.user_metadata?.must_change_password === true;
-          setMustChangePassword(mustChange);
-          
-          // Fetch profile and roles in a deferred manner
-          setTimeout(() => {
-            fetchProfile(session.user.id);
-            fetchRoles(session.user.id);
-          }, 0);
-        } else {
-          setProfile(null);
-          setRoles([]);
-          setMustChangePassword(false);
-        }
-        
-        setLoading(false);
-      }
-    );
-
-    // Check for existing session
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-      setUser(session?.user ?? null);
-      
-      if (session?.user) {
-        fetchProfile(session.user.id);
-        fetchRoles(session.user.id);
-      }
-      setLoading(false);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const fetchProfile = async (userId: string) => {
+  const fetchProfile = useCallback(async (userId: string) => {
     try {
       console.log('[AuthContext] Fetching profile for user:', userId);
       
@@ -129,9 +72,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (err) {
       console.error('[AuthContext] Exception fetching profile:', err);
     }
-  };
+  }, []);
 
-  const fetchRoles = async (userId: string) => {
+  const fetchRoles = useCallback(async (userId: string) => {
     try {
       console.log('[AuthContext] Fetching roles for user:', userId);
       
@@ -150,39 +93,88 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (err) {
       console.error('[AuthContext] Exception fetching roles:', err);
     }
-  };
+  }, []);
 
-  const hasRole = (role: string) => roles.some(r => r.role === role);
-  const isSuperAdmin = hasRole('super_admin');
-  const isTenantAdmin = hasRole('tenant_admin');
-  const isViewer = hasRole('viewer');
-  const isAnalyst = hasRole('analyst_db') || hasRole('analyst_app');
-  const isOtimizzoUser = roles.some(r => r.tenant_id === '00000000-0000-0000-0000-000000000001');
-  const tenantId = roles.find(r => r.tenant_id)?.tenant_id || null;
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        console.log('[AuthContext] Auth event:', event);
+        
+        if (event === 'SIGNED_OUT' || (event === 'TOKEN_REFRESHED' && !session)) {
+          console.log('[AuthContext] Session ended, clearing state');
+          setUser(null);
+          setSession(null);
+          setProfile(null);
+          setRoles([]);
+          setMustChangePassword(false);
+          setLoading(false);
+          return;
+        }
+        
+        setSession(session);
+        setUser(session?.user ?? null);
+        
+        if (session?.user) {
+          const mustChange = session.user.user_metadata?.must_change_password === true;
+          setMustChangePassword(mustChange);
+          
+          setTimeout(() => {
+            fetchProfile(session.user.id);
+            fetchRoles(session.user.id);
+          }, 0);
+        } else {
+          setProfile(null);
+          setRoles([]);
+          setMustChangePassword(false);
+        }
+        
+        setLoading(false);
+      }
+    );
 
-  const signIn = async (email: string, password: string) => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      setUser(session?.user ?? null);
+      
+      if (session?.user) {
+        fetchProfile(session.user.id);
+        fetchRoles(session.user.id);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchProfile, fetchRoles]);
+
+  const hasRole = useCallback((role: string) => roles.some(r => r.role === role), [roles]);
+  
+  const isSuperAdmin = useMemo(() => roles.some(r => r.role === 'super_admin'), [roles]);
+  const isTenantAdmin = useMemo(() => roles.some(r => r.role === 'tenant_admin'), [roles]);
+  const isViewer = useMemo(() => roles.some(r => (r.role as string) === 'viewer'), [roles]);
+  const isAnalyst = useMemo(() => roles.some(r => r.role === 'analyst_db' || r.role === 'analyst_app'), [roles]);
+  const isOtimizzoUser = useMemo(() => roles.some(r => r.tenant_id === '00000000-0000-0000-0000-000000000001'), [roles]);
+  const tenantId = useMemo(() => roles.find(r => r.tenant_id)?.tenant_id || null, [roles]);
+
+  const signIn = useCallback(async (email: string, password: string) => {
     const { data, error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
     
     if (!error && data?.user) {
-      // Verificar ANTES de navegar se precisa trocar senha
       const mustChange = data.user.user_metadata?.must_change_password === true;
       console.log('[AuthContext] Login successful, must_change_password:', mustChange);
       setMustChangePassword(mustChange);
       
-      // Só navega se NÃO precisar trocar senha
       if (!mustChange) {
         navigate('/dashboard');
       }
-      // Se mustChange = true, permanece em /auth e ForcePasswordChange será exibido
     }
     
     return { error };
-  };
+  }, [navigate]);
 
-  const signUp = async (email: string, password: string, full_name: string, tenant_id: string) => {
+  const signUp = useCallback(async (email: string, password: string, full_name: string, tenant_id: string) => {
     const redirectUrl = `${window.location.origin}/dashboard`;
     
     const { error } = await supabase.auth.signUp({
@@ -198,9 +190,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     });
     
     return { error };
-  };
+  }, []);
 
-  const signOut = async () => {
+  const signOut = useCallback(async () => {
     await supabase.auth.signOut();
     setUser(null);
     setSession(null);
@@ -208,13 +200,13 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     setRoles([]);
     setMustChangePassword(false);
     navigate('/auth');
-  };
+  }, [navigate]);
 
-  const clearMustChangePassword = () => {
+  const clearMustChangePassword = useCallback(() => {
     setMustChangePassword(false);
-  };
+  }, []);
 
-  const resetPassword = async (email: string) => {
+  const resetPassword = useCallback(async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/auth/reset-password`,
@@ -223,9 +215,9 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       return { error };
     }
-  };
+  }, []);
 
-  const updatePassword = async (newPassword: string) => {
+  const updatePassword = useCallback(async (newPassword: string) => {
     try {
       const { error } = await supabase.auth.updateUser({
         password: newPassword,
@@ -234,30 +226,36 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
     } catch (error) {
       return { error };
     }
-  };
+  }, []);
+
+  const value = useMemo(() => ({
+    user,
+    session,
+    profile,
+    roles,
+    loading,
+    mustChangePassword,
+    hasRole,
+    isSuperAdmin,
+    isTenantAdmin,
+    isViewer,
+    isAnalyst,
+    isOtimizzoUser,
+    tenantId,
+    signIn,
+    signUp,
+    signOut,
+    clearMustChangePassword,
+    resetPassword,
+    updatePassword,
+  }), [
+    user, session, profile, roles, loading, mustChangePassword,
+    hasRole, isSuperAdmin, isTenantAdmin, isViewer, isAnalyst, isOtimizzoUser, tenantId,
+    signIn, signUp, signOut, clearMustChangePassword, resetPassword, updatePassword,
+  ]);
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      session, 
-      profile, 
-      roles,
-      loading,
-      mustChangePassword,
-      hasRole,
-      isSuperAdmin,
-      isTenantAdmin,
-      isViewer,
-      isAnalyst,
-      isOtimizzoUser,
-      tenantId,
-      signIn, 
-      signUp, 
-      signOut,
-      clearMustChangePassword,
-      resetPassword,
-      updatePassword
-    }}>
+    <AuthContext.Provider value={value}>
       {children}
     </AuthContext.Provider>
   );
@@ -266,9 +264,6 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 export const useAuth = () => {
   const context = useContext(AuthContext);
   if (context === undefined) {
-    // Retornar um objeto de contexto "vazio" para evitar erro durante transições de navegação
-    // Isso permite que componentes sejam renderizados brevemente sem provider
-    // enquanto a navegação para /auth acontece
     return {
       user: null,
       session: null,
