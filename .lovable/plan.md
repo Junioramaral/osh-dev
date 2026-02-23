@@ -1,64 +1,69 @@
 
 
-# Workflow de Execucao de RFC — Plano de Implementacao
+# Cronometragem de Atividades RFC e Relatorio de Tempo
 
-## Resumo
+## Objetivo
 
-Refatorar completamente as telas de Execucao RFC (analista) e Minhas RFCs (cliente) para criar um workflow interativo com persistencia de dados, observacoes com auto-save, botoes de copiar, badges coloridos, progresso salvo no banco e animacao de conclusao.
+Adicionar um sistema de cronometragem por passo na execucao de RFCs: o analista clica "Iniciar Atividade" para registrar o inicio, e ao marcar como concluido o sistema calcula automaticamente a duracao. Na tela do ticket (TicketDetail), adicionar uma aba "RFC" ao lado de "Timeline" com um relatorio de tempo por atividade e total. Tambem incluir eventos de RFC (inicio/conclusao de passos) na Timeline do ticket.
 
 ---
 
 ## 1. Migracao de Banco de Dados
 
-Adicionar 3 colunas novas:
+Adicionar coluna na tabela `rfc_steps`:
 
-- **`rfc_steps.observacao`** (`text`, nullable) — campo de observacao do analista por passo
-- **`rfc_steps.concluded_by`** (`uuid`, nullable) — quem concluiu o passo
-- **`tickets.rfc_progress`** (`integer`, default 0) — percentual de progresso calculado e persistido
+- **`started_at`** (`timestamptz`, nullable) — timestamp de quando o analista clicou "Iniciar Atividade"
+- **`started_by`** (`uuid`, nullable) — quem iniciou a atividade
 
-Criar um **trigger** na tabela `rfc_steps` que recalcula automaticamente `tickets.rfc_progress` sempre que um passo for atualizado (INSERT/UPDATE/DELETE). Formula: `ROUND(count_concluidos / count_total * 100)`.
-
----
-
-## 2. Refatorar `src/pages/RFCExecution.tsx` (Tela do Analista)
-
-**Corrigir anti-pattern**: Remover `ListPanel` e `DetailPanel` como funcoes internas (mesmo problema de re-render que causava perda de foco).
-
-**Novos recursos por passo:**
-
-- **Badge de status**: Verde "Concluido" ou Azul "Pendente" ao lado de cada passo
-- **Bloco de codigo** (`<pre>` com fundo escuro) para scripts/comandos com **botao "Copiar"** que usa `navigator.clipboard.writeText()`
-- **Botao "Copiar"** tambem no campo de procedimento
-- **Campo de observacao** (`Textarea`) com **debounce de 1.5s** para auto-save — salva automaticamente no `rfc_steps.observacao`
-- **Timestamp e autor**: Ao marcar como concluido, salvar `concluded_at`, `concluded_by` (auth.uid) e exibir "Concluido por [nome] em [data/hora]"
-- **Barra de progresso** com percentual atualizado em tempo real
-- **Animacao de 100%**: Quando todos os passos forem concluidos, exibir um banner animado com brilho verde pulsante e icone de celebracao
+Isso permite calcular a duracao: `concluded_at - started_at`.
 
 ---
 
-## 3. Refatorar `src/pages/ClientRFCPortal.tsx` (Tela do Cliente)
+## 2. Modificar `src/hooks/useRFCStepActions.ts`
 
-**Corrigir anti-pattern**: Remover `ListPanel` e `DetailPanel` como funcoes internas.
-
-**Ajustes:**
-
-- **Barra de progresso**: Ler `tickets.rfc_progress` do banco (valor persistido) em vez de calcular localmente
-- **Timeline vertical**: Manter layout atual, mas adicionar:
-  - Badge "Concluido" (verde) ou "Pendente" (azul) por passo
-  - Timestamp de conclusao quando disponivel
-  - Observacao publica do analista (campo `observacao`) — exibida como texto somente leitura
-  - **Ocultar scripts/comandos** (ja esta assim, manter)
-- **Animacao de 100%**: Banner de "Manutencao concluida" com animacao de brilho verde
+Adicionar nova acao `startStep(stepId)` que salva `started_at = now()` e `started_by = auth.uid()`. Atualizar `toggleStep` para, ao marcar como concluido, manter o `started_at` existente (nao sobrescrever).
 
 ---
 
-## 4. Novo hook `useRFCStepActions.ts`
+## 3. Modificar `src/pages/RFCExecution.tsx`
 
-Hook centralizado para logica de execucao de passos:
+Para cada passo, adicionar um botao **"Iniciar Atividade"** (com icone de play/relogio) que aparece quando:
+- O passo NAO esta concluido
+- O passo NAO tem `started_at` preenchido
 
-- `toggleStep(stepId, currentValue)` — marca/desmarca passo, salva `concluded_at`, `concluded_by`
-- `updateObservacao(stepId, text)` — atualiza observacao com debounce
-- Invalida queries apos cada operacao
+Quando o passo ja foi iniciado mas nao concluido, mostrar um badge "Em andamento" (amarelo/laranja) com o horario de inicio, substituindo o badge "Pendente" atual.
+
+Ao marcar como concluido (checkbox), exibir a duracao calculada (`concluded_at - started_at`) no info de conclusao.
+
+---
+
+## 4. Nova aba "RFC" no `src/pages/TicketDetail.tsx`
+
+Adicionar uma aba condicional (apenas quando `record_type === 'rfc'`) chamada **"RFC"** com um componente novo `TicketRFCReport`.
+
+---
+
+## 5. Novo componente `src/components/tickets/TicketRFCReport.tsx`
+
+Relatorio de tempo da RFC contendo:
+- Tabela com colunas: Passo, Descricao, Inicio, Fim, Duracao, Responsavel
+- Cada linha mostra o tempo de cada atividade (diferenca entre `started_at` e `concluded_at`)
+- Linha final com o **tempo total** somado de todas as atividades
+- Passos sem inicio/fim mostram "—"
+- Badge de status por passo (Pendente / Em andamento / Concluido)
+- Barra de progresso geral no topo
+
+Este componente busca dados de `rfc_steps` (com join em `profiles` para nome do responsavel).
+
+---
+
+## 6. Modificar `src/components/tickets/TicketTimeline.tsx`
+
+Adicionar os eventos de RFC steps na timeline. Buscar `rfc_steps` do ticket e gerar eventos:
+- **`rfc_step_started`**: "Passo X iniciado" — quando `started_at` nao e null
+- **`rfc_step_completed`**: "Passo X concluido (duracao: Xh Xmin)" — quando `concluded_at` nao e null
+
+Esses eventos aparecem na timeline junto com os demais (status changes, comments, time logs), ordenados cronologicamente.
 
 ---
 
@@ -67,36 +72,45 @@ Hook centralizado para logica de execucao de passos:
 ### Migracao SQL
 
 ```text
-1. ALTER TABLE rfc_steps ADD COLUMN observacao text;
-2. ALTER TABLE rfc_steps ADD COLUMN concluded_by uuid;
-3. ALTER TABLE tickets ADD COLUMN rfc_progress integer DEFAULT 0;
-4. CREATE FUNCTION recalculate_rfc_progress() — trigger function
-5. CREATE TRIGGER on rfc_steps AFTER INSERT/UPDATE/DELETE
+ALTER TABLE public.rfc_steps ADD COLUMN started_at timestamptz;
+ALTER TABLE public.rfc_steps ADD COLUMN started_by uuid;
 ```
 
 ### Arquivos a criar
 
-- `src/hooks/useRFCStepActions.ts` — hook com toggleStep + updateObservacao (debounce)
+- `src/components/tickets/TicketRFCReport.tsx` — relatorio de tempo por atividade
 
 ### Arquivos a modificar
 
-- `src/pages/RFCExecution.tsx` — refatoracao completa (inline JSX, observacoes, code blocks, copiar, badges, animacao)
-- `src/pages/ClientRFCPortal.tsx` — refatoracao (inline JSX, progresso do banco, observacoes publicas, badges, animacao)
-- `src/integrations/supabase/types.ts` — atualizado automaticamente apos migracao
+- `src/hooks/useRFCStepActions.ts` — adicionar `startStep`
+- `src/pages/RFCExecution.tsx` — botao "Iniciar Atividade", badge "Em andamento", exibir duracao
+- `src/pages/TicketDetail.tsx` — nova aba "RFC" condicional
+- `src/components/tickets/TicketTimeline.tsx` — incluir eventos de rfc_steps na timeline
+- `src/hooks/useTicketDetail.ts` — novo hook `useTicketRFCSteps` para buscar passos com perfis
 
 ### Sequencia
 
 ```text
-1. Migracao SQL (colunas + trigger)
-2. useRFCStepActions.ts (criar hook)
-3. RFCExecution.tsx (refatorar)
-4. ClientRFCPortal.tsx (refatorar)
+1. Migracao SQL (started_at, started_by)
+2. useRFCStepActions.ts (startStep)
+3. useTicketDetail.ts (useTicketRFCSteps)
+4. RFCExecution.tsx (botao iniciar, badge em andamento, duracao)
+5. TicketRFCReport.tsx (criar relatorio)
+6. TicketDetail.tsx (aba RFC)
+7. TicketTimeline.tsx (eventos de RFC na timeline)
 ```
+
+### Calculo de duracao
+
+A duracao e calculada como `concluded_at - started_at` em minutos/horas. Formato de exibicao:
+- Menos de 60min: "Xmin"
+- 60min ou mais: "Xh Xmin"
 
 ### O que NAO muda
 
 - RFCStepBuilder, RFCFormSection (criacao de RFC)
 - RFCApproval (aprovacao)
+- ClientRFCPortal (portal do cliente — nao ve cronometragem interna)
 - Edge functions existentes
-- RLS policies (rfc_steps ja tem policies corretas)
-- Outras paginas do sistema
+- RLS policies (rfc_steps ja tem policies corretas para leitura)
+
