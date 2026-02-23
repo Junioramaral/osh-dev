@@ -184,7 +184,6 @@ export default function TicketTimeline({ ticketId, clientId, recordType }: Ticke
             type: 'rfc_step_started',
             created_at: step.started_at,
             label: `Passo ${step.ordem + 1} iniciado: ${step.descricao}`,
-            observacao: step.observacao,
             profiles: step.started_by_name ? { full_name: step.started_by_name } : null,
           });
         }
