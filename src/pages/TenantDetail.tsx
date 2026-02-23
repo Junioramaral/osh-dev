@@ -140,15 +140,14 @@ const TenantDetail = () => {
 
       // Fetch email for each admin specifically in parallel (optimized)
       const adminPromises = profiles.map(async (profile) => {
-        const {
-          data: { user },
-          error,
-        } = await supabase.auth.admin.getUserById(profile.id);
+        const { data, error } = await supabase.functions.invoke("manage-user", {
+          body: { action: "get_user", userId: profile.id }
+        });
 
         return {
           id: profile.id,
           full_name: profile.full_name,
-          email: user?.email || "",
+          email: data?.data?.user?.email || "",
         };
       });
 
@@ -210,13 +209,13 @@ const TenantDetail = () => {
           if (profileError) throw profileError;
         }
 
-        // Update email in auth.users
+        // Update email via edge function (server-side authorization)
         if (updates.admin_email) {
-          const { error: emailError } = await supabase.auth.admin.updateUserById(updates.admin_user_id, {
-            email: updates.admin_email,
+          const { data: emailResult, error: emailError } = await supabase.functions.invoke("manage-user", {
+            body: { action: "update_email", userId: updates.admin_user_id, data: { email: updates.admin_email } }
           });
 
-          if (emailError) throw emailError;
+          if (emailError || emailResult?.error) throw new Error(emailError?.message || emailResult?.error || "Erro ao atualizar email");
         }
       }
 
