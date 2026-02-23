@@ -1,6 +1,8 @@
 import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useAnalystQueues } from "@/hooks/useAnalystQueues";
 import AppLayout from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
@@ -13,11 +15,13 @@ import { Textarea } from "@/components/ui/textarea";
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Loader2, Calendar,
   Building2, Tag, ChevronDown, ChevronUp, Copy, PartyPopper, Clock, Play, Timer,
+  AlertTriangle, ExternalLink,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
 import { useRFCStepActions } from "@/hooks/useRFCStepActions";
+import { Link } from "react-router-dom";
 
 type RFC = {
   id: string;
@@ -27,6 +31,9 @@ type RFC = {
   status: string;
   created_at: string;
   clients: { name: string } | null;
+  analyst_id: string | null;
+  team_id: string | null;
+  queue_id: string | null;
 };
 
 type RFCStep = {
@@ -55,20 +62,36 @@ const RFCExecution = () => {
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [localObservacoes, setLocalObservacoes] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
+  const { user, isSuperAdmin, isOtimizzoUser } = useAuth();
+  const { queueIds, shouldRestrictView } = useAnalystQueues();
   const { startStep, toggleStep, updateObservacao } = useRFCStepActions(selectedRfcId);
 
+  const isAdmin = isSuperAdmin || isOtimizzoUser;
+
   const { data: rfcs = [], isLoading: rfcsLoading } = useQuery({
-    queryKey: ["rfc-approved-list"],
+    queryKey: ["rfc-approved-list", user?.id, isAdmin, queueIds],
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tickets")
-        .select("id, ticket_number, title, segment, status, created_at, clients(name)")
+        .select("id, ticket_number, title, segment, status, created_at, clients(name), analyst_id, team_id, queue_id")
         .eq("record_type", "rfc")
         .eq("status", "aprovado")
         .order("created_at", { ascending: false });
+
       if (error) throw error;
-      return (data ?? []) as RFC[];
+      let results = (data ?? []) as RFC[];
+
+      // Filter for non-admin analysts: only show RFCs assigned to them or their queues
+      if (shouldRestrictView && user?.id) {
+        results = results.filter(rfc =>
+          rfc.analyst_id === user.id ||
+          (rfc.queue_id && queueIds.includes(rfc.queue_id))
+        );
+      }
+
+      return results;
     },
+    enabled: !!user,
   });
 
   const { data: steps = [], isLoading: stepsLoading } = useQuery({
@@ -109,6 +132,7 @@ const RFCExecution = () => {
   }, [steps]);
 
   const selectedRfc = rfcs.find((r) => r.id === selectedRfcId) ?? null;
+  const canExecute = !!(selectedRfc?.analyst_id && selectedRfc?.team_id);
   const completedCount = steps.filter((s) => s.status_concluido).length;
   const totalCount = steps.length;
   const progressPercent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
@@ -262,8 +286,36 @@ const RFCExecution = () => {
                       <Progress value={progressPercent} className="h-2.5" />
                     </div>
 
+                    {/* Prerequisites Alert */}
+                    {!canExecute && (
+                      <div className="rounded-lg border border-amber-300 dark:border-amber-700 bg-amber-50 dark:bg-amber-950/30 p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertTriangle className="w-5 h-5 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                          <div className="flex-1 space-y-1">
+                            <p className="text-sm font-semibold text-amber-800 dark:text-amber-200">
+                              Pré-requisitos não atendidos
+                            </p>
+                            <p className="text-sm text-amber-700 dark:text-amber-300">
+                              Para iniciar a execução desta RFC, é necessário atribuir:
+                            </p>
+                            <ul className="text-sm text-amber-700 dark:text-amber-300 list-disc list-inside space-y-0.5">
+                              {!selectedRfc?.analyst_id && <li>Analista responsável</li>}
+                              {!selectedRfc?.team_id && <li>Time responsável</li>}
+                            </ul>
+                            <Link
+                              to={`/tickets/${selectedRfc?.id}`}
+                              className="inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline mt-2"
+                            >
+                              <ExternalLink className="w-3.5 h-3.5" />
+                              Abrir ticket para atribuir
+                            </Link>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     {/* 100% Celebration Banner */}
-                    {allDone && (
+                    {allDone && canExecute && (
                       <div className="relative overflow-hidden rounded-xl border-2 border-green-400 bg-green-50 dark:bg-green-950/30 p-4">
                         <div className="absolute inset-0 bg-gradient-to-r from-green-400/10 via-green-400/20 to-green-400/10 animate-pulse" />
                         <div className="relative flex items-center gap-3">
@@ -333,6 +385,7 @@ const RFCExecution = () => {
                                     checked={isDone}
                                     onCheckedChange={() => toggleStep(step.id, isDone)}
                                     className="mt-0.5 shrink-0"
+                                    disabled={!canExecute}
                                   />
                                   <div
                                     className="flex items-start gap-2 min-w-0 flex-1 cursor-pointer"
@@ -386,6 +439,7 @@ const RFCExecution = () => {
                                       size="sm"
                                       className="shrink-0 h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
                                       onClick={(e) => { e.stopPropagation(); startStep(step.id); }}
+                                      disabled={!canExecute}
                                     >
                                       <Play className="w-3 h-3" />
                                       Iniciar Atividade
