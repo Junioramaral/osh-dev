@@ -1489,6 +1489,15 @@ export type Database = {
       }
       decrypt_machine_secret: { Args: { secret_id: string }; Returns: string }
       extract_domain_from_email: { Args: { _email: string }; Returns: string }
+      get_analyst_public_info: {
+        Args: { _analyst_id: string }
+        Returns: {
+          avatar_url: string
+          full_name: string
+          id: string
+          team_id: string
+        }[]
+      }
       get_analyst_queue_ids: { Args: { _user_id: string }; Returns: string[] }
       get_tenant_by_domain: { Args: { _email: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
