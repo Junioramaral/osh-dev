@@ -719,6 +719,8 @@ export type Database = {
           ordem: number
           procedimento: string | null
           scripts: string | null
+          started_at: string | null
+          started_by: string | null
           status_concluido: boolean
           ticket_id: string
           updated_at: string | null
@@ -733,6 +735,8 @@ export type Database = {
           ordem?: number
           procedimento?: string | null
           scripts?: string | null
+          started_at?: string | null
+          started_by?: string | null
           status_concluido?: boolean
           ticket_id: string
           updated_at?: string | null
@@ -747,6 +751,8 @@ export type Database = {
           ordem?: number
           procedimento?: string | null
           scripts?: string | null
+          started_at?: string | null
+          started_by?: string | null
           status_concluido?: boolean
           ticket_id?: string
           updated_at?: string | null

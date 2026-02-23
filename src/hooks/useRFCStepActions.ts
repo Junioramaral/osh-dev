@@ -7,6 +7,29 @@ export const useRFCStepActions = (ticketId: string | null) => {
   const queryClient = useQueryClient();
   const debounceTimers = useRef<Record<string, ReturnType<typeof setTimeout>>>({});
 
+  const startStep = useCallback(async (stepId: string) => {
+    if (!ticketId) return;
+
+    const { data: { user } } = await supabase.auth.getUser();
+
+    const { error } = await supabase
+      .from("rfc_steps")
+      .update({
+        started_at: new Date().toISOString(),
+        started_by: user?.id ?? null,
+        updated_at: new Date().toISOString(),
+      } as any)
+      .eq("id", stepId);
+
+    if (error) {
+      toast({ title: "Erro ao iniciar atividade", description: error.message, variant: "destructive" });
+    }
+
+    queryClient.invalidateQueries({ queryKey: ["rfc-steps", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["client-rfc-steps", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["ticket-rfc-steps", ticketId] });
+  }, [ticketId, queryClient]);
+
   const toggleStep = useCallback(async (stepId: string, currentValue: boolean) => {
     if (!ticketId) return;
 
@@ -28,6 +51,7 @@ export const useRFCStepActions = (ticketId: string | null) => {
 
     queryClient.invalidateQueries({ queryKey: ["rfc-steps", ticketId] });
     queryClient.invalidateQueries({ queryKey: ["client-rfc-steps", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["ticket-rfc-steps", ticketId] });
   }, [ticketId, queryClient]);
 
   const updateObservacao = useCallback((stepId: string, text: string) => {
@@ -47,5 +71,5 @@ export const useRFCStepActions = (ticketId: string | null) => {
     }, 1500);
   }, []);
 
-  return { toggleStep, updateObservacao };
+  return { startStep, toggleStep, updateObservacao };
 };
