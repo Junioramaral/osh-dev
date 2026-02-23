@@ -124,6 +124,28 @@ const RFCApproval = () => {
       is_internal: true,
     });
 
+    // Fire-and-forget: send email notification
+    const { data: ticketData } = await supabase
+      .from("tickets")
+      .select("contact_email, contact_name, ticket_number, title")
+      .eq("id", selectedRfcId)
+      .single();
+
+    if (ticketData?.contact_email) {
+      supabase.functions.invoke("send-rfc-decision-notification", {
+        body: {
+          ticketId: selectedRfcId,
+          ticketNumber: ticketData.ticket_number,
+          ticketTitle: ticketData.title,
+          contactEmail: ticketData.contact_email,
+          contactName: ticketData.contact_name,
+          decision: "aprovada",
+          comentario: comentario.trim(),
+          gestorName: profile?.full_name ?? "Gestor",
+        },
+      }).catch((err) => console.error("Erro ao enviar notificação RFC:", err));
+    }
+
     toast({ title: "RFC Aprovada!", description: "A RFC foi aprovada e agora aparece na fila de execução." });
     queryClient.invalidateQueries({ queryKey: ["rfc-pending-approval-list"] });
     setSelectedRfcId(null);
@@ -153,6 +175,28 @@ const RFCApproval = () => {
       content: `❌ RFC REJEITADA por ${profile?.full_name ?? "Gestor"}.\n\nMotivo: ${comentario.trim()}`,
       is_internal: true,
     });
+
+    // Fire-and-forget: send email notification
+    const { data: ticketDataReject } = await supabase
+      .from("tickets")
+      .select("contact_email, contact_name, ticket_number, title")
+      .eq("id", selectedRfcId)
+      .single();
+
+    if (ticketDataReject?.contact_email) {
+      supabase.functions.invoke("send-rfc-decision-notification", {
+        body: {
+          ticketId: selectedRfcId,
+          ticketNumber: ticketDataReject.ticket_number,
+          ticketTitle: ticketDataReject.title,
+          contactEmail: ticketDataReject.contact_email,
+          contactName: ticketDataReject.contact_name,
+          decision: "rejeitada",
+          comentario: comentario.trim(),
+          gestorName: profile?.full_name ?? "Gestor",
+        },
+      }).catch((err) => console.error("Erro ao enviar notificação RFC:", err));
+    }
 
     toast({ title: "RFC Rejeitada", description: "A RFC foi rejeitada e retornou para rascunho.", variant: "destructive" });
     queryClient.invalidateQueries({ queryKey: ["rfc-pending-approval-list"] });

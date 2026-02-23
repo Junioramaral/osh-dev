@@ -35,3 +35,6 @@ verify_jwt = false
 
 [functions.unlock-inactive-tickets]
 verify_jwt = false
+
+[functions.send-rfc-decision-notification]
+verify_jwt = false
