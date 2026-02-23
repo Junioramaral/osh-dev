@@ -1,4 +1,4 @@
-import { useRef, useCallback } from "react";
+import { useRef, useCallback, useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -69,6 +69,12 @@ export const useRFCStepActions = (ticketId: string | null) => {
         toast({ title: "Erro ao salvar observação", description: error.message, variant: "destructive" });
       }
     }, 1500);
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      Object.values(debounceTimers.current).forEach(clearTimeout);
+    };
   }, []);
 
   return { startStep, toggleStep, updateObservacao };
