@@ -22,6 +22,7 @@ import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
 import { useRFCStepActions } from "@/hooks/useRFCStepActions";
 import { Link } from "react-router-dom";
+import { RFCCompleteDialog } from "@/components/tickets/RFCCompleteDialog";
 
 type RFC = {
   id: string;
@@ -59,6 +60,8 @@ const copyToClipboard = (text: string) => {
 const RFCExecution = () => {
   const [selectedRfcId, setSelectedRfcId] = useState<string | null>(null);
   const [showDetails, setShowDetails] = useState(false);
+  const [showCompleteDialog, setShowCompleteDialog] = useState(false);
+  const [isCompleting, setIsCompleting] = useState(false);
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [localObservacoes, setLocalObservacoes] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
@@ -144,20 +147,68 @@ const RFCExecution = () => {
     setExpandedStepId(null);
   };
 
-  const handleMarkConcluida = async () => {
-    if (!selectedRfcId) return;
-    const { error } = await supabase
-      .from("tickets")
-      .update({ status: "resolvido", resolved_at: new Date().toISOString() })
-      .eq("id", selectedRfcId);
-    if (error) {
+  const handleMarkConcluida = async (message: string) => {
+    if (!selectedRfcId || !user) return;
+    setIsCompleting(true);
+    try {
+      // 1. Fetch ticket data for email
+      const { data: ticketData, error: ticketError } = await supabase
+        .from("tickets")
+        .select("contact_email, contact_name, created_at, ticket_number, title")
+        .eq("id", selectedRfcId)
+        .single();
+      if (ticketError || !ticketData) throw new Error("Erro ao buscar dados do ticket");
+
+      // 2. Fetch analyst profile
+      const { data: profile } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", user.id)
+        .single();
+      const analystName = profile?.full_name || "Analista";
+
+      // 3. Update ticket status
+      const resolvedAt = new Date().toISOString();
+      const { error: updateError } = await supabase
+        .from("tickets")
+        .update({ status: "resolvido", resolved_at: resolvedAt, resolved_by: analystName })
+        .eq("id", selectedRfcId);
+      if (updateError) throw updateError;
+
+      // 4. Insert comment for history
+      await supabase.from("ticket_comments").insert({
+        ticket_id: selectedRfcId,
+        author_id: user.id,
+        content: `**RFC Concluída**\n\n${message}`,
+        is_internal: false,
+      });
+
+      // 5. Send resolution email
+      const { data: session } = await supabase.auth.getSession();
+      await supabase.functions.invoke("send-resolution-notification", {
+        body: {
+          ticketId: selectedRfcId,
+          ticketNumber: ticketData.ticket_number,
+          ticketTitle: ticketData.title,
+          contactEmail: ticketData.contact_email,
+          contactName: ticketData.contact_name,
+          resolutionReason: message,
+          analystName,
+          createdAt: ticketData.created_at,
+          resolvedAt,
+        },
+      });
+
+      toast({ title: "RFC concluída com sucesso!", description: "Email enviado ao cliente e registrado no histórico." });
+      queryClient.invalidateQueries({ queryKey: ["rfc-approved-list"] });
+      setSelectedRfcId(null);
+      setShowDetails(false);
+      setShowCompleteDialog(false);
+    } catch (error: any) {
       toast({ title: "Erro ao concluir RFC", description: error.message, variant: "destructive" });
-      return;
+    } finally {
+      setIsCompleting(false);
     }
-    toast({ title: "RFC marcada como concluída!", description: "O status foi atualizado para Resolvido." });
-    queryClient.invalidateQueries({ queryKey: ["rfc-approved-list"] });
-    setSelectedRfcId(null);
-    setShowDetails(false);
   };
 
   const handleObservacaoChange = (stepId: string, text: string) => {
@@ -328,7 +379,7 @@ const RFCExecution = () => {
                               A execução foi finalizada com sucesso. Marque a RFC como concluída.
                             </p>
                           </div>
-                          <Button size="sm" onClick={handleMarkConcluida} className="shrink-0 bg-green-600 hover:bg-green-700 text-white">
+                          <Button size="sm" onClick={() => setShowCompleteDialog(true)} className="shrink-0 bg-green-600 hover:bg-green-700 text-white">
                             Concluir RFC
                           </Button>
                         </div>
@@ -521,6 +572,21 @@ const RFCExecution = () => {
           </div>
         </div>
       </Card>
+
+      {selectedRfc && (
+        <RFCCompleteDialog
+          open={showCompleteDialog}
+          onOpenChange={setShowCompleteDialog}
+          ticket={{
+            id: selectedRfc.id,
+            ticket_number: selectedRfc.ticket_number,
+            title: selectedRfc.title,
+            clientName: selectedRfc.clients?.name ?? "—",
+          }}
+          onConfirm={handleMarkConcluida}
+          isLoading={isCompleting}
+        />
+      )}
     </AppLayout>
   );
 };
