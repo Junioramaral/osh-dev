@@ -12,7 +12,7 @@ import { Separator } from "@/components/ui/separator";
 import { Textarea } from "@/components/ui/textarea";
 import {
   ClipboardCheck, ArrowLeft, CheckCircle2, Loader2, Calendar,
-  Building2, Tag, ChevronDown, ChevronUp, Copy, PartyPopper, Clock,
+  Building2, Tag, ChevronDown, ChevronUp, Copy, PartyPopper, Clock, Play, Timer,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
@@ -38,6 +38,8 @@ type RFCStep = {
   status_concluido: boolean;
   concluded_at: string | null;
   concluded_by: string | null;
+  started_at: string | null;
+  started_by: string | null;
   observacao: string | null;
   ticket_id: string;
 };
@@ -53,7 +55,7 @@ const RFCExecution = () => {
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [localObservacoes, setLocalObservacoes] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
-  const { toggleStep, updateObservacao } = useRFCStepActions(selectedRfcId);
+  const { startStep, toggleStep, updateObservacao } = useRFCStepActions(selectedRfcId);
 
   const { data: rfcs = [], isLoading: rfcsLoading } = useQuery({
     queryKey: ["rfc-approved-list"],
@@ -301,11 +303,28 @@ const RFCExecution = () => {
                             const isStepExpanded = expandedStepId === step.id;
                             const hasDetails = !!(step.procedimento || step.scripts);
                             const isDone = step.status_concluido;
+                            const isStarted = !!(step as any).started_at;
+                            const isInProgress = isStarted && !isDone;
+
+                            const calcDuration = () => {
+                              const sa = (step as any).started_at;
+                              if (!sa || !step.concluded_at) return null;
+                              const diffMs = new Date(step.concluded_at).getTime() - new Date(sa).getTime();
+                              if (diffMs < 0) return null;
+                              const totalMin = Math.round(diffMs / 60000);
+                              if (totalMin < 60) return `${totalMin}min`;
+                              const h = Math.floor(totalMin / 60);
+                              const m = totalMin % 60;
+                              return m > 0 ? `${h}h ${m}min` : `${h}h`;
+                            };
+
                             return (
                               <div
                                 key={step.id}
                                 className={`rounded-lg border transition-colors ${
-                                  isDone ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800" : "bg-card border-border"
+                                  isDone ? "bg-green-50/50 dark:bg-green-950/20 border-green-200 dark:border-green-800" 
+                                  : isInProgress ? "bg-amber-50/50 dark:bg-amber-950/20 border-amber-200 dark:border-amber-800"
+                                  : "bg-card border-border"
                                 }`}
                               >
                                 {/* Header row */}
@@ -326,7 +345,7 @@ const RFCExecution = () => {
                                       <span className={`text-sm leading-snug block ${isDone ? "line-through text-muted-foreground" : "text-foreground"}`}>
                                         {step.descricao}
                                       </span>
-                                      {/* Concluded info */}
+                                      {/* Concluded info with duration */}
                                       {isDone && step.concluded_at && (
                                         <p className="text-xs text-green-600 dark:text-green-400 mt-1 flex items-center gap-1">
                                           <CheckCircle2 className="w-3 h-3" />
@@ -334,20 +353,43 @@ const RFCExecution = () => {
                                             ? `por ${concludedByProfiles[step.concluded_by]} `
                                             : ""}
                                           em {format(new Date(step.concluded_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
+                                          {calcDuration() && (
+                                            <span className="ml-1 font-medium">
+                                              <Timer className="w-3 h-3 inline mr-0.5" />
+                                              {calcDuration()}
+                                            </span>
+                                          )}
+                                        </p>
+                                      )}
+                                      {/* In progress info */}
+                                      {isInProgress && (step as any).started_at && (
+                                        <p className="text-xs text-amber-600 dark:text-amber-400 mt-1 flex items-center gap-1">
+                                          <Play className="w-3 h-3" />
+                                          Iniciado em {format(new Date((step as any).started_at), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR })}
                                         </p>
                                       )}
                                     </div>
                                   </div>
-                                  {/* Status badge */}
+                                  {/* Status badge / Start button */}
                                   {isDone ? (
                                     <Badge className="shrink-0 bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200 dark:border-green-700 text-xs">
                                       Concluído
                                     </Badge>
-                                  ) : (
-                                    <Badge className="shrink-0 bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-700 text-xs">
-                                      <Clock className="w-3 h-3 mr-1" />
-                                      Pendente
+                                  ) : isInProgress ? (
+                                    <Badge className="shrink-0 bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700 text-xs">
+                                      <Play className="w-3 h-3 mr-1" />
+                                      Em andamento
                                     </Badge>
+                                  ) : (
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      className="shrink-0 h-7 text-xs gap-1 border-primary/40 text-primary hover:bg-primary/10"
+                                      onClick={(e) => { e.stopPropagation(); startStep(step.id); }}
+                                    >
+                                      <Play className="w-3 h-3" />
+                                      Iniciar Atividade
+                                    </Button>
                                   )}
                                   <button
                                     type="button"

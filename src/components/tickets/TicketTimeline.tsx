@@ -2,8 +2,8 @@ import { useState } from "react";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity, Pencil, Trash2, AlertTriangle } from "lucide-react";
-import { useTicketHistory, useTicketComments, useTicketTimeLogs } from "@/hooks/useTicketDetail";
+import { Plus, RefreshCw, UserPlus, MessageSquare, CheckCircle, Clock, Activity, Pencil, Trash2, AlertTriangle, Play, Timer } from "lucide-react";
+import { useTicketHistory, useTicketComments, useTicketTimeLogs, useTicketRFCSteps } from "@/hooks/useTicketDetail";
 import { useMemo } from "react";
 import { formatSmartDate } from "@/lib/dateUtils";
 import { useAuth } from "@/contexts/AuthContext";
@@ -28,6 +28,8 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
       case 'commented': return <MessageSquare className="h-4 w-4" />;
       case 'resolved': return <CheckCircle className="h-4 w-4" />;
       case 'time_logged': return <Clock className="h-4 w-4" />;
+      case 'rfc_step_started': return <Play className="h-4 w-4" />;
+      case 'rfc_step_completed': return <Timer className="h-4 w-4" />;
       default: return <Activity className="h-4 w-4" />;
     }
   };
@@ -42,6 +44,8 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
       case 'resolved': return 'Ticket resolvido';
       case 'commented': return 'Novo comentário adicionado';
       case 'time_logged': return `${event.hours}h registradas`;
+      case 'rfc_step_started': return event.label;
+      case 'rfc_step_completed': return event.label;
       default: return event.action_type || event.type;
     }
   };
@@ -50,6 +54,8 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
     if (event.type === 'resolved' || event.type === 'first_response') return 'bg-green-100 border-green-500';
     if (event.type === 'commented') return 'bg-blue-100 border-blue-500';
     if (event.type === 'time_logged') return 'bg-orange-100 border-orange-500';
+    if (event.type === 'rfc_step_started') return 'bg-amber-100 border-amber-500';
+    if (event.type === 'rfc_step_completed') return 'bg-emerald-100 border-emerald-500';
     return 'bg-background border-border';
   };
 
@@ -127,12 +133,14 @@ function TimelineItem({ event, ticketId, onEdit, onDelete, permissions }: Timeli
 interface TicketTimelineProps {
   ticketId: string;
   clientId: string;
+  recordType?: string;
 }
 
-export default function TicketTimeline({ ticketId, clientId }: TicketTimelineProps) {
+export default function TicketTimeline({ ticketId, clientId, recordType }: TicketTimelineProps) {
   const { data: history } = useTicketHistory(ticketId);
   const { data: comments } = useTicketComments(ticketId);
   const { data: timeLogs } = useTicketTimeLogs(ticketId);
+  const { data: rfcSteps } = useTicketRFCSteps(recordType === 'rfc' ? ticketId : undefined);
   const { profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser } = useAuth();
   
   const [editLog, setEditLog] = useState<any>(null);
@@ -144,11 +152,45 @@ export default function TicketTimeline({ ticketId, clientId }: TicketTimelinePro
       ...(comments || []).map(c => ({ ...c, type: 'commented' })),
       ...(timeLogs || []).map(t => ({ ...t, type: 'time_logged', created_at: t.logged_at }))
     ];
+
+    // Add RFC step events
+    if (rfcSteps) {
+      rfcSteps.forEach(step => {
+        if (step.started_at) {
+          allEvents.push({
+            id: `rfc-start-${step.id}`,
+            type: 'rfc_step_started',
+            created_at: step.started_at,
+            label: `Passo ${step.ordem + 1} iniciado: ${step.descricao}`,
+            profiles: step.started_by_name ? { full_name: step.started_by_name } : null,
+          });
+        }
+        if (step.concluded_at && step.status_concluido) {
+          const durationLabel = (() => {
+            if (!step.started_at) return '';
+            const diffMs = new Date(step.concluded_at).getTime() - new Date(step.started_at).getTime();
+            if (diffMs < 0) return '';
+            const totalMin = Math.round(diffMs / 60000);
+            if (totalMin < 60) return ` (duração: ${totalMin}min)`;
+            const h = Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return m > 0 ? ` (duração: ${h}h ${m}min)` : ` (duração: ${h}h)`;
+          })();
+          allEvents.push({
+            id: `rfc-done-${step.id}`,
+            type: 'rfc_step_completed',
+            created_at: step.concluded_at,
+            label: `Passo ${step.ordem + 1} concluído: ${step.descricao}${durationLabel}`,
+            profiles: step.concluded_by_name ? { full_name: step.concluded_by_name } : null,
+          });
+        }
+      });
+    }
     
     return allEvents.sort((a, b) => 
       new Date(b.created_at || b.logged_at).getTime() - new Date(a.created_at || a.logged_at).getTime()
     );
-  }, [history, comments, timeLogs]);
+  }, [history, comments, timeLogs, rfcSteps]);
 
   const getPermissionsForLog = (log: any) => {
     if (log.type !== 'time_logged') return undefined;

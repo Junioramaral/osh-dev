@@ -90,3 +90,44 @@ export function useTicketTimeLogs(ticketId: string | undefined) {
     enabled: !!ticketId
   });
 }
+
+export function useTicketRFCSteps(ticketId: string | undefined) {
+  return useQuery({
+    queryKey: ['ticket-rfc-steps', ticketId],
+    queryFn: async () => {
+      if (!ticketId) return [];
+      
+      const { data, error } = await supabase
+        .from('rfc_steps')
+        .select('*')
+        .eq('ticket_id', ticketId)
+        .order('ordem', { ascending: true });
+      
+      if (error) throw error;
+      
+      // Fetch profiles for started_by and concluded_by
+      const userIds = [
+        ...data.filter(s => (s as any).started_by).map(s => (s as any).started_by),
+        ...data.filter(s => s.concluded_by).map(s => s.concluded_by!),
+      ].filter((v, i, a) => a.indexOf(v) === i);
+      
+      let profileMap: Record<string, string> = {};
+      if (userIds.length > 0) {
+        const { data: profiles } = await supabase
+          .from('profiles')
+          .select('id, full_name')
+          .in('id', userIds);
+        (profiles ?? []).forEach(p => { profileMap[p.id] = p.full_name; });
+      }
+      
+      return data.map(step => ({
+        ...step,
+        started_at: (step as any).started_at,
+        started_by: (step as any).started_by,
+        started_by_name: (step as any).started_by ? profileMap[(step as any).started_by] : null,
+        concluded_by_name: step.concluded_by ? profileMap[step.concluded_by] : null,
+      }));
+    },
+    enabled: !!ticketId
+  });
+}

@@ -3,6 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTicketDetail, useTicketComments } from "@/hooks/useTicketDetail";
+import TicketRFCReport from "@/components/tickets/TicketRFCReport";
 import TicketHeader from "@/components/tickets/TicketHeader";
 import TicketDetails from "@/components/tickets/TicketDetails";
 import TicketTimeline from "@/components/tickets/TicketTimeline";
@@ -77,9 +78,12 @@ export default function TicketDetail() {
         <div className="flex flex-col lg:flex-row gap-6">
           <main className="flex-1">
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className={`grid w-full ${ticket.record_type === 'rfc' ? 'grid-cols-4' : 'grid-cols-5'}`}>
+              <TabsList className={`grid w-full ${
+                ticket.record_type === 'rfc' ? 'grid-cols-5' : 'grid-cols-5'
+              }`}>
                 <TabsTrigger value="details">Detalhes</TabsTrigger>
                 {ticket.record_type !== 'rfc' && <TabsTrigger value="sla">SLA</TabsTrigger>}
+                {ticket.record_type === 'rfc' && <TabsTrigger value="rfc">RFC</TabsTrigger>}
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="comments">
                   Comentários {comments && comments.length > 0 ? `(${comments.length})` : ''}
@@ -94,8 +98,13 @@ export default function TicketDetail() {
                   <TicketSLATab ticket={ticket} />
                 </TabsContent>
               )}
+              {ticket.record_type === 'rfc' && (
+                <TabsContent value="rfc" className="mt-6">
+                  <TicketRFCReport ticketId={ticket.id} />
+                </TabsContent>
+              )}
               <TabsContent value="timeline" className="mt-6">
-                <TicketTimeline ticketId={ticket.id} clientId={ticket.client_id} />
+                <TicketTimeline ticketId={ticket.id} clientId={ticket.client_id} recordType={ticket.record_type} />
               </TabsContent>
               <TabsContent value="comments" className="mt-6">
                 <TicketComments ticketId={ticket.id} />
