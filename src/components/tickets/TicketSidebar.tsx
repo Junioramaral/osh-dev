@@ -25,7 +25,7 @@ import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer } from "l
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
-import { useTicketTimeLogs } from "@/hooks/useTicketDetail";
+import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 
@@ -49,7 +49,16 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
   const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
+  const { data: history } = useTicketHistory(ticket.id);
   
+  // Fallback: get resolver name from history if resolved_by is empty
+  const resolvedByName = useMemo(() => {
+    if (ticket.resolved_by) return ticket.resolved_by;
+    if (!history) return "Não registrado";
+    const resolvedEvent = history.find((h: any) => h.action_type === 'resolved' || h.action_type === 'status_changed' && h.new_value === 'resolvido');
+    return (resolvedEvent as any)?.profiles?.full_name || "Não registrado";
+  }, [ticket.resolved_by, history]);
+
   // Calculate total hours
   const totalHours = useMemo(() => {
     if (!timeLogs || timeLogs.length === 0) return 0;
@@ -136,7 +145,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                   <User className="h-3.5 w-3.5 text-muted-foreground" />
                   <span className="text-muted-foreground">Por:</span>
                   <span className="font-semibold text-foreground">
-                    {ticket.resolved_by || "Não registrado"}
+                    {resolvedByName}
                   </span>
                 </div>
                 
