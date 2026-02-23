@@ -1,95 +1,102 @@
 
 
-# Edge Function: Notificacao de Aprovacao/Rejeicao de RFC
+# Workflow de Execucao de RFC — Plano de Implementacao
 
-## Objetivo
+## Resumo
 
-Criar uma edge function `send-rfc-decision-notification` que envia um e-mail ao criador da RFC informando se ela foi aprovada ou rejeitada, incluindo o comentario do gestor. Integrar a chamada nos handlers `handleApprove` e `handleReject` da pagina `RFCApproval.tsx`.
-
----
-
-## Arquivos a criar/modificar
-
-### 1. `supabase/functions/send-rfc-decision-notification/index.ts` (Novo)
-
-Edge function que recebe os dados da decisao e envia e-mail via Resend. Segue o mesmo padrao de autenticacao e estrutura das funcoes existentes (`send-resolution-notification`, `send-comment-notification`).
-
-**Parametros de entrada (JSON body):**
-- `ticketId` - UUID do ticket RFC
-- `ticketNumber` - Numero do ticket
-- `ticketTitle` - Titulo
-- `contactEmail` - Email do criador da RFC (campo `contact_email` do ticket)
-- `contactName` - Nome do criador (campo `contact_name` do ticket)
-- `decision` - `"aprovada"` ou `"rejeitada"`
-- `comentario` - Texto do gestor
-- `gestorName` - Nome do gestor que tomou a decisao
-
-**Logica:**
-1. Validar autenticacao (JWT)
-2. Verificar que o usuario e Otimizzo ou Super Admin
-3. Montar template HTML com cores diferenciadas:
-   - Aprovada: header verde, badge "APROVADA", icone de check
-   - Rejeitada: header vermelho, badge "REJEITADA", icone X
-4. Enviar via Resend com `from: noreply@resend.otimizzo.com`
-5. Subject: `[RFC #XXXX] Aprovada - Titulo` ou `[RFC #XXXX] Rejeitada - Titulo`
-
-**Template do e-mail:**
-- Header colorido (verde ou vermelho conforme decisao)
-- Badge de status (APROVADA / REJEITADA)
-- Info do ticket: numero, titulo, data de criacao
-- Caixa com comentario do gestor e nome
-- Se rejeitada: nota informando que a RFC retornou para rascunho para ajustes
-- Footer padrao Otimizzo
-
-### 2. `supabase/config.toml` — Registrar a nova funcao
-
-```toml
-[functions.send-rfc-decision-notification]
-verify_jwt = false
-```
-
-### 3. `src/pages/RFCApproval.tsx` — Chamar a edge function
-
-Modificar `handleApprove` e `handleReject` para, apos o update de status e insercao do comentario, buscar os dados do ticket (`contact_email`, `contact_name`) e invocar a edge function:
-
-```typescript
-// Buscar dados do ticket para notificacao
-const { data: ticketData } = await supabase
-  .from("tickets")
-  .select("contact_email, contact_name, ticket_number, title")
-  .eq("id", selectedRfcId)
-  .single();
-
-// Enviar notificacao (fire-and-forget, nao bloqueia o fluxo)
-supabase.functions.invoke("send-rfc-decision-notification", {
-  body: {
-    ticketId: selectedRfcId,
-    ticketNumber: ticketData.ticket_number,
-    ticketTitle: ticketData.title,
-    contactEmail: ticketData.contact_email,
-    contactName: ticketData.contact_name,
-    decision: "aprovada", // ou "rejeitada"
-    comentario: comentario.trim(),
-    gestorName: profile?.full_name ?? "Gestor",
-  },
-});
-```
-
-A chamada e fire-and-forget — se o envio falhar, nao impede a aprovacao/rejeicao ja concluida. Apenas um `console.error` para registro.
+Refatorar completamente as telas de Execucao RFC (analista) e Minhas RFCs (cliente) para criar um workflow interativo com persistencia de dados, observacoes com auto-save, botoes de copiar, badges coloridos, progresso salvo no banco e animacao de conclusao.
 
 ---
 
-## Sequencia de implementacao
+## 1. Migracao de Banco de Dados
+
+Adicionar 3 colunas novas:
+
+- **`rfc_steps.observacao`** (`text`, nullable) — campo de observacao do analista por passo
+- **`rfc_steps.concluded_by`** (`uuid`, nullable) — quem concluiu o passo
+- **`tickets.rfc_progress`** (`integer`, default 0) — percentual de progresso calculado e persistido
+
+Criar um **trigger** na tabela `rfc_steps` que recalcula automaticamente `tickets.rfc_progress` sempre que um passo for atualizado (INSERT/UPDATE/DELETE). Formula: `ROUND(count_concluidos / count_total * 100)`.
+
+---
+
+## 2. Refatorar `src/pages/RFCExecution.tsx` (Tela do Analista)
+
+**Corrigir anti-pattern**: Remover `ListPanel` e `DetailPanel` como funcoes internas (mesmo problema de re-render que causava perda de foco).
+
+**Novos recursos por passo:**
+
+- **Badge de status**: Verde "Concluido" ou Azul "Pendente" ao lado de cada passo
+- **Bloco de codigo** (`<pre>` com fundo escuro) para scripts/comandos com **botao "Copiar"** que usa `navigator.clipboard.writeText()`
+- **Botao "Copiar"** tambem no campo de procedimento
+- **Campo de observacao** (`Textarea`) com **debounce de 1.5s** para auto-save — salva automaticamente no `rfc_steps.observacao`
+- **Timestamp e autor**: Ao marcar como concluido, salvar `concluded_at`, `concluded_by` (auth.uid) e exibir "Concluido por [nome] em [data/hora]"
+- **Barra de progresso** com percentual atualizado em tempo real
+- **Animacao de 100%**: Quando todos os passos forem concluidos, exibir um banner animado com brilho verde pulsante e icone de celebracao
+
+---
+
+## 3. Refatorar `src/pages/ClientRFCPortal.tsx` (Tela do Cliente)
+
+**Corrigir anti-pattern**: Remover `ListPanel` e `DetailPanel` como funcoes internas.
+
+**Ajustes:**
+
+- **Barra de progresso**: Ler `tickets.rfc_progress` do banco (valor persistido) em vez de calcular localmente
+- **Timeline vertical**: Manter layout atual, mas adicionar:
+  - Badge "Concluido" (verde) ou "Pendente" (azul) por passo
+  - Timestamp de conclusao quando disponivel
+  - Observacao publica do analista (campo `observacao`) — exibida como texto somente leitura
+  - **Ocultar scripts/comandos** (ja esta assim, manter)
+- **Animacao de 100%**: Banner de "Manutencao concluida" com animacao de brilho verde
+
+---
+
+## 4. Novo hook `useRFCStepActions.ts`
+
+Hook centralizado para logica de execucao de passos:
+
+- `toggleStep(stepId, currentValue)` — marca/desmarca passo, salva `concluded_at`, `concluded_by`
+- `updateObservacao(stepId, text)` — atualiza observacao com debounce
+- Invalida queries apos cada operacao
+
+---
+
+## Detalhes Tecnicos
+
+### Migracao SQL
 
 ```text
-1. supabase/functions/send-rfc-decision-notification/index.ts (criar)
-2. supabase/config.toml (registrar funcao)
-3. src/pages/RFCApproval.tsx (integrar chamada nos handlers)
+1. ALTER TABLE rfc_steps ADD COLUMN observacao text;
+2. ALTER TABLE rfc_steps ADD COLUMN concluded_by uuid;
+3. ALTER TABLE tickets ADD COLUMN rfc_progress integer DEFAULT 0;
+4. CREATE FUNCTION recalculate_rfc_progress() — trigger function
+5. CREATE TRIGGER on rfc_steps AFTER INSERT/UPDATE/DELETE
 ```
 
-## O que NAO muda
+### Arquivos a criar
 
-- Fluxo de aprovacao/rejeicao (status update + comentario interno)
-- Outras edge functions existentes
-- Schema do banco de dados
-- RLS policies
+- `src/hooks/useRFCStepActions.ts` — hook com toggleStep + updateObservacao (debounce)
+
+### Arquivos a modificar
+
+- `src/pages/RFCExecution.tsx` — refatoracao completa (inline JSX, observacoes, code blocks, copiar, badges, animacao)
+- `src/pages/ClientRFCPortal.tsx` — refatoracao (inline JSX, progresso do banco, observacoes publicas, badges, animacao)
+- `src/integrations/supabase/types.ts` — atualizado automaticamente apos migracao
+
+### Sequencia
+
+```text
+1. Migracao SQL (colunas + trigger)
+2. useRFCStepActions.ts (criar hook)
+3. RFCExecution.tsx (refatorar)
+4. ClientRFCPortal.tsx (refatorar)
+```
+
+### O que NAO muda
+
+- RFCStepBuilder, RFCFormSection (criacao de RFC)
+- RFCApproval (aprovacao)
+- Edge functions existentes
+- RLS policies (rfc_steps ja tem policies corretas)
+- Outras paginas do sistema
