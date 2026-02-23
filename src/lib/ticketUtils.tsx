@@ -28,6 +28,17 @@ export const formatDuration = (minutes: number): string => {
 };
 
 export const calculateSLAStatus = (ticket: any): SLAStatus => {
+  // RFCs don't have SLA
+  if (ticket.record_type === 'rfc') {
+    return {
+      type: 'not-applicable',
+      label: 'SLA N/A',
+      color: 'bg-gray-100 text-gray-800 border-gray-300',
+      icon: <Clock className="h-3 w-3" />,
+      borderClass: ''
+    };
+  }
+
   const now = new Date();
   
   if (ticket.status === 'resolvido' || ticket.status === 'fechado') {

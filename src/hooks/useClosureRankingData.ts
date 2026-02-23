@@ -57,6 +57,7 @@ export function useClosureRankingData({ startDate, endDate, segment, clientId }:
         `)
         .not("resolved_at", "is", null)
         .not("analyst_id", "is", null)
+        .neq("record_type", "rfc")
         .gte("resolved_at", startDate)
         .lte("resolved_at", endDate);
 

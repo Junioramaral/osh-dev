@@ -59,6 +59,7 @@ export function useResolutionTimeData({ startDate, endDate, segment, clientId }:
           profiles!tickets_analyst_id_fkey(full_name)
         `)
         .not("resolved_at", "is", null)
+        .neq("record_type", "rfc")
         .gte("resolved_at", startDate)
         .lte("resolved_at", endDate);
 

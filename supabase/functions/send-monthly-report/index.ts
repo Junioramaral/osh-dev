@@ -393,6 +393,7 @@ const handler = async (req: Request): Promise<Response> => {
             created_at, resolved_at, sla_first_response_met, sla_resolution_met
           `)
           .eq("client_id", client.id)
+          .neq("record_type", "rfc")
           .gte("created_at", startDate.toISOString())
           .lte("created_at", endDate.toISOString())
           .order("created_at", { ascending: false });

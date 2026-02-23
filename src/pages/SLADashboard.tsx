@@ -185,7 +185,8 @@ const SLADashboard = () => {
         .select(`
           *,
           clients(name)
-        `);
+        `)
+        .neq('record_type', 'rfc');
       
       // Apply period filter
       const now = new Date();

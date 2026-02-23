@@ -69,6 +69,7 @@ export const useReportData = (clientId: string | null, month: number, year: numb
           profiles!tickets_analyst_id_fkey(full_name)
         `)
         .eq("client_id", clientId)
+        .neq("record_type", "rfc")
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString())
         .order("created_at", { ascending: false });
