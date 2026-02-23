@@ -122,9 +122,25 @@ export function useTicketActions() {
       ticketId: string;
       status: TicketStatus;
     }) => {
+      const updateData: Record<string, any> = { status };
+
+      // If resolving, also set resolved_by and resolved_at
+      if (status === "resolvido") {
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) {
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("full_name")
+            .eq("id", user.id)
+            .single();
+          updateData.resolved_by = profile?.full_name || "Analista";
+          updateData.resolved_at = new Date().toISOString();
+        }
+      }
+
       const { error } = await supabase
         .from("tickets")
-        .update({ status })
+        .update(updateData)
         .eq("id", ticketId);
 
       if (error) throw error;
