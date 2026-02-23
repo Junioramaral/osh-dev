@@ -1,97 +1,99 @@
 
 
-# Diagnostico e Correcao: UI Travando Apos Alguns Minutos
+# Correcao: UI Travando - SidebarContent Inline Causando Remontagem
 
-## Problema Identificado
+## Causa Raiz Identificada
 
-Apos analise do codigo, identifiquei **3 problemas criticos** que, combinados, causam o travamento progressivo da interface.
+O problema **persiste** porque a causa principal nao estava no `useToast` nem no `AuthContext`. O verdadeiro problema esta no **`AppLayout.tsx`**:
 
----
+O componente `SidebarContent` e definido como uma **funcao inline** dentro do corpo do `AppLayout` (linha ~89). Isso significa que:
 
-## Causa 1: Bug no Hook `useToast` (CRITICO)
+1. A cada re-render do `AppLayout`, uma **nova referencia de funcao** `SidebarContent` e criada
+2. O React interpreta como um **componente completamente diferente**, desmontando a arvore anterior e montando uma nova
+3. Isso causa **remontagem** do `SLAAlertBell`, de todos os `NavLink`, e de todos os hooks internos
+4. O `SLAAlertBell` contem 2 queries com `refetchInterval: 30000` — a cada remontagem, as queries reiniciam
+5. O `SidebarContent` e renderizado em **2 locais** (sidebar desktop + Sheet mobile), duplicando o problema
+6. A cada 30s, o polling dispara -> re-render -> remontagem do SidebarContent -> queries reiniciam -> mais re-renders -> **acumulo exponencial** ate travar a UI
 
-**Arquivo:** `src/hooks/use-toast.ts` (linha 177)
+Isso explica por que a tela funciona apos refresh (nova montagem limpa) e trava apos alguns minutos (acumulo progressivo).
 
-O `useEffect` do hook `useToast` tem `[state]` como dependencia. Isso significa que toda vez que um toast e adicionado/removido, o efeito re-executa, removendo e re-adicionando o listener na lista global. Isso causa:
-- Re-subscricoes desnecessarias a cada mudanca de estado
-- Potencial acumulo de listeners em condicoes de concorrencia
-- Re-renders cascateados em todos os componentes que usam `useToast`
+## Evidencia nos Logs de Rede
 
-Alem disso, o `TOAST_REMOVE_DELAY` esta em `1000000` (16.7 minutos), fazendo com que toasts nunca sejam removidos da memoria durante a sessao.
+Os logs de rede mostram **8+ requests identicas** de `sla_notifications` no mesmo segundo (13:34:15), quando deveria haver apenas 2 (count + data). Isso confirma remontagens multiplas.
 
-**Correcao:**
-- Trocar `[state]` por `[]` no useEffect
-- Reduzir `TOAST_REMOVE_DELAY` para `5000` (5 segundos)
+## Solucao
 
----
-
-## Causa 2: AuthContext Recria Funcoes a Cada Render (ALTO IMPACTO)
-
-**Arquivo:** `src/contexts/AuthContext.tsx`
-
-O `AuthProvider` cria novas referencias de funcao (`hasRole`, `signIn`, `signOut`, `signUp`, `resetPassword`, `updatePassword`) a cada render. Como o valor do contexto muda a cada render, TODOS os componentes consumidores (via `useAuth()`) tambem re-renderizam.
-
-Com 4 queries de polling rodando a cada 30 segundos no `AppLayout` (pendingCount, myTicketsCount, SLA alerts count, SLA alerts), cada poll causa re-render no AuthProvider, que propaga para toda a arvore de componentes.
-
-**Correcao:**
-- Envolver `signIn`, `signUp`, `signOut`, `clearMustChangePassword`, `resetPassword`, `updatePassword` com `useCallback`
-- Memoizar o objeto de valor do contexto com `useMemo`
-- Memoizar `hasRole` com `useCallback` e derivados (`isSuperAdmin`, etc.) com `useMemo`
-
----
-
-## Causa 3: Debounce Timers Sem Cleanup no `useRFCStepActions`
-
-**Arquivo:** `src/hooks/useRFCStepActions.ts`
-
-Os timers de debounce no `useRef` nunca sao limpos quando o componente desmonta. Se o usuario navega para outra pagina, os timers disparam e tentam fazer chamadas Supabase em componentes desmontados, podendo causar erros silenciosos e comportamento inesperado.
-
-**Correcao:**
-- Adicionar cleanup dos timers no `useEffect` de desmontagem
+Extrair `SidebarContent` como um componente separado com props, para que o React mantenha a mesma referencia entre re-renders.
 
 ---
 
 ## Detalhes Tecnicos
 
-### Arquivo 1: `src/hooks/use-toast.ts`
+### Arquivo: `src/components/layout/AppLayout.tsx`
 
-Mudancas:
-- Linha 6: `TOAST_REMOVE_DELAY = 1000000` para `TOAST_REMOVE_DELAY = 5000`
-- Linha 177: `}, [state]);` para `}, []);`
-
-### Arquivo 2: `src/contexts/AuthContext.tsx`
-
-Mudancas:
-- Importar `useCallback` e `useMemo`
-- Envolver `fetchProfile`, `fetchRoles`, `signIn`, `signUp`, `signOut`, `clearMustChangePassword`, `resetPassword`, `updatePassword` com `useCallback`
-- Memoizar `hasRole` com `useCallback`
-- Memoizar `isSuperAdmin`, `isTenantAdmin`, `isViewer`, `isAnalyst`, `isOtimizzoUser`, `tenantId` com `useMemo`
-- Memoizar o objeto de valor do `Provider` com `useMemo`
-
-### Arquivo 3: `src/hooks/useRFCStepActions.ts`
-
-Mudancas:
-- Adicionar `useEffect` com cleanup que limpa todos os timers no desmonte:
+**Problema atual (linha ~89):**
 ```text
-useEffect(() => {
-  return () => {
-    Object.values(debounceTimers.current).forEach(clearTimeout);
-  };
-}, []);
+const AppLayout = ({ children }) => {
+  // ... state, hooks ...
+  
+  const SidebarContent = () => (  // <-- NOVA funcao a cada render!
+    <>
+      ...SLAAlertBell, NavLinks, etc...
+    </>
+  );
+
+  return (
+    <aside><SidebarContent /></aside>       // Remonta tudo
+    <Sheet><SidebarContent /></Sheet>        // Remonta tudo
+  );
+};
 ```
 
-### Sequencia de Implementacao
+**Correcao:** Extrair `SidebarContent` como componente separado fora do `AppLayout`, passando as dependencias como props:
 
 ```text
-1. use-toast.ts (correcao do memory leak)
-2. AuthContext.tsx (memoizacao do contexto)
-3. useRFCStepActions.ts (cleanup de timers)
+// Componente separado, referencia estavel
+interface SidebarContentProps {
+  operationalNav: NavItem[];
+  adminNav: NavItem[];
+  pendingCount: number;
+  myTicketsCount: number;
+  profile: Profile | null;
+  user: User | null;
+  isSuperAdmin: boolean;
+  isViewer: boolean;
+  isOtimizzoUser: boolean;
+  onClose: () => void;
+  onProfileOpen: () => void;
+  signOut: () => Promise<void>;
+}
+
+const SidebarContent = ({ ...props }: SidebarContentProps) => (
+  // ... mesmo JSX de antes, usando props em vez de closures
+);
+
+const AppLayout = ({ children }) => {
+  // ... state, hooks ...
+  
+  return (
+    <aside>
+      <SidebarContent operationalNav={...} ... />
+    </aside>
+    <Sheet>
+      <SidebarContent operationalNav={...} ... />
+    </Sheet>
+  );
+};
 ```
+
+### Arquivos a modificar
+
+- `src/components/layout/AppLayout.tsx` — extrair SidebarContent como componente proprio
 
 ### O que NAO muda
 
-- Nenhuma pagina ou componente visual e alterado
-- Nenhuma query de banco e modificada
-- Nenhuma funcionalidade e removida
-- Apenas otimizacoes de performance e correcao de bugs
+- Nenhuma funcionalidade e alterada
+- Nenhum visual e modificado
+- Nenhum outro arquivo e tocado
+- Apenas refatoracao estrutural para evitar remontagem
 
