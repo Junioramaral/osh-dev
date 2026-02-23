@@ -206,10 +206,10 @@ export default function TenantAdmin() {
       if (profiles && profiles.length > 0) {
         for (const profile of profiles) {
           try {
-            // Deletar do Auth (isso também deleta o profile via CASCADE)
-            const { error: authDeleteError } = await supabase.auth.admin.deleteUser(
-              profile.id
-            );
+            // Deletar do Auth via edge function (server-side authorization)
+            const { data: deleteResult, error: authDeleteError } = await supabase.functions.invoke("manage-user", {
+              body: { action: "delete", userId: profile.id }
+            });
             
             if (authDeleteError) {
               console.error(`Erro ao deletar usuário ${profile.full_name}:`, authDeleteError);
