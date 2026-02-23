@@ -1,37 +1,104 @@
 
-# Correção: Campo "Comentário" perde foco ao digitar
+# Excluir RFCs do SLA
 
-## Causa Raiz
+## Objetivo
 
-O problema está na estrutura do `RFCApproval.tsx`. Os "componentes" `ListPanel` e `DetailPanel` são declarados como funções dentro do corpo de `RFCApproval`:
+Tickets do tipo RFC (`record_type = 'rfc'`) nao devem ter SLA calculado, exibido, nem ser contabilizados em relatórios e dashboards de SLA.
 
-```tsx
-// DENTRO do componente RFCApproval:
-const ListPanel = () => (...)
-const DetailPanel = () => (...)
+---
+
+## Mudanças Necessárias
+
+### 1. Banco de Dados — Trigger `calculate_sla_deadlines`
+
+Alterar a function `calculate_sla_deadlines()` para **pular o cálculo** quando o ticket for RFC. No início da function, adicionar:
+
+```sql
+IF NEW.record_type = 'rfc' THEN
+  NEW.sla_first_response_deadline := NULL;
+  NEW.sla_resolution_deadline := NULL;
+  RETURN NEW;
+END IF;
 ```
 
-Quando o usuário digita no `Textarea`, o estado `comentario` muda → o React re-renderiza `RFCApproval` → as funções `ListPanel` e `DetailPanel` são **recriadas do zero** → o React entende que são componentes completamente novos → **desmonta o DOM antigo e monta um novo** → o `Textarea` perde o foco.
+Isso garante que RFCs nunca terão deadlines de SLA no banco.
 
-Esse é um anti-pattern conhecido: nunca declare componentes dentro de outros componentes.
+---
 
-## Correção
+### 2. `src/lib/ticketUtils.tsx` — `calculateSLAStatus()`
 
-**Arquivo:** `src/pages/RFCApproval.tsx`
+No início da função, retornar `not-applicable` imediatamente se `ticket.record_type === 'rfc'`:
 
-**Estratégia:** Transformar `<ListPanel />` e `<DetailPanel />` em **JSX inline**, removendo as declarações `const ListPanel = () => (...)` e `const DetailPanel = () => (...)` do interior do componente. O conteúdo de cada um será renderizado diretamente no lugar onde eram chamados, sem ser "componente", apenas blocos de JSX.
+```typescript
+if (ticket.record_type === 'rfc') {
+  return { type: 'not-applicable', label: 'SLA N/A', ... };
+}
+```
 
-Todo o código permanece idêntico — apenas o mecanismo de encapsulamento muda de "componente filho redeclarado a cada render" para "JSX inline estático".
+Isso afeta automaticamente todos os componentes que usam esta função: TicketHeader, TicketRow, TicketSidebar.
 
-## O que muda
+---
 
-- Remove as linhas `const ListPanel = () => (...)` e `const DetailPanel = () => (...)`
-- Substitui `<ListPanel />` e `<DetailPanel />` pelo JSX equivalente inline no `return` principal
-- **Zero mudança visual ou funcional** — apenas a estrutura interna de React
+### 3. `src/pages/TicketDetail.tsx` — Ocultar aba SLA para RFCs
 
-## O que NÃO muda
+Remover a aba "SLA" do `TabsList` quando `ticket.record_type === 'rfc'`. O grid de colunas passa de 5 para 4.
 
-- Aparência da tela
-- Queries, handlers (approve/reject), estados
-- Responsividade mobile
-- Qualquer outra página
+---
+
+### 4. `src/components/tickets/TicketSidebar.tsx` — Ocultar card SLA para RFCs
+
+Envolver o card "Status do SLA" com a condição `ticket.record_type !== 'rfc'` para não exibir o card lateral de SLA.
+
+---
+
+### 5. `src/pages/SLADashboard.tsx` — Filtrar RFCs da query
+
+Adicionar `.neq('record_type', 'rfc')` na query de tickets do dashboard para excluir RFCs de todas as métricas.
+
+---
+
+### 6. Edge Function `sla-monitor` — Excluir RFCs do monitoramento
+
+Adicionar `.neq('record_type', 'rfc')` na query que busca tickets ativos para verificação de SLA, evitando alertas para RFCs.
+
+---
+
+### 7. Edge Function `send-monthly-report` — Excluir RFCs do relatório mensal
+
+Adicionar `.neq('record_type', 'rfc')` na query que busca tickets do período, para que RFCs não distorçam métricas de SLA no relatório enviado ao cliente.
+
+---
+
+### 8. Hooks de relatórios — Excluir RFCs das queries
+
+Adicionar `.neq('record_type', 'rfc')` nos seguintes hooks:
+- `useReportData.ts`
+- `useAnalystPerformanceData.ts`
+- `usePeriodComparisonData.ts`
+- `useQueueWorkloadData.ts`
+- `useResolutionTimeData.ts`
+- `useClosureRankingData.ts`
+
+---
+
+## Detalhes Técnicos
+
+### Sequência de implementação
+
+```text
+1. Migration SQL (trigger calculate_sla_deadlines)
+2. ticketUtils.tsx (calculateSLAStatus)
+3. TicketDetail.tsx (ocultar aba SLA)
+4. TicketSidebar.tsx (ocultar card SLA)
+5. SLADashboard.tsx (filtrar query)
+6. sla-monitor/index.ts (filtrar query)
+7. send-monthly-report/index.ts (filtrar query)
+8. Hooks de relatórios (filtrar queries)
+```
+
+### O que NAO muda
+
+- Fluxo de criação, aprovação e execução de RFC
+- Componentes RFCStepBuilder, RFCFormSection, RFCExecution, RFCApproval, ClientRFCPortal
+- RLS policies
+- Outros tipos de ticket (suporte) continuam com SLA normalmente
