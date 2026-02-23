@@ -355,49 +355,51 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         </DialogContent>
       </Dialog>
 
-      {/* SLA Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-sm">Status do SLA</CardTitle>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-sm text-muted-foreground">1ª Resposta</span>
-              <Badge className={slaStatus.color} variant="outline">
-                {slaStatus.label}
-              </Badge>
-            </div>
-            {slaStatus.percentage !== undefined && (
-              <>
-                <Progress value={slaStatus.percentage} className="h-2" />
-                <p className="text-xs text-muted-foreground mt-1">{slaStatus.timeRemaining}</p>
-              </>
-            )}
-          </div>
-          
-          {resolutionSLA && (
+      {/* SLA Card - hidden for RFCs */}
+      {ticket.record_type !== 'rfc' && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Status do SLA</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm text-muted-foreground">Resolução</span>
-                <Badge 
-                  className={resolutionSLA.isOverdue ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}
-                  variant="outline"
-                >
-                  {resolutionSLA.isOverdue ? 'Vencido' : 'No Prazo'}
+                <span className="text-sm text-muted-foreground">1ª Resposta</span>
+                <Badge className={slaStatus.color} variant="outline">
+                  {slaStatus.label}
                 </Badge>
               </div>
-              <Progress value={resolutionSLA.percentage} className="h-2" />
-              <p className="text-xs text-muted-foreground mt-1">
-                {resolutionSLA.isOverdue 
-                  ? `Venceu há ${formatDuration(Math.abs(resolutionSLA.remaining))}`
-                  : `${formatDuration(resolutionSLA.remaining)} restantes`
-                }
-              </p>
+              {slaStatus.percentage !== undefined && (
+                <>
+                  <Progress value={slaStatus.percentage} className="h-2" />
+                  <p className="text-xs text-muted-foreground mt-1">{slaStatus.timeRemaining}</p>
+                </>
+              )}
             </div>
-          )}
-        </CardContent>
-      </Card>
+            
+            {resolutionSLA && (
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-sm text-muted-foreground">Resolução</span>
+                  <Badge 
+                    className={resolutionSLA.isOverdue ? 'bg-red-100 text-red-800' : 'bg-green-100 text-green-800'}
+                    variant="outline"
+                  >
+                    {resolutionSLA.isOverdue ? 'Vencido' : 'No Prazo'}
+                  </Badge>
+                </div>
+                <Progress value={resolutionSLA.percentage} className="h-2" />
+                <p className="text-xs text-muted-foreground mt-1">
+                  {resolutionSLA.isOverdue 
+                    ? `Venceu há ${formatDuration(Math.abs(resolutionSLA.remaining))}`
+                    : `${formatDuration(resolutionSLA.remaining)} restantes`
+                  }
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      )}
       
       {/* Technical Info */}
       <Card>

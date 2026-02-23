@@ -43,7 +43,8 @@ export const useQueueWorkloadData = ({
         .from("tickets")
         .select("id, queue_id, status, created_at, resolved_at, sla_resolution_met")
         .gte("created_at", startDate.toISOString())
-        .lte("created_at", endDate.toISOString());
+        .lte("created_at", endDate.toISOString())
+        .neq("record_type", "rfc");
 
       if (segment && segment !== "all") {
         query = query.eq("segment", segment as "DB" | "APP");

@@ -77,9 +77,9 @@ export default function TicketDetail() {
         <div className="flex flex-col lg:flex-row gap-6">
           <main className="flex-1">
             <Tabs defaultValue="details" className="w-full">
-              <TabsList className="grid w-full grid-cols-5">
+              <TabsList className={`grid w-full ${ticket.record_type === 'rfc' ? 'grid-cols-4' : 'grid-cols-5'}`}>
                 <TabsTrigger value="details">Detalhes</TabsTrigger>
-                <TabsTrigger value="sla">SLA</TabsTrigger>
+                {ticket.record_type !== 'rfc' && <TabsTrigger value="sla">SLA</TabsTrigger>}
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="comments">
                   Comentários {comments && comments.length > 0 ? `(${comments.length})` : ''}
@@ -89,9 +89,11 @@ export default function TicketDetail() {
               <TabsContent value="details" className="mt-6">
                 <TicketDetails ticket={ticket} />
               </TabsContent>
-              <TabsContent value="sla" className="mt-6">
-                <TicketSLATab ticket={ticket} />
-              </TabsContent>
+              {ticket.record_type !== 'rfc' && (
+                <TabsContent value="sla" className="mt-6">
+                  <TicketSLATab ticket={ticket} />
+                </TabsContent>
+              )}
               <TabsContent value="timeline" className="mt-6">
                 <TicketTimeline ticketId={ticket.id} clientId={ticket.client_id} />
               </TabsContent>

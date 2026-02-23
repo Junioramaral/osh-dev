@@ -26,7 +26,8 @@ const fetchPeriodMetrics = async (month: number, year: number, clientId?: string
     .from("tickets")
     .select("id, priority, segment, status, sla_resolution_met")
     .gte("created_at", startDate.toISOString())
-    .lte("created_at", endDate.toISOString());
+    .lte("created_at", endDate.toISOString())
+    .neq("record_type", "rfc");
 
   if (clientId) {
     query = query.eq("client_id", clientId);

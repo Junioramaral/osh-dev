@@ -71,6 +71,7 @@ serve(async (req) => {
         clients(name)
       `)
       .not("status", "in", '("resolvido","fechado")')
+      .neq("record_type", "rfc")
       .order("created_at", { ascending: true });
 
     if (ticketsError) {

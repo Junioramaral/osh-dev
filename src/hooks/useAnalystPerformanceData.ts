@@ -49,7 +49,8 @@ export const useAnalystPerformanceData = ({
         `)
         .gte("created_at", startDate.toISOString())
         .lte("created_at", endDate.toISOString())
-        .not("analyst_id", "is", null);
+        .not("analyst_id", "is", null)
+        .neq("record_type", "rfc");
 
       if (segment && segment !== "all") {
         query = query.eq("segment", segment as "DB" | "APP");
