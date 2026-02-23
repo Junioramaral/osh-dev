@@ -1,59 +1,52 @@
 
-# Restricao de Visibilidade e Pre-requisitos para Execucao de RFC
+# Corrigir "Não registrado" na Resolucao de RFC
 
-## Resumo
+## Problema
 
-Duas mudancas principais:
+Quando uma RFC e resolvida, o campo `resolved_by` no banco de dados esta NULL, fazendo o sidebar exibir "Por: Nao registrado". Isso acontece porque o fluxo de resolucao nao salvou o nome do analista corretamente.
 
-1. **Filtrar RFCs na tela de Execucao**: Analistas so veem RFCs atribuidas a eles (analyst_id) ou a sua fila (queue_id). Administradores (super_admin e Otimizzo) veem todas.
+## Solucao
 
-2. **Validar pre-requisitos antes de iniciar execucao**: Para iniciar uma atividade (startStep), a RFC precisa ter analyst_id, team_id e status "aprovado". Se faltar algum, exibir alerta pedindo para atribuir antes.
+Duas acoes complementares:
+
+### 1. Fallback no TicketSidebar (correcao visual imediata)
+
+**Arquivo: `src/components/tickets/TicketSidebar.tsx`**
+
+Quando `ticket.resolved_by` estiver vazio, buscar o nome do usuario que resolveu a partir do `ticket_history` (evento "resolved" com `user_id` preenchido). O historico ja tem essa informacao vinculada ao profile.
+
+- Usar os dados de `ticket_history` que ja sao carregados pelo hook `useTicketHistory`
+- Buscar o evento do tipo "resolved" e pegar o `profiles.full_name` associado
+- Exibir esse nome como fallback em vez de "Nao registrado"
+
+### 2. Garantir que `resolved_by` seja preenchido em todos os fluxos
+
+**Arquivo: `src/hooks/useTicketActions.ts`**
+
+Verificar e reforcar que o `updateTicketStatus` tambem preencha `resolved_by` quando o status muda para "resolvido". Atualmente, apenas o `resolveTicketWithReason` faz isso. Adicionar logica no `updateTicketStatus` para buscar o nome do usuario logado e preencher `resolved_by` e `resolved_at` quando status = "resolvido".
 
 ---
 
-## Detalhes Tecnicos
+## Detalhe Tecnico
 
-### 1. Arquivo: `src/pages/RFCExecution.tsx`
+### TicketSidebar.tsx
 
-**Query de RFCs aprovadas (linha 60-72)**: Atualmente busca todas as RFCs com status "aprovado" sem filtro de analista.
+- Importar `useTicketHistory` do hook existente
+- Na secao do "Ticket Resolvido", se `ticket.resolved_by` for null/vazio:
+  - Buscar no historico o evento com `action_type === 'resolved'`
+  - Usar `event.profiles?.full_name` como fallback
+  - Se tambem nao encontrar, manter "Nao registrado"
 
-Mudanca:
-- Importar `useAuth` do AuthContext
-- Obter `user`, `isSuperAdmin`, `isOtimizzoUser`, `profile` do contexto
-- Adicionar `analyst_id`, `team_id`, `queue_id` ao select da query
-- Apos receber os dados, filtrar no client-side:
-  - Se `isSuperAdmin || isOtimizzoUser`: mostra todas (sem filtro)
-  - Senao: filtra onde `analyst_id === user.id` OU `queue_id` esta nas filas do analista (usando uma query auxiliar de `teams_queues` baseada no `profile.team_id`)
+### useTicketActions.ts - updateTicketStatus
 
-Alternativa mais simples (recomendada): filtrar diretamente na query Supabase:
-- Para admins: sem filtro adicional
-- Para analistas: adicionar `.eq("analyst_id", user.id)` (filtra apenas RFCs atribuidas ao analista logado)
-
-### 2. Arquivo: `src/pages/RFCExecution.tsx`
-
-**Validacao ao selecionar RFC**: Ao clicar em uma RFC para executar, buscar os dados completos do ticket (analyst_id, team_id, status). Se faltar analyst_id ou team_id:
-- Exibir um banner/alerta na area de detalhes informando que e necessario atribuir o analista e/ou o time antes de iniciar a execucao
-- Desabilitar os checkboxes e botoes de "Iniciar Atividade" ate que as condicoes sejam atendidas
-- Incluir um link/botao para abrir o ticket e fazer a atribuicao
-
-Para implementar:
-- Adicionar `analyst_id, team_id` ao select da query de RFCs (linha 65)
-- Criar um tipo RFC atualizado com esses campos
-- Na area de detalhes, verificar `selectedRfc.analyst_id && selectedRfc.team_id` antes de habilitar a execucao
-- Se faltar, renderizar um Card de alerta com icone de aviso e texto explicativo
-
-### 3. Arquivo: `src/hooks/useRFCStepActions.ts`
-
-**Guard no startStep e toggleStep**: Adicionar validacao server-side - antes de executar update, verificar se o ticket tem analyst_id e team_id preenchidos e status "aprovado". Se nao, retornar toast de erro.
+- Quando `status === "resolvido"`, buscar o perfil do usuario logado (`auth.getUser()` + `profiles`)
+- Incluir `resolved_by: full_name` e `resolved_at: new Date().toISOString()` no update
 
 ### Arquivos a modificar
 
-- `src/pages/RFCExecution.tsx` — filtrar lista por analista + validar pre-requisitos
-- `src/hooks/useRFCStepActions.ts` — guard de validacao
+- `src/components/tickets/TicketSidebar.tsx`
+- `src/hooks/useTicketActions.ts`
 
-### O que NAO muda
+### Correcao de dados existentes
 
-- Tela de Aprovacao de RFC (continua visivel para admins)
-- Portal do cliente
-- Banco de dados (nenhuma migracao necessaria)
-- Nenhum outro componente
+Alem do codigo, executar um UPDATE SQL para corrigir o ticket atual que ja esta com `resolved_by` NULL, preenchendo com o nome do analista que resolveu (disponivel no ticket_history).
