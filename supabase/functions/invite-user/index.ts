@@ -208,7 +208,10 @@ serve(async (req) => {
 
     if (createError) {
       console.error("❌ Error creating user:", createError);
-      return new Response(JSON.stringify({ error: createError.message }), {
+      const safeMsg = createError.message?.includes("already been registered")
+        ? "A user with this email already exists"
+        : "Failed to create user";
+      return new Response(JSON.stringify({ error: safeMsg }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -399,7 +402,7 @@ serve(async (req) => {
     );
   } catch (error: any) {
     console.error("❌ Unexpected error in invite-user function:", error);
-    return new Response(JSON.stringify({ error: error.message || "Internal server error" }), {
+    return new Response(JSON.stringify({ error: "An internal error occurred" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

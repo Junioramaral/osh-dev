@@ -4,6 +4,22 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.80.0";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+async function timingSafeCompare(a: string, b: string): Promise<boolean> {
+  const encoder = new TextEncoder();
+  const aData = encoder.encode(a);
+  const bData = encoder.encode(b);
+  const aHash = await crypto.subtle.digest("SHA-256", aData);
+  const bHash = await crypto.subtle.digest("SHA-256", bData);
+  const aArr = new Uint8Array(aHash);
+  const bArr = new Uint8Array(bHash);
+  if (aArr.length !== bArr.length) return false;
+  let result = 0;
+  for (let i = 0; i < aArr.length; i++) {
+    result |= aArr[i] ^ bArr[i];
+  }
+  return result === 0;
+}
+
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
@@ -51,8 +67,9 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Validate token
-    if (ticket.feedback_token !== token) {
+    // Validate token using timing-safe comparison
+    const tokenValid = await timingSafeCompare(ticket.feedback_token || "", token);
+    if (!tokenValid) {
       console.error("Invalid feedback token");
       return new Response(
         JSON.stringify({ error: "Invalid token", valid: false }),
@@ -127,7 +144,7 @@ const handler = async (req: Request): Promise<Response> => {
   } catch (error: any) {
     console.error("Error in submit-feedback function:", error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ error: "An error occurred while processing your request" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
