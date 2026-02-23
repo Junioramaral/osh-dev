@@ -1,52 +1,63 @@
 
-# Corrigir "Não registrado" na Resolucao de RFC
+# Modal de Conclusao de RFC com Email e Registro no Historico
 
-## Problema
+## O que muda
 
-Quando uma RFC e resolvida, o campo `resolved_by` no banco de dados esta NULL, fazendo o sidebar exibir "Por: Nao registrado". Isso acontece porque o fluxo de resolucao nao salvou o nome do analista corretamente.
+Ao clicar em "Concluir RFC" (quando 100% dos passos estao concluidos), em vez de concluir imediatamente, abre um modal onde o analista escreve uma mensagem de conclusao. Ao confirmar:
 
-## Solucao
+1. O status da RFC muda para "resolvido"
+2. Um email e enviado ao cliente informando que a RFC foi concluida
+3. A mensagem e registrada como comentario no ticket para historico
 
-Duas acoes complementares:
+## Detalhes Tecnicos
 
-### 1. Fallback no TicketSidebar (correcao visual imediata)
+### 1. Criar componente `RFCCompleteDialog`
 
-**Arquivo: `src/components/tickets/TicketSidebar.tsx`**
+**Novo arquivo: `src/components/tickets/RFCCompleteDialog.tsx`**
 
-Quando `ticket.resolved_by` estiver vazio, buscar o nome do usuario que resolveu a partir do `ticket_history` (evento "resolved" com `user_id` preenchido). O historico ja tem essa informacao vinculada ao profile.
+Modal similar ao `TicketResolveDialog` existente, com:
+- Informacoes do ticket (numero, titulo, cliente)
+- Campo de texto para a mensagem de conclusao (minimo 10 caracteres)
+- Botoes Cancelar e Confirmar
 
-- Usar os dados de `ticket_history` que ja sao carregados pelo hook `useTicketHistory`
-- Buscar o evento do tipo "resolved" e pegar o `profiles.full_name` associado
-- Exibir esse nome como fallback em vez de "Nao registrado"
+### 2. Modificar `src/pages/RFCExecution.tsx`
 
-### 2. Garantir que `resolved_by` seja preenchido em todos os fluxos
+- Adicionar estado `showCompleteDialog` (boolean)
+- O botao "Concluir RFC" (linha 331) passa a abrir o modal em vez de chamar `handleMarkConcluida` diretamente
+- Reescrever `handleMarkConcluida` para receber a mensagem e:
+  1. Buscar dados do ticket (contact_email, contact_name, created_at)
+  2. Buscar perfil do usuario logado (full_name)
+  3. Atualizar status para "resolvido" com `resolved_at` e `resolved_by`
+  4. Inserir comentario em `ticket_comments` com a mensagem
+  5. Chamar edge function `send-resolution-notification` para enviar email ao cliente
+  6. Invalidar queries relevantes
 
-**Arquivo: `src/hooks/useTicketActions.ts`**
+### Fluxo
 
-Verificar e reforcar que o `updateTicketStatus` tambem preencha `resolved_by` quando o status muda para "resolvido". Atualmente, apenas o `resolveTicketWithReason` faz isso. Adicionar logica no `updateTicketStatus` para buscar o nome do usuario logado e preencher `resolved_by` e `resolved_at` quando status = "resolvido".
+```text
+[Todos passos concluidos]
+        |
+        v
+[Clica "Concluir RFC"]
+        |
+        v
+[Modal abre - preenche mensagem]
+        |
+        v
+[Confirma]
+        |
+        +---> UPDATE tickets (status=resolvido, resolved_at, resolved_by)
+        +---> INSERT ticket_comments (mensagem de conclusao)
+        +---> CALL send-resolution-notification (email ao cliente)
+```
 
----
+### Arquivos
 
-## Detalhe Tecnico
+- **Novo**: `src/components/tickets/RFCCompleteDialog.tsx`
+- **Editado**: `src/pages/RFCExecution.tsx`
 
-### TicketSidebar.tsx
+### O que NAO muda
 
-- Importar `useTicketHistory` do hook existente
-- Na secao do "Ticket Resolvido", se `ticket.resolved_by` for null/vazio:
-  - Buscar no historico o evento com `action_type === 'resolved'`
-  - Usar `event.profiles?.full_name` como fallback
-  - Se tambem nao encontrar, manter "Nao registrado"
-
-### useTicketActions.ts - updateTicketStatus
-
-- Quando `status === "resolvido"`, buscar o perfil do usuario logado (`auth.getUser()` + `profiles`)
-- Incluir `resolved_by: full_name` e `resolved_at: new Date().toISOString()` no update
-
-### Arquivos a modificar
-
-- `src/components/tickets/TicketSidebar.tsx`
-- `src/hooks/useTicketActions.ts`
-
-### Correcao de dados existentes
-
-Alem do codigo, executar um UPDATE SQL para corrigir o ticket atual que ja esta com `resolved_by` NULL, preenchendo com o nome do analista que resolveu (disponivel no ticket_history).
+- Edge function `send-resolution-notification` (ja existe e sera reutilizada)
+- Banco de dados (nenhuma migracao)
+- Outros componentes
