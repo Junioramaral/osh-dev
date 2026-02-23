@@ -1,116 +1,97 @@
 
 
-# Cronometragem de Atividades RFC e Relatorio de Tempo
+# Diagnostico e Correcao: UI Travando Apos Alguns Minutos
 
-## Objetivo
+## Problema Identificado
 
-Adicionar um sistema de cronometragem por passo na execucao de RFCs: o analista clica "Iniciar Atividade" para registrar o inicio, e ao marcar como concluido o sistema calcula automaticamente a duracao. Na tela do ticket (TicketDetail), adicionar uma aba "RFC" ao lado de "Timeline" com um relatorio de tempo por atividade e total. Tambem incluir eventos de RFC (inicio/conclusao de passos) na Timeline do ticket.
-
----
-
-## 1. Migracao de Banco de Dados
-
-Adicionar coluna na tabela `rfc_steps`:
-
-- **`started_at`** (`timestamptz`, nullable) — timestamp de quando o analista clicou "Iniciar Atividade"
-- **`started_by`** (`uuid`, nullable) — quem iniciou a atividade
-
-Isso permite calcular a duracao: `concluded_at - started_at`.
+Apos analise do codigo, identifiquei **3 problemas criticos** que, combinados, causam o travamento progressivo da interface.
 
 ---
 
-## 2. Modificar `src/hooks/useRFCStepActions.ts`
+## Causa 1: Bug no Hook `useToast` (CRITICO)
 
-Adicionar nova acao `startStep(stepId)` que salva `started_at = now()` e `started_by = auth.uid()`. Atualizar `toggleStep` para, ao marcar como concluido, manter o `started_at` existente (nao sobrescrever).
+**Arquivo:** `src/hooks/use-toast.ts` (linha 177)
 
----
+O `useEffect` do hook `useToast` tem `[state]` como dependencia. Isso significa que toda vez que um toast e adicionado/removido, o efeito re-executa, removendo e re-adicionando o listener na lista global. Isso causa:
+- Re-subscricoes desnecessarias a cada mudanca de estado
+- Potencial acumulo de listeners em condicoes de concorrencia
+- Re-renders cascateados em todos os componentes que usam `useToast`
 
-## 3. Modificar `src/pages/RFCExecution.tsx`
+Alem disso, o `TOAST_REMOVE_DELAY` esta em `1000000` (16.7 minutos), fazendo com que toasts nunca sejam removidos da memoria durante a sessao.
 
-Para cada passo, adicionar um botao **"Iniciar Atividade"** (com icone de play/relogio) que aparece quando:
-- O passo NAO esta concluido
-- O passo NAO tem `started_at` preenchido
-
-Quando o passo ja foi iniciado mas nao concluido, mostrar um badge "Em andamento" (amarelo/laranja) com o horario de inicio, substituindo o badge "Pendente" atual.
-
-Ao marcar como concluido (checkbox), exibir a duracao calculada (`concluded_at - started_at`) no info de conclusao.
-
----
-
-## 4. Nova aba "RFC" no `src/pages/TicketDetail.tsx`
-
-Adicionar uma aba condicional (apenas quando `record_type === 'rfc'`) chamada **"RFC"** com um componente novo `TicketRFCReport`.
+**Correcao:**
+- Trocar `[state]` por `[]` no useEffect
+- Reduzir `TOAST_REMOVE_DELAY` para `5000` (5 segundos)
 
 ---
 
-## 5. Novo componente `src/components/tickets/TicketRFCReport.tsx`
+## Causa 2: AuthContext Recria Funcoes a Cada Render (ALTO IMPACTO)
 
-Relatorio de tempo da RFC contendo:
-- Tabela com colunas: Passo, Descricao, Inicio, Fim, Duracao, Responsavel
-- Cada linha mostra o tempo de cada atividade (diferenca entre `started_at` e `concluded_at`)
-- Linha final com o **tempo total** somado de todas as atividades
-- Passos sem inicio/fim mostram "—"
-- Badge de status por passo (Pendente / Em andamento / Concluido)
-- Barra de progresso geral no topo
+**Arquivo:** `src/contexts/AuthContext.tsx`
 
-Este componente busca dados de `rfc_steps` (com join em `profiles` para nome do responsavel).
+O `AuthProvider` cria novas referencias de funcao (`hasRole`, `signIn`, `signOut`, `signUp`, `resetPassword`, `updatePassword`) a cada render. Como o valor do contexto muda a cada render, TODOS os componentes consumidores (via `useAuth()`) tambem re-renderizam.
+
+Com 4 queries de polling rodando a cada 30 segundos no `AppLayout` (pendingCount, myTicketsCount, SLA alerts count, SLA alerts), cada poll causa re-render no AuthProvider, que propaga para toda a arvore de componentes.
+
+**Correcao:**
+- Envolver `signIn`, `signUp`, `signOut`, `clearMustChangePassword`, `resetPassword`, `updatePassword` com `useCallback`
+- Memoizar o objeto de valor do contexto com `useMemo`
+- Memoizar `hasRole` com `useCallback` e derivados (`isSuperAdmin`, etc.) com `useMemo`
 
 ---
 
-## 6. Modificar `src/components/tickets/TicketTimeline.tsx`
+## Causa 3: Debounce Timers Sem Cleanup no `useRFCStepActions`
 
-Adicionar os eventos de RFC steps na timeline. Buscar `rfc_steps` do ticket e gerar eventos:
-- **`rfc_step_started`**: "Passo X iniciado" — quando `started_at` nao e null
-- **`rfc_step_completed`**: "Passo X concluido (duracao: Xh Xmin)" — quando `concluded_at` nao e null
+**Arquivo:** `src/hooks/useRFCStepActions.ts`
 
-Esses eventos aparecem na timeline junto com os demais (status changes, comments, time logs), ordenados cronologicamente.
+Os timers de debounce no `useRef` nunca sao limpos quando o componente desmonta. Se o usuario navega para outra pagina, os timers disparam e tentam fazer chamadas Supabase em componentes desmontados, podendo causar erros silenciosos e comportamento inesperado.
+
+**Correcao:**
+- Adicionar cleanup dos timers no `useEffect` de desmontagem
 
 ---
 
 ## Detalhes Tecnicos
 
-### Migracao SQL
+### Arquivo 1: `src/hooks/use-toast.ts`
 
+Mudancas:
+- Linha 6: `TOAST_REMOVE_DELAY = 1000000` para `TOAST_REMOVE_DELAY = 5000`
+- Linha 177: `}, [state]);` para `}, []);`
+
+### Arquivo 2: `src/contexts/AuthContext.tsx`
+
+Mudancas:
+- Importar `useCallback` e `useMemo`
+- Envolver `fetchProfile`, `fetchRoles`, `signIn`, `signUp`, `signOut`, `clearMustChangePassword`, `resetPassword`, `updatePassword` com `useCallback`
+- Memoizar `hasRole` com `useCallback`
+- Memoizar `isSuperAdmin`, `isTenantAdmin`, `isViewer`, `isAnalyst`, `isOtimizzoUser`, `tenantId` com `useMemo`
+- Memoizar o objeto de valor do `Provider` com `useMemo`
+
+### Arquivo 3: `src/hooks/useRFCStepActions.ts`
+
+Mudancas:
+- Adicionar `useEffect` com cleanup que limpa todos os timers no desmonte:
 ```text
-ALTER TABLE public.rfc_steps ADD COLUMN started_at timestamptz;
-ALTER TABLE public.rfc_steps ADD COLUMN started_by uuid;
+useEffect(() => {
+  return () => {
+    Object.values(debounceTimers.current).forEach(clearTimeout);
+  };
+}, []);
 ```
 
-### Arquivos a criar
-
-- `src/components/tickets/TicketRFCReport.tsx` — relatorio de tempo por atividade
-
-### Arquivos a modificar
-
-- `src/hooks/useRFCStepActions.ts` — adicionar `startStep`
-- `src/pages/RFCExecution.tsx` — botao "Iniciar Atividade", badge "Em andamento", exibir duracao
-- `src/pages/TicketDetail.tsx` — nova aba "RFC" condicional
-- `src/components/tickets/TicketTimeline.tsx` — incluir eventos de rfc_steps na timeline
-- `src/hooks/useTicketDetail.ts` — novo hook `useTicketRFCSteps` para buscar passos com perfis
-
-### Sequencia
+### Sequencia de Implementacao
 
 ```text
-1. Migracao SQL (started_at, started_by)
-2. useRFCStepActions.ts (startStep)
-3. useTicketDetail.ts (useTicketRFCSteps)
-4. RFCExecution.tsx (botao iniciar, badge em andamento, duracao)
-5. TicketRFCReport.tsx (criar relatorio)
-6. TicketDetail.tsx (aba RFC)
-7. TicketTimeline.tsx (eventos de RFC na timeline)
+1. use-toast.ts (correcao do memory leak)
+2. AuthContext.tsx (memoizacao do contexto)
+3. useRFCStepActions.ts (cleanup de timers)
 ```
-
-### Calculo de duracao
-
-A duracao e calculada como `concluded_at - started_at` em minutos/horas. Formato de exibicao:
-- Menos de 60min: "Xmin"
-- 60min ou mais: "Xh Xmin"
 
 ### O que NAO muda
 
-- RFCStepBuilder, RFCFormSection (criacao de RFC)
-- RFCApproval (aprovacao)
-- ClientRFCPortal (portal do cliente — nao ve cronometragem interna)
-- Edge functions existentes
-- RLS policies (rfc_steps ja tem policies corretas para leitura)
+- Nenhuma pagina ou componente visual e alterado
+- Nenhuma query de banco e modificada
+- Nenhuma funcionalidade e removida
+- Apenas otimizacoes de performance e correcao de bugs
 
