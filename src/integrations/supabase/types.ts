@@ -711,9 +711,11 @@ export type Database = {
       rfc_steps: {
         Row: {
           concluded_at: string | null
+          concluded_by: string | null
           created_at: string | null
           descricao: string
           id: string
+          observacao: string | null
           ordem: number
           procedimento: string | null
           scripts: string | null
@@ -723,9 +725,11 @@ export type Database = {
         }
         Insert: {
           concluded_at?: string | null
+          concluded_by?: string | null
           created_at?: string | null
           descricao: string
           id?: string
+          observacao?: string | null
           ordem?: number
           procedimento?: string | null
           scripts?: string | null
@@ -735,9 +739,11 @@ export type Database = {
         }
         Update: {
           concluded_at?: string | null
+          concluded_by?: string | null
           created_at?: string | null
           descricao?: string
           id?: string
+          observacao?: string | null
           ordem?: number
           procedimento?: string | null
           scripts?: string | null
@@ -1199,6 +1205,7 @@ export type Database = {
           reproduction_steps: string | null
           resolved_at: string | null
           resolved_by: string | null
+          rfc_progress: number | null
           segment: Database["public"]["Enums"]["ticket_segment"]
           sla_first_response_deadline: string | null
           sla_first_response_met: boolean | null
@@ -1261,6 +1268,7 @@ export type Database = {
           reproduction_steps?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          rfc_progress?: number | null
           segment: Database["public"]["Enums"]["ticket_segment"]
           sla_first_response_deadline?: string | null
           sla_first_response_met?: boolean | null
@@ -1323,6 +1331,7 @@ export type Database = {
           reproduction_steps?: string | null
           resolved_at?: string | null
           resolved_by?: string | null
+          rfc_progress?: number | null
           segment?: Database["public"]["Enums"]["ticket_segment"]
           sla_first_response_deadline?: string | null
           sla_first_response_met?: boolean | null
