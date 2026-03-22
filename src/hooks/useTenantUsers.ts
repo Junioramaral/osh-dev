@@ -224,6 +224,7 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       phone?: string;
       roles?: string[];
       team_id?: string | null;
+      queue_ids?: string[];
     }) => {
       // Update profile (full_name, phone, team_id)
       const profileUpdates: Record<string, any> = {};
