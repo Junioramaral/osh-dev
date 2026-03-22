@@ -786,6 +786,12 @@ const TenantDetail = () => {
                             <TableCell>{user.phone || "-"}</TableCell>
                             <TableCell>{getRolesLabel(user.roles)}</TableCell>
                             <TableCell>
+                              {user.roles.some(r => r === 'analyst_db' || r === 'analyst_app')
+                                ? (user.team_name || <span className="text-muted-foreground">—</span>)
+                                : <span className="text-muted-foreground">—</span>
+                              }
+                            </TableCell>
+                            <TableCell>
                               <Badge variant={status.variant}>
                                 <StatusIcon className="mr-1 h-3 w-3" />
                                 {status.label}
