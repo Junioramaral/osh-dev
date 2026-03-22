@@ -1,32 +1,20 @@
 
 
-# Fix: Ticket Count and Last Activity in Tenant User Report
+# Add "Último Login" Column to Tenant User Report
 
-## Root Cause
+## Overview
 
-In `TenantUserReport.tsx`, the queries for ticket count and last activity filter by `analyst_id` or `lock_owner_id`. Client users create tickets and are identified by `contact_email`, not by analyst fields. So their tickets are never counted.
+Add a "Último Login" column to the user detail table, sourced from the `last_sign_in_at` field already available in the Supabase Auth users data (fetched via the `manage-user` edge function).
 
-## Solution
+## Changes (single file)
 
-Modify `src/components/tenants/TenantUserReport.tsx` to query tickets using the user's email (`contact_email`) in addition to `analyst_id`/`lock_owner_id`.
+**`src/components/tenants/TenantUserReport.tsx`**
 
-### Changes in the `queryFn` (single file)
+1. Add `lastLogin: string | null` to the `UserStats` interface
+2. In the `queryFn`, extract `authUser.last_sign_in_at` and include it in the returned user stats object
+3. Add "Último Login" column header and cell to the detail table (between "Última Atividade" and "Cadastrado em")
+4. Include "Último Login" in the CSV export headers and row data
+5. Include "Último Login" in the PDF export table
 
-**Ticket count query (line 81-85):** Replace the `.or(analyst_id, lock_owner_id)` filter with a broader filter that also matches `contact_email.eq.{userEmail}`:
-
-```typescript
-.or(`analyst_id.eq.${profile.id},lock_owner_id.eq.${profile.id},contact_email.eq.${email}`)
-```
-
-Where `email` comes from the already-fetched `authUser`.
-
-**Last ticket activity query (lines 102-108):** Same fix -- include `contact_email.eq.${email}` in the `.or()` filter so tickets created by the user are also considered for last activity.
-
-**Last activity should also consider `created_at`:** Currently only checks `updated_at` on tickets. For a user who just created a ticket, `created_at` is the relevant timestamp. We should use `created_at` as well (or keep `updated_at` since it defaults to `now()` on creation, which should work).
-
-### Summary
-
-- **File**: `src/components/tenants/TenantUserReport.tsx`
-- **What changes**: Two `.or()` filters gain a `contact_email.eq.{email}` condition
-- **No database changes needed**
+No database changes needed — `last_sign_in_at` is already provided by Supabase Auth's `listUsers` response.
 
