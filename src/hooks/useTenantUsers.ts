@@ -7,12 +7,14 @@ export interface TenantUser {
   email: string;
   full_name: string;
   phone: string | null;
-  roles: string[]; // Changed to array for multiple roles
+  roles: string[];
   is_active: boolean;
   email_confirmed_at: string | null;
   invited_at: string | null;
   created_at: string;
   last_sign_in_at: string | null;
+  team_id: string | null;
+  team_name: string | null;
 }
 
 export const useTenantUsers = (tenantId: string | undefined) => {
