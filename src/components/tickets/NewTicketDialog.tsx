@@ -138,23 +138,29 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
 
-  // Check if analyst (not super_admin/tenant_admin) to restrict by team
+  // Check if analyst (not super_admin/tenant_admin) to restrict by queues
   const isAnalystOnly = isOtimizzoUser && (hasRole('analyst_db') || hasRole('analyst_app')) && !isSuperAdmin && !isTenantAdmin;
 
-  // Fetch analyst's team data (segment)
-  const { data: analystTeam } = useQuery({
-    queryKey: ["analyst-team", profile?.team_id],
+  // Derive analyst segments from roles instead of team
+  const analystSegments: string[] = [];
+  if (isAnalystOnly) {
+    if (hasRole('analyst_db')) analystSegments.push('DB');
+    if (hasRole('analyst_app')) analystSegments.push('APP');
+  }
+
+  // Fetch analyst's assigned queues from user_queues
+  const { data: analystQueues } = useQuery({
+    queryKey: ["analyst-user-queues", profile?.id],
     queryFn: async () => {
-      if (!profile?.team_id) return null;
+      if (!profile?.id) return [];
       const { data, error } = await supabase
-        .from("teams")
-        .select("id, name, segment")
-        .eq("id", profile.team_id)
-        .single();
+        .from("user_queues")
+        .select("queue_id")
+        .eq("user_id", profile.id);
       if (error) throw error;
-      return data;
+      return data.map(uq => uq.queue_id);
     },
-    enabled: !!profile?.team_id && isAnalystOnly,
+    enabled: !!profile?.id && isAnalystOnly,
   });
 
   // Fetch selected client data (when Otimizzo user selects a different client)
