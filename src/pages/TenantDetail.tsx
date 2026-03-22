@@ -345,7 +345,7 @@ const TenantDetail = () => {
         onSuccess: () => {
           setIsEditUserDialogOpen(false);
           setUserToEdit(null);
-          setEditUserForm({ full_name: "", email: "", phone: "", roles: [] });
+          setEditUserForm({ full_name: "", email: "", phone: "", roles: [], team_id: "" });
         },
       }
     );
