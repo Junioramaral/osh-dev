@@ -134,6 +134,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
             role: (profile.user_roles as any)[0]?.role || "user",
             createdAt: profile.created_at || "",
             lastActivity,
+            lastLogin: authUser?.last_sign_in_at || null,
             ticketsCreated: ticketsCount || 0,
             commentsCreated: commentsCount || 0,
           };
