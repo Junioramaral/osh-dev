@@ -622,6 +622,17 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
                     )}
                   </TableCell>
                   <TableCell>
+                    {user.lastLogin ? (
+                      <div className="text-sm">
+                        {format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", {
+                          locale: ptBR,
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Nunca</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
                     <div className="text-sm">
                       {format(new Date(user.createdAt), "dd/MM/yyyy", {
                         locale: ptBR,
