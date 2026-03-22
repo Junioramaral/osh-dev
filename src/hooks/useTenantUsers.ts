@@ -54,28 +54,43 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       const userIds = profiles?.map(p => p.id) || [];
       if (userIds.length === 0) return [];
 
-      // Get auth users data via edge function
-      let authUsers: any[] = [];
-      try {
-        const { data, error: authError } = await supabase.functions.invoke("manage-user", {
+      // Fetch user_queues for all users in parallel with auth users
+      const [authUsersResult, userQueuesResult] = await Promise.all([
+        supabase.functions.invoke("manage-user", {
           body: { action: "list_users" }
-        });
-        if (!authError && data?.data?.users) {
-          authUsers = data.data.users;
+        }).catch(err => {
+          console.error("Error fetching auth users:", err);
+          return { data: null, error: err };
+        }),
+        supabase
+          .from("user_queues")
+          .select("user_id, queue_id, queues(name)")
+          .in("user_id", userIds),
+      ]);
+
+      const authUsers = authUsersResult.data?.data?.users || [];
+      const userQueuesData = userQueuesResult.data || [];
+
+      // Build a map of user_id -> { queue_ids, queue_names }
+      const userQueuesMap: Record<string, { queue_ids: string[]; queue_names: string[] }> = {};
+      for (const uq of userQueuesData) {
+        if (!userQueuesMap[uq.user_id]) {
+          userQueuesMap[uq.user_id] = { queue_ids: [], queue_names: [] };
         }
-      } catch (err) {
-        console.error("Error fetching auth users:", err);
+        userQueuesMap[uq.user_id].queue_ids.push(uq.queue_id);
+        userQueuesMap[uq.user_id].queue_names.push((uq.queues as any)?.name || "");
       }
 
       // Combine data
       const combinedUsers: TenantUser[] = (profiles || []).map((profile: any) => {
-        const authUser = authUsers?.find(u => u.id === profile.id);
+        const authUser = authUsers?.find((u: any) => u.id === profile.id);
         const userRolesArray = Array.isArray(profile.user_roles) 
           ? profile.user_roles 
           : profile.user_roles ? [profile.user_roles] : [];
         
         // Extract all roles for this user
         const roles = userRolesArray.map((r: any) => r?.role).filter(Boolean);
+        const uqData = userQueuesMap[profile.id] || { queue_ids: [], queue_names: [] };
 
         return {
           id: profile.id,
@@ -90,6 +105,8 @@ export const useTenantUsers = (tenantId: string | undefined) => {
           last_sign_in_at: authUser?.last_sign_in_at || null,
           team_id: profile.team_id || null,
           team_name: (profile as any).teams?.name || null,
+          queue_ids: uqData.queue_ids,
+          queue_names: uqData.queue_names,
         };
       });
 
