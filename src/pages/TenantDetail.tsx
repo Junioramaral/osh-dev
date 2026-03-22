@@ -345,12 +345,13 @@ const TenantDetail = () => {
         phone: editUserForm.phone ? cleanPhone(editUserForm.phone) : "",
         roles: editUserForm.roles,
         team_id: hasAnalystRole ? (editUserForm.team_id || null) : null,
+        queue_ids: hasAnalystRole ? editUserForm.queue_ids : [],
       },
       {
         onSuccess: () => {
           setIsEditUserDialogOpen(false);
           setUserToEdit(null);
-          setEditUserForm({ full_name: "", email: "", phone: "", roles: [], team_id: "" });
+          setEditUserForm({ full_name: "", email: "", phone: "", roles: [], team_id: "", queue_ids: [] });
         },
       }
     );
