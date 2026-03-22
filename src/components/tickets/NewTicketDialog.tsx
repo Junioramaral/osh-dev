@@ -86,7 +86,7 @@ interface NewTicketDialogProps {
 }
 
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
-  const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
+  const { profile, tenantId, hasRole, isOtimizzoUser, isSuperAdmin, isTenantAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [recordType, setRecordType] = useState<"suporte" | "rfc">("suporte");
   const [segment, setSegment] = useState<string | null>(null);
