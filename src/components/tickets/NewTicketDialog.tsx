@@ -138,6 +138,25 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
 
+  // Check if analyst (not super_admin/tenant_admin) to restrict by team
+  const isAnalystOnly = isOtimizzoUser && (hasRole('analyst_db') || hasRole('analyst_app')) && !isSuperAdmin && !isTenantAdmin;
+
+  // Fetch analyst's team data (segment)
+  const { data: analystTeam } = useQuery({
+    queryKey: ["analyst-team", profile?.team_id],
+    queryFn: async () => {
+      if (!profile?.team_id) return null;
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, segment")
+        .eq("id", profile.team_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.team_id && isAnalystOnly,
+  });
+
   // Fetch selected client data (when Otimizzo user selects a different client)
   const { data: selectedClientData } = useQuery({
     queryKey: ["selected-client-data", selectedClientId],
