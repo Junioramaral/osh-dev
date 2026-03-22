@@ -189,8 +189,23 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const hasOnlyOneSegment = availableSegments.length === 1;
   const availableDbEngines = effectiveClientData?.db_engines || [];
 
+  // For analysts, force segment to team segment
+  const analystSegmentForced = isAnalystOnly && analystTeam;
+  const effectiveAvailableSegments = analystSegmentForced
+    ? allSegments?.filter(s => s.code === analystTeam.segment) || []
+    : availableSegments;
+  const effectiveHasOnlyOneSegment = effectiveAvailableSegments.length === 1;
+
   // Initialize segment when tenant loads
   useEffect(() => {
+    if (analystSegmentForced) {
+      // Force analyst segment
+      if (segment !== analystTeam.segment) {
+        setSegment(analystTeam.segment);
+        setValue("segment", analystTeam.segment);
+      }
+      return;
+    }
     if (currentTenant && availableSegments.length > 0 && segment === null) {
       const initialSegment = availableSegments[0].code;
       setSegment(initialSegment);
@@ -206,7 +221,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       });
     }
-  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId]);
+  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId, analystSegmentForced, analystTeam]);
 
   // Fetch clients
   const { data: clients } = useQuery({
