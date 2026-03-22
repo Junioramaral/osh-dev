@@ -118,18 +118,7 @@ const TenantDetail = () => {
     isResending,
   } = useTenantUsers(tenantId);
 
-  // Query to fetch teams for analyst assignment
-  const { data: teams } = useQuery({
-    queryKey: ["teams-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, name, segment")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Teams query removed - now using QueueCheckboxGroup which fetches queues internally
 
   // Query para buscar admins do tenant
   const {
