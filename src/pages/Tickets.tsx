@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 export default function Tickets() {
   const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst } = useAuth();
-  const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasTeam, hasQueues } = useAnalystQueues();
+  const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
