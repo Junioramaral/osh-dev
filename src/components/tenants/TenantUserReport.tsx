@@ -37,6 +37,7 @@ interface UserStats {
   role: string;
   createdAt: string;
   lastActivity: string | null;
+  lastLogin: string | null;
   ticketsCreated: number;
   commentsCreated: number;
 }
@@ -133,6 +134,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
             role: (profile.user_roles as any)[0]?.role || "user",
             createdAt: profile.created_at || "",
             lastActivity,
+            lastLogin: authUser?.last_sign_in_at || null,
             ticketsCreated: ticketsCount || 0,
             commentsCreated: commentsCount || 0,
           };
@@ -217,7 +219,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
 
     const headers = [
       "Nome", "Email", "Status", "Perfil",
-      "Tickets", "Comentários", "Última Atividade", "Cadastrado em"
+      "Tickets", "Comentários", "Última Atividade", "Último Login", "Cadastrado em"
     ];
 
     const rows = stats.users.map(user => [
@@ -228,6 +230,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
       user.ticketsCreated,
       user.commentsCreated,
       user.lastActivity ? format(new Date(user.lastActivity), "dd/MM/yyyy HH:mm") : "Sem atividade",
+      user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm") : "Nunca",
       format(new Date(user.createdAt), "dd/MM/yyyy")
     ]);
 
@@ -317,6 +320,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
               <th>Tickets</th>
               <th>Comentários</th>
               <th>Última Atividade</th>
+              <th>Último Login</th>
               <th>Cadastro</th>
             </tr>
           </thead>
@@ -330,6 +334,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
                 <td style="text-align: center">${user.ticketsCreated}</td>
                 <td style="text-align: center">${user.commentsCreated}</td>
                 <td>${user.lastActivity ? format(new Date(user.lastActivity), "dd/MM/yyyy HH:mm") : "-"}</td>
+                <td>${user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm") : "Nunca"}</td>
                 <td>${format(new Date(user.createdAt), "dd/MM/yyyy")}</td>
               </tr>
             `).join("")}
@@ -572,6 +577,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
                 <TableHead className="text-center">Tickets</TableHead>
                 <TableHead className="text-center">Comentários</TableHead>
                 <TableHead>Última Atividade</TableHead>
+                <TableHead>Último Login</TableHead>
                 <TableHead>Cadastrado em</TableHead>
               </TableRow>
             </TableHeader>
@@ -613,6 +619,17 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
                       </div>
                     ) : (
                       <span className="text-sm text-muted-foreground">Sem atividade</span>
+                    )}
+                  </TableCell>
+                  <TableCell>
+                    {user.lastLogin ? (
+                      <div className="text-sm">
+                        {format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm", {
+                          locale: ptBR,
+                        })}
+                      </div>
+                    ) : (
+                      <span className="text-sm text-muted-foreground">Nunca</span>
                     )}
                   </TableCell>
                   <TableCell>
