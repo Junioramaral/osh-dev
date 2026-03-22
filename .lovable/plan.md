@@ -1,37 +1,32 @@
 
 
-# Restringir Abertura de Tickets por Analistas Otimizzo (por Filas/Equipe)
+# Problema: Analista sem equipe atribuída não consegue criar tickets
 
-## Problema
+## Diagnóstico
 
-Atualmente, todos os usuários do tenant Otimizzo (incluindo analistas) veem o seletor de clientes e podem abrir tickets para qualquer cliente. O seletor está desabilitado para analistas (linha 626), mas o `client_id` já está definido como o tenant Otimizzo, o que não faz sentido para abertura de tickets de suporte.
+O erro ocorre porque a restrição implementada anteriormente exige que analistas Otimizzo tenham um `team_id` no seu perfil (`profiles.team_id`). Porém, **não existe nenhuma tela no sistema para atribuir um time a um usuário/analista**. O campo `profiles.team_id` só pode ser alterado diretamente no banco de dados.
 
 ## Solução
 
-Filtrar a lista de clientes disponíveis para analistas Otimizzo com base no segmento da equipe do analista, e restringir os segmentos disponíveis conforme as filas da equipe.
+Adicionar um campo de seleção de **Time** na tela de gerenciamento de usuários do tenant (`TenantDetail.tsx`), visível apenas para usuários do tenant Otimizzo que possuem role de analista. Isso permitirá que o super_admin atribua um time a cada analista.
 
-### Lógica
+## Mudanças
 
-1. **Analistas Otimizzo (analyst_db/analyst_app)** sem role de super_admin ou tenant_admin:
-   - Buscar a equipe do analista (`profile.team_id`) e seu segmento
-   - Filtrar a lista de clientes para mostrar apenas clientes que possuem o segmento da equipe do analista (ex: analista DB vê apenas clientes com segmento "DB")
-   - Restringir o seletor de segmento ao segmento da equipe
-   - Habilitar o seletor de clientes (atualmente está disabled para analistas)
+### 1. `src/pages/TenantDetail.tsx`
 
-2. **Super Admin / Tenant Admin Otimizzo**: mantém comportamento atual (todos os clientes, todos os segmentos)
+- Na tabela de usuários, adicionar uma coluna **"Time"** que mostra o time atribuído ao analista (ou "—" se nenhum)
+- No dialog de edição de usuário (já existente para nome/email/telefone), adicionar um campo **Select de Time** que aparece quando o usuário tem role de analista (`analyst_db` ou `analyst_app`)
+- Ao salvar, atualizar o `profiles.team_id` junto com os outros campos
 
-### Mudanças em `src/components/tickets/NewTicketDialog.tsx`
+### 2. `src/hooks/useTenantUsers.ts`
 
-1. **Buscar dados da equipe do analista**: Nova query para obter o segmento da equipe (`teams.segment`) usando `profile.team_id`
+- Incluir `team_id` e o join com `teams(name)` na query de usuários do tenant, para exibir o nome do time na listagem
 
-2. **Filtrar clientes**: Quando o usuário é analista Otimizzo, filtrar a lista de `clients` para mostrar apenas clientes que incluem o segmento da equipe em seu array `segments`
+### Fluxo do admin
 
-3. **Restringir segmento**: Para analistas, forçar o segmento para o da equipe (não permitir trocar)
-
-4. **Habilitar seletor de clientes**: Remover o `disabled` do seletor de clientes para analistas (eles precisam escolher o cliente, mas da lista filtrada)
-
-5. **Tratar analista sem equipe**: Se o analista não tem equipe atribuída, exibir mensagem informando que precisa ser atribuído a uma equipe antes de abrir tickets
-
-### Arquivo editado
-- `src/components/tickets/NewTicketDialog.tsx`
+1. Admin acessa **Admin Tenants → Otimizzo → Gerenciar Usuários**
+2. Clica em editar um analista
+3. Seleciona o **Time** no novo campo (ex: "Time Oracle", "Time PostgreSQL")
+4. Salva — o `profiles.team_id` é atualizado
+5. Analista agora pode criar tickets filtrados pelo segmento da sua equipe
 
