@@ -116,6 +116,19 @@ const TenantDetail = () => {
     isResending,
   } = useTenantUsers(tenantId);
 
+  // Query to fetch teams for analyst assignment
+  const { data: teams } = useQuery({
+    queryKey: ["teams-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, segment")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
+
   // Query para buscar admins do tenant
   const {
     data: tenantAdmins,
