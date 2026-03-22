@@ -86,7 +86,7 @@ interface NewTicketDialogProps {
 }
 
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
-  const { profile, tenantId, hasRole, isOtimizzoUser } = useAuth();
+  const { profile, tenantId, hasRole, isOtimizzoUser, isSuperAdmin, isTenantAdmin } = useAuth();
   const queryClient = useQueryClient();
   const [recordType, setRecordType] = useState<"suporte" | "rfc">("suporte");
   const [segment, setSegment] = useState<string | null>(null);
@@ -138,6 +138,25 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
 
+  // Check if analyst (not super_admin/tenant_admin) to restrict by team
+  const isAnalystOnly = isOtimizzoUser && (hasRole('analyst_db') || hasRole('analyst_app')) && !isSuperAdmin && !isTenantAdmin;
+
+  // Fetch analyst's team data (segment)
+  const { data: analystTeam } = useQuery({
+    queryKey: ["analyst-team", profile?.team_id],
+    queryFn: async () => {
+      if (!profile?.team_id) return null;
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, segment")
+        .eq("id", profile.team_id)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!profile?.team_id && isAnalystOnly,
+  });
+
   // Fetch selected client data (when Otimizzo user selects a different client)
   const { data: selectedClientData } = useQuery({
     queryKey: ["selected-client-data", selectedClientId],
@@ -170,8 +189,27 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const hasOnlyOneSegment = availableSegments.length === 1;
   const availableDbEngines = effectiveClientData?.db_engines || [];
 
+  // For analysts, force segment to team segment
+  const analystSegmentForced = isAnalystOnly && analystTeam;
+  const effectiveAvailableSegments = analystSegmentForced
+    ? allSegments?.filter(s => s.code === analystTeam.segment) || []
+    : availableSegments;
+  const effectiveHasOnlyOneSegment = effectiveAvailableSegments.length === 1;
+
   // Initialize segment when tenant loads
   useEffect(() => {
+    if (analystSegmentForced) {
+      // Force analyst segment and clear client_id (analyst must choose)
+      if (segment !== analystTeam.segment) {
+        setSegment(analystTeam.segment);
+        setValue("segment", analystTeam.segment);
+      }
+      // Clear the default Otimizzo client_id so analyst must pick a client
+      if (watch("client_id") === effectiveTenantId) {
+        setValue("client_id", "");
+      }
+      return;
+    }
     if (currentTenant && availableSegments.length > 0 && segment === null) {
       const initialSegment = availableSegments[0].code;
       setSegment(initialSegment);
@@ -187,17 +225,22 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       });
     }
-  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId]);
+  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId, analystSegmentForced, analystTeam]);
 
   // Fetch clients
   const { data: clients } = useQuery({
     queryKey: ["clients"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id, name").order("name");
+      const { data, error } = await supabase.from("clients").select("id, name, segments, tenant_type").order("name");
       if (error) throw error;
       return data;
     },
   });
+
+  // Filter clients for analysts: only show clients with matching team segment (exclude otimizzo tenant)
+  const filteredClients = isAnalystOnly && analystTeam
+    ? clients?.filter(c => c.tenant_type !== 'otimizzo' && c.segments?.includes(analystTeam.segment))
+    : clients?.filter(c => c.tenant_type !== 'otimizzo');
 
   // Fetch DB instances
   const { data: dbInstances } = useQuery({
@@ -616,6 +659,14 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         {/* Formulário Suporte (fluxo existente) */}
         {recordType === "suporte" && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Analyst without team warning */}
+          {isAnalystOnly && !profile?.team_id && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Você precisa ser atribuído a uma equipe antes de abrir tickets. Contate o administrador.</span>
+            </div>
+          )}
+
           {/* 1. Cliente (apenas para Otimizzo) */}
           {isOtimizzoTenant && (
             <div className="space-y-2">
@@ -623,13 +674,13 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <Select
                 value={watch("client_id")}
                 onValueChange={(value) => setValue("client_id", value)}
-                disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
+                disabled={isAnalystOnly && !profile?.team_id}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {clients?.map((client) => (
+                  {filteredClients?.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
                     </SelectItem>
@@ -642,17 +693,17 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
           {/* 2. Segmento — sempre visível para cliente; para Otimizzo só após escolher cliente */}
           {(!isOtimizzoTenant || selectedClientId) && (
-            hasOnlyOneSegment ? (
+            effectiveHasOnlyOneSegment ? (
               <div className="space-y-2">
                 <Label>Segmento *</Label>
                 <div className="flex items-center gap-2">
                   <Input 
-                    value={availableSegments[0]?.display_name || ""}
+                    value={effectiveAvailableSegments[0]?.display_name || ""}
                     disabled
                     className="bg-muted cursor-not-allowed"
                   />
                   <p className="text-xs text-muted-foreground">
-                    (Segmento único disponível)
+                    {analystSegmentForced ? "(Segmento da sua equipe)" : "(Segmento único disponível)"}
                   </p>
                 </div>
               </div>
@@ -664,7 +715,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                     <SelectValue placeholder="Selecione o segmento" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableSegments.map((seg) => (
+                    {effectiveAvailableSegments.map((seg) => (
                       <SelectItem key={seg.id} value={seg.code}>
                         {seg.display_name}
                       </SelectItem>
@@ -1207,6 +1258,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               disabled={
                 isSubmitting || 
                 isUploading ||
+                (isAnalystOnly && !profile?.team_id) ||
                 (segment === "DB" && dbInstances?.length === 0 && !!selectedDbEngine) ||
                 (segment === "APP" && appInstances?.length === 0 && !!selectedAppProductId)
               }
