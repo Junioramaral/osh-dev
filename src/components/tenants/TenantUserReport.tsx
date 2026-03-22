@@ -230,6 +230,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
       user.ticketsCreated,
       user.commentsCreated,
       user.lastActivity ? format(new Date(user.lastActivity), "dd/MM/yyyy HH:mm") : "Sem atividade",
+      user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm") : "Nunca",
       format(new Date(user.createdAt), "dd/MM/yyyy")
     ]);
 
