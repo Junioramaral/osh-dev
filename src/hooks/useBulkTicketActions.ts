@@ -130,13 +130,33 @@ export function useBulkTicketActions() {
         updates.resolved_by = authorName;
       }
 
-      // 3. Atualizar status dos tickets
-      const { error: updateError } = await supabase
-        .from("tickets")
-        .update(updates)
-        .in("id", ticketIds);
+      // 3. Separate tickets with and without analyst for auto-allocation
+      const ticketsWithoutAnalyst = tickets.filter(t => !(t as any).analyst_id).map(t => t.id);
+      const ticketsWithAnalyst = tickets.filter(t => (t as any).analyst_id).map(t => t.id);
 
-      if (updateError) throw updateError;
+      // Update tickets that already have an analyst
+      if (ticketsWithAnalyst.length > 0) {
+        const { error: updateError } = await supabase
+          .from("tickets")
+          .update(updates)
+          .in("id", ticketsWithAnalyst);
+        if (updateError) throw updateError;
+      }
+
+      // Update tickets without analyst (auto-allocate)
+      if (ticketsWithoutAnalyst.length > 0) {
+        const { error: updateError } = await supabase
+          .from("tickets")
+          .update({
+            ...updates,
+            analyst_id: userId,
+            lock_status: "locked",
+            lock_owner_id: userId,
+            lock_at: new Date().toISOString(),
+          })
+          .in("id", ticketsWithoutAnalyst);
+        if (updateError) throw updateError;
+      }
 
       // 4. Obter sessão para auth
       const { data: { session } } = await supabase.auth.getSession();

@@ -239,6 +239,19 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
         }
       }
       
+      // Auto-allocate analyst if ticket has no analyst and commenter is staff
+      if (!ticketData?.analyst_id && !isClientUser && user?.id) {
+        await supabase
+          .from('tickets')
+          .update({
+            analyst_id: user.id,
+            lock_status: 'locked',
+            lock_owner_id: user.id,
+            lock_at: new Date().toISOString(),
+          })
+          .eq('id', ticketId);
+      }
+      
       return { commentData, isExternal: !is_internal, isClientComment: isClientUser, hasCc: ccEmails.length > 0 };
     },
     onSuccess: (data) => {

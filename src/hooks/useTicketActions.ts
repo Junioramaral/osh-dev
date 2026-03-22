@@ -133,10 +133,26 @@ export function useTicketActions() {
     }) => {
       const updateData: Record<string, any> = { status };
 
-      // If resolving, also set resolved_by and resolved_at
-      if (status === "resolvido") {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Check current ticket for auto-allocation
+      if (user) {
+        const { data: currentTicket } = await supabase
+          .from("tickets")
+          .select("analyst_id")
+          .eq("id", ticketId)
+          .single();
+
+        // Auto-allocate if no analyst assigned
+        if (currentTicket && !currentTicket.analyst_id) {
+          updateData.analyst_id = user.id;
+          updateData.lock_status = "locked";
+          updateData.lock_owner_id = user.id;
+          updateData.lock_at = new Date().toISOString();
+        }
+
+        // If resolving, also set resolved_by and resolved_at
+        if (status === "resolvido") {
           const { data: profile } = await supabase
             .from("profiles")
             .select("full_name")
