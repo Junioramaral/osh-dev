@@ -1,63 +1,51 @@
 
-# Modal de Conclusao de RFC com Email e Registro no Historico
 
-## O que muda
+# Auto-alocacao de Analista em Qualquer Interacao com o Ticket
 
-Ao clicar em "Concluir RFC" (quando 100% dos passos estao concluidos), em vez de concluir imediatamente, abre um modal onde o analista escreve uma mensagem de conclusao. Ao confirmar:
+## Problema Identificado
 
-1. O status da RFC muda para "resolvido"
-2. Um email e enviado ao cliente informando que a RFC foi concluida
-3. A mensagem e registrada como comentario no ticket para historico
+Atualmente, o sistema so aloca o analista ao ticket quando ele explicitamente "Assume" o ticket (lock). Porem, quando um analista:
+- **Resolve um ticket** (via `resolveTicketWithReason`)
+- **Altera o status** (via `updateTicketStatus`)
+- **Conclui uma RFC** (via `handleMarkConcluida` em RFCExecution)
+- **Adiciona um comentario** (via `addCommentMutation` em TicketComments)
 
-## Detalhes Tecnicos
+...o `analyst_id` nao e preenchido automaticamente se estava vazio. O campo `resolved_by` tambem fica vazio em alguns fluxos bulk.
 
-### 1. Criar componente `RFCCompleteDialog`
+## Solucao
 
-**Novo arquivo: `src/components/tickets/RFCCompleteDialog.tsx`**
+Adicionar auto-alocacao (`analyst_id`, `lock_status`, `lock_owner_id`) em todos os pontos de interacao do analista Otimizzo/SuperAdmin, caso o ticket ainda nao tenha analista atribuido.
 
-Modal similar ao `TicketResolveDialog` existente, com:
-- Informacoes do ticket (numero, titulo, cliente)
-- Campo de texto para a mensagem de conclusao (minimo 10 caracteres)
-- Botoes Cancelar e Confirmar
+### Arquivos a modificar
 
-### 2. Modificar `src/pages/RFCExecution.tsx`
+**1. `src/hooks/useTicketActions.ts`**
 
-- Adicionar estado `showCompleteDialog` (boolean)
-- O botao "Concluir RFC" (linha 331) passa a abrir o modal em vez de chamar `handleMarkConcluida` diretamente
-- Reescrever `handleMarkConcluida` para receber a mensagem e:
-  1. Buscar dados do ticket (contact_email, contact_name, created_at)
-  2. Buscar perfil do usuario logado (full_name)
-  3. Atualizar status para "resolvido" com `resolved_at` e `resolved_by`
-  4. Inserir comentario em `ticket_comments` com a mensagem
-  5. Chamar edge function `send-resolution-notification` para enviar email ao cliente
-  6. Invalidar queries relevantes
+- `resolveTicketWithReason`: Antes do update, verificar se o ticket tem `analyst_id`. Se nao, incluir `analyst_id: userId`, `lock_status: 'locked'`, `lock_owner_id: userId` no update.
+- `updateTicketStatus`: Buscar o ticket atual para checar `analyst_id`. Se vazio, incluir auto-alocacao no update junto com o status.
 
-### Fluxo
+**2. `src/pages/RFCExecution.tsx`**
 
+- `handleMarkConcluida`: Buscar `analyst_id` do ticket. Se nao tiver, incluir `analyst_id: user.id`, `lock_status: 'locked'`, `lock_owner_id: user.id` no update de resolucao.
+
+**3. `src/components/tickets/TicketComments.tsx`**
+
+- `addCommentMutation`: Apos inserir o comentario, verificar se `ticketData.analyst_id` e null e se o usuario e Otimizzo/SuperAdmin. Se sim, fazer update do ticket com `analyst_id: user.id`, `lock_status: 'locked'`, `lock_owner_id: user.id`.
+
+**4. `src/hooks/useBulkTicketActions.ts`**
+
+- `bulkChangeStatusWithReason`: Adicionar `analyst_id: userId`, `lock_status: 'locked'`, `lock_owner_id: userId` ao update quando o ticket nao tem analista (buscar tickets sem analyst_id e aplicar separadamente).
+
+### Logica comum
+
+Em cada ponto de interacao:
 ```text
-[Todos passos concluidos]
-        |
-        v
-[Clica "Concluir RFC"]
-        |
-        v
-[Modal abre - preenche mensagem]
-        |
-        v
-[Confirma]
-        |
-        +---> UPDATE tickets (status=resolvido, resolved_at, resolved_by)
-        +---> INSERT ticket_comments (mensagem de conclusao)
-        +---> CALL send-resolution-notification (email ao cliente)
+SE ticket.analyst_id == null E usuario e Otimizzo/SuperAdmin:
+  incluir no update:
+    analyst_id = userId
+    lock_status = 'locked'
+    lock_owner_id = userId
+    lock_at = now()
 ```
 
-### Arquivos
+Isso garante que qualquer interacao de um analista com o ticket o aloca automaticamente, sem necessidade de clicar "Assumir Ticket" separadamente.
 
-- **Novo**: `src/components/tickets/RFCCompleteDialog.tsx`
-- **Editado**: `src/pages/RFCExecution.tsx`
-
-### O que NAO muda
-
-- Edge function `send-resolution-notification` (ja existe e sera reutilizada)
-- Banco de dados (nenhuma migracao)
-- Outros componentes
