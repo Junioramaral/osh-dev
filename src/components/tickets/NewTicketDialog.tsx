@@ -212,11 +212,16 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const { data: clients } = useQuery({
     queryKey: ["clients"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("clients").select("id, name").order("name");
+      const { data, error } = await supabase.from("clients").select("id, name, segments, tenant_type").order("name");
       if (error) throw error;
       return data;
     },
   });
+
+  // Filter clients for analysts: only show clients with matching team segment (exclude otimizzo tenant)
+  const filteredClients = isAnalystOnly && analystTeam
+    ? clients?.filter(c => c.tenant_type !== 'otimizzo' && c.segments?.includes(analystTeam.segment))
+    : clients?.filter(c => c.tenant_type !== 'otimizzo');
 
   // Fetch DB instances
   const { data: dbInstances } = useQuery({
