@@ -5,6 +5,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail, Edit, Loader2, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
@@ -81,6 +82,7 @@ const TenantDetail = () => {
     email: "",
     phone: "",
     roles: [] as string[],
+    team_id: "" as string,
   });
 
   const [editForm, setEditForm] = useState({
@@ -113,6 +115,19 @@ const TenantDetail = () => {
     resendInvite,
     isResending,
   } = useTenantUsers(tenantId);
+
+  // Query to fetch teams for analyst assignment
+  const { data: teams } = useQuery({
+    queryKey: ["teams-list"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("teams")
+        .select("id, name, segment")
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   // Query para buscar admins do tenant
   const {
@@ -318,6 +333,8 @@ const TenantDetail = () => {
       return;
     }
 
+    const hasAnalystRole = editUserForm.roles.some(r => r === 'analyst_db' || r === 'analyst_app');
+
     updateUser(
       {
         userId: userToEdit.id,
@@ -325,12 +342,13 @@ const TenantDetail = () => {
         email: editUserForm.email,
         phone: editUserForm.phone ? cleanPhone(editUserForm.phone) : "",
         roles: editUserForm.roles,
+        team_id: hasAnalystRole ? (editUserForm.team_id || null) : null,
       },
       {
         onSuccess: () => {
           setIsEditUserDialogOpen(false);
           setUserToEdit(null);
-          setEditUserForm({ full_name: "", email: "", phone: "", roles: [] });
+          setEditUserForm({ full_name: "", email: "", phone: "", roles: [], team_id: "" });
         },
       }
     );
@@ -738,6 +756,7 @@ const TenantDetail = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Telefone</TableHead>
                       <TableHead>Função</TableHead>
+                      <TableHead>Time</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
@@ -750,13 +769,14 @@ const TenantDetail = () => {
                            <TableRow 
                             key={user.id}
                             className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => {
+                             onClick={() => {
                               setUserToEdit(user);
                               setEditUserForm({
                                 full_name: user.full_name,
                                 email: user.email,
                                 phone: user.phone || "",
                                 roles: user.roles,
+                                team_id: user.team_id || "",
                               });
                               setIsEditUserDialogOpen(true);
                             }}
@@ -765,6 +785,12 @@ const TenantDetail = () => {
                             <TableCell>{user.email}</TableCell>
                             <TableCell>{user.phone || "-"}</TableCell>
                             <TableCell>{getRolesLabel(user.roles)}</TableCell>
+                            <TableCell>
+                              {user.roles.some(r => r === 'analyst_db' || r === 'analyst_app')
+                                ? (user.team_name || <span className="text-muted-foreground">—</span>)
+                                : <span className="text-muted-foreground">—</span>
+                              }
+                            </TableCell>
                             <TableCell>
                               <Badge variant={status.variant}>
                                 <StatusIcon className="mr-1 h-3 w-3" />
@@ -906,6 +932,30 @@ const TenantDetail = () => {
               selectedRoles={editUserForm.roles}
               onRolesChange={(roles) => setEditUserForm({ ...editUserForm, roles })}
             />
+
+            {editUserForm.roles.some(r => r === 'analyst_db' || r === 'analyst_app') && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-team">Time</Label>
+                <Select
+                  value={editUserForm.team_id}
+                  onValueChange={(value) => setEditUserForm({ ...editUserForm, team_id: value })}
+                >
+                  <SelectTrigger id="edit-team">
+                    <SelectValue placeholder="Selecione um time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams?.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} ({team.segment})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  O time define quais clientes e segmentos o analista pode atender
+                </p>
+              </div>
+            )}
 
             <DialogFooter>
               <Button
