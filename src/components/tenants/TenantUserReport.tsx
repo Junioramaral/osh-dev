@@ -577,6 +577,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
                 <TableHead className="text-center">Tickets</TableHead>
                 <TableHead className="text-center">Comentários</TableHead>
                 <TableHead>Última Atividade</TableHead>
+                <TableHead>Último Login</TableHead>
                 <TableHead>Cadastrado em</TableHead>
               </TableRow>
             </TableHeader>
