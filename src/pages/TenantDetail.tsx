@@ -768,13 +768,14 @@ const TenantDetail = () => {
                            <TableRow 
                             key={user.id}
                             className="cursor-pointer hover:bg-muted/50"
-                            onClick={() => {
+                             onClick={() => {
                               setUserToEdit(user);
                               setEditUserForm({
                                 full_name: user.full_name,
                                 email: user.email,
                                 phone: user.phone || "",
                                 roles: user.roles,
+                                team_id: user.team_id || "",
                               });
                               setIsEditUserDialogOpen(true);
                             }}
