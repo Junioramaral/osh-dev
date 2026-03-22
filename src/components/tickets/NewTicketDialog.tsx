@@ -683,7 +683,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <Select
                 value={watch("client_id")}
                 onValueChange={(value) => setValue("client_id", value)}
-                disabled={isAnalystOnly && !profile?.team_id}
+                disabled={isAnalystOnly && (!analystQueues || analystQueues.length === 0)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o cliente" />
