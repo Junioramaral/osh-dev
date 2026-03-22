@@ -1435,6 +1435,35 @@ export type Database = {
           },
         ]
       }
+      user_queues: {
+        Row: {
+          created_at: string | null
+          id: string
+          queue_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          queue_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          queue_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_queues_queue_id_fkey"
+            columns: ["queue_id"]
+            isOneToOne: false
+            referencedRelation: "queues"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string | null

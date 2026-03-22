@@ -15,6 +15,8 @@ export interface TenantUser {
   last_sign_in_at: string | null;
   team_id: string | null;
   team_name: string | null;
+  queue_ids: string[];
+  queue_names: string[];
 }
 
 export const useTenantUsers = (tenantId: string | undefined) => {
