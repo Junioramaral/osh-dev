@@ -86,6 +86,8 @@ export const useTenantUsers = (tenantId: string | undefined) => {
           invited_at: authUser?.invited_at || null,
           created_at: profile.created_at,
           last_sign_in_at: authUser?.last_sign_in_at || null,
+          team_id: profile.team_id || null,
+          team_name: (profile as any).teams?.name || null,
         };
       });
 
