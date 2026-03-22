@@ -759,7 +759,7 @@ const TenantDetail = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Telefone</TableHead>
                       <TableHead>Função</TableHead>
-                      <TableHead>Time</TableHead>
+                      <TableHead>Filas</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
