@@ -18,7 +18,7 @@ import {
   FileText,
   Menu,
   BarChart3,
-  Shield,
+  
   FileBarChart,
   Star,
   ClipboardCheck,
