@@ -780,6 +780,7 @@ const TenantDetail = () => {
                                 phone: user.phone || "",
                                 roles: user.roles,
                                 team_id: user.team_id || "",
+                                queue_ids: user.queue_ids || [],
                               });
                               setIsEditUserDialogOpen(true);
                             }}
@@ -790,7 +791,9 @@ const TenantDetail = () => {
                             <TableCell>{getRolesLabel(user.roles)}</TableCell>
                             <TableCell>
                               {user.roles.some(r => r === 'analyst_db' || r === 'analyst_app')
-                                ? (user.team_name || <span className="text-muted-foreground">—</span>)
+                                ? (user.queue_names.length > 0 
+                                    ? user.queue_names.join(", ") 
+                                    : <span className="text-muted-foreground">—</span>)
                                 : <span className="text-muted-foreground">—</span>
                               }
                             </TableCell>
