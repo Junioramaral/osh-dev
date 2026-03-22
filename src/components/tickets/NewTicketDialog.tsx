@@ -655,6 +655,14 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         {/* Formulário Suporte (fluxo existente) */}
         {recordType === "suporte" && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          {/* Analyst without team warning */}
+          {isAnalystOnly && !profile?.team_id && (
+            <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
+              <AlertCircle className="h-4 w-4 flex-shrink-0" />
+              <span>Você precisa ser atribuído a uma equipe antes de abrir tickets. Contate o administrador.</span>
+            </div>
+          )}
+
           {/* 1. Cliente (apenas para Otimizzo) */}
           {isOtimizzoTenant && (
             <div className="space-y-2">
@@ -662,13 +670,13 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <Select
                 value={watch("client_id")}
                 onValueChange={(value) => setValue("client_id", value)}
-                disabled={!hasRole('super_admin') && !hasRole('tenant_admin')}
+                disabled={isAnalystOnly && !profile?.team_id}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o cliente" />
                 </SelectTrigger>
                 <SelectContent>
-                  {clients?.map((client) => (
+                  {filteredClients?.map((client) => (
                     <SelectItem key={client.id} value={client.id}>
                       {client.name}
                     </SelectItem>
@@ -681,17 +689,17 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
           {/* 2. Segmento — sempre visível para cliente; para Otimizzo só após escolher cliente */}
           {(!isOtimizzoTenant || selectedClientId) && (
-            hasOnlyOneSegment ? (
+            effectiveHasOnlyOneSegment ? (
               <div className="space-y-2">
                 <Label>Segmento *</Label>
                 <div className="flex items-center gap-2">
                   <Input 
-                    value={availableSegments[0]?.display_name || ""}
+                    value={effectiveAvailableSegments[0]?.display_name || ""}
                     disabled
                     className="bg-muted cursor-not-allowed"
                   />
                   <p className="text-xs text-muted-foreground">
-                    (Segmento único disponível)
+                    {analystSegmentForced ? "(Segmento da sua equipe)" : "(Segmento único disponível)"}
                   </p>
                 </div>
               </div>
@@ -703,7 +711,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                     <SelectValue placeholder="Selecione o segmento" />
                   </SelectTrigger>
                   <SelectContent>
-                    {availableSegments.map((seg) => (
+                    {effectiveAvailableSegments.map((seg) => (
                       <SelectItem key={seg.id} value={seg.code}>
                         {seg.display_name}
                       </SelectItem>
