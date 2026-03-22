@@ -59,7 +59,7 @@ const App = () => (
             <Route path="/reports" element={<Reports />} />
             <Route path="/admin/tenants" element={<TenantAdmin />} />
             <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
-            <Route path="/admin/permissions" element={<UserPermissions />} />
+            
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/rfc-execution" element={<RFCExecution />} />
             <Route path="/rfc-aprovacao" element={<RFCApproval />} />
