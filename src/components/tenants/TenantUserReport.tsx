@@ -108,7 +108,8 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
           const { data: lastTicket } = await supabase
             .from("tickets")
             .select("updated_at")
-            .or(`analyst_id.eq.${profile.id},lock_owner_id.eq.${profile.id}`)
+            .eq("client_id", tenantId)
+            .or(ticketFilter)
             .order("updated_at", { ascending: false })
             .limit(1)
             .single();
