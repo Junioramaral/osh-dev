@@ -203,16 +203,19 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       full_name?: string;
       email?: string;
       phone?: string;
-      roles?: string[]; // Changed to array
+      roles?: string[];
+      team_id?: string | null;
     }) => {
-      // Update profile (full_name, phone)
-      if (params.full_name !== undefined || params.phone !== undefined) {
+      // Update profile (full_name, phone, team_id)
+      const profileUpdates: Record<string, any> = {};
+      if (params.full_name !== undefined) profileUpdates.full_name = params.full_name;
+      if (params.phone !== undefined) profileUpdates.phone = params.phone || null;
+      if (params.team_id !== undefined) profileUpdates.team_id = params.team_id || null;
+
+      if (Object.keys(profileUpdates).length > 0) {
         const { error: profileError } = await supabase
           .from("profiles")
-          .update({
-            ...(params.full_name !== undefined && { full_name: params.full_name }),
-            ...(params.phone !== undefined && { phone: params.phone || null }),
-          })
+          .update(profileUpdates)
           .eq("id", params.userId);
 
         if (profileError) throw profileError;
