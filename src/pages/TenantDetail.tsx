@@ -84,6 +84,7 @@ const TenantDetail = () => {
     phone: "",
     roles: [] as string[],
     team_id: "" as string,
+    queue_ids: [] as string[],
   });
 
   const [editForm, setEditForm] = useState({

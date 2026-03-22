@@ -311,6 +311,31 @@ export const useTenantUsers = (tenantId: string | undefined) => {
           }
         }
       }
+
+      // Update user_queues
+      if (params.queue_ids !== undefined) {
+        // Delete existing queue assignments
+        const { error: deleteQueuesError } = await supabase
+          .from("user_queues")
+          .delete()
+          .eq("user_id", params.userId);
+
+        if (deleteQueuesError) throw deleteQueuesError;
+
+        // Insert new queue assignments
+        if (params.queue_ids.length > 0) {
+          const queueInserts = params.queue_ids.map(queue_id => ({
+            user_id: params.userId,
+            queue_id,
+          }));
+
+          const { error: insertQueuesError } = await supabase
+            .from("user_queues")
+            .insert(queueInserts);
+
+          if (insertQueuesError) throw insertQueuesError;
+        }
+      }
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tenant-users", tenantId] });
