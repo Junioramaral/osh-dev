@@ -668,11 +668,11 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         {/* Formulário Suporte (fluxo existente) */}
         {recordType === "suporte" && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Analyst without team warning */}
-          {isAnalystOnly && !profile?.team_id && (
+          {/* Analyst without queues warning */}
+          {isAnalystOnly && (!analystQueues || analystQueues.length === 0) && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <span>Você precisa ser atribuído a uma equipe antes de abrir tickets. Contate o administrador.</span>
+              <span>Você precisa ter filas de atendimento atribuídas antes de abrir tickets. Contate o administrador.</span>
             </div>
           )}
 
