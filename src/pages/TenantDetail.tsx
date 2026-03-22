@@ -933,6 +933,30 @@ const TenantDetail = () => {
               onRolesChange={(roles) => setEditUserForm({ ...editUserForm, roles })}
             />
 
+            {editUserForm.roles.some(r => r === 'analyst_db' || r === 'analyst_app') && (
+              <div className="space-y-2">
+                <Label htmlFor="edit-team">Time</Label>
+                <Select
+                  value={editUserForm.team_id}
+                  onValueChange={(value) => setEditUserForm({ ...editUserForm, team_id: value })}
+                >
+                  <SelectTrigger id="edit-team">
+                    <SelectValue placeholder="Selecione um time" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {teams?.map((team) => (
+                      <SelectItem key={team.id} value={team.id}>
+                        {team.name} ({team.segment})
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  O time define quais clientes e segmentos o analista pode atender
+                </p>
+              </div>
+            )}
+
             <DialogFooter>
               <Button
                 type="button"
