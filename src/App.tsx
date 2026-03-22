@@ -22,7 +22,7 @@ import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
 import SLAAcknowledge from "./pages/SLAAcknowledge";
 import CSATDashboard from "./pages/CSATDashboard";
-import UserPermissions from "./pages/UserPermissions";
+
 import SystemSettings from "./pages/SystemSettings";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
@@ -59,7 +59,7 @@ const App = () => (
             <Route path="/reports" element={<Reports />} />
             <Route path="/admin/tenants" element={<TenantAdmin />} />
             <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
-            <Route path="/admin/permissions" element={<UserPermissions />} />
+            
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/rfc-execution" element={<RFCExecution />} />
             <Route path="/rfc-aprovacao" element={<RFCApproval />} />
