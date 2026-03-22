@@ -116,7 +116,7 @@ export function useBulkTicketActions() {
       // 2. Buscar dados completos dos tickets
       const { data: tickets } = await supabase
         .from("tickets")
-        .select("id, ticket_number, title, contact_email, contact_name, client_id")
+        .select("id, ticket_number, title, contact_email, contact_name, client_id, analyst_id")
         .in("id", ticketIds);
 
       if (!tickets || tickets.length === 0) {
