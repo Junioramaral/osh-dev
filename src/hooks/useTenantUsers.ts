@@ -35,6 +35,10 @@ export const useTenantUsers = (tenantId: string | undefined) => {
           phone,
           is_active,
           created_at,
+          team_id,
+          teams (
+            name
+          ),
           user_roles (
             role,
             tenant_id
