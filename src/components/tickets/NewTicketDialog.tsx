@@ -199,10 +199,14 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   // Initialize segment when tenant loads
   useEffect(() => {
     if (analystSegmentForced) {
-      // Force analyst segment
+      // Force analyst segment and clear client_id (analyst must choose)
       if (segment !== analystTeam.segment) {
         setSegment(analystTeam.segment);
         setValue("segment", analystTeam.segment);
+      }
+      // Clear the default Otimizzo client_id so analyst must pick a client
+      if (watch("client_id") === effectiveTenantId) {
+        setValue("client_id", "");
       }
       return;
     }
