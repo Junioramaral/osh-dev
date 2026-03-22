@@ -219,7 +219,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
 
     const headers = [
       "Nome", "Email", "Status", "Perfil",
-      "Tickets", "Comentários", "Última Atividade", "Cadastrado em"
+      "Tickets", "Comentários", "Última Atividade", "Último Login", "Cadastrado em"
     ];
 
     const rows = stats.users.map(user => [
