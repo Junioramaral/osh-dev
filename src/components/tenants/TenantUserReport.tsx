@@ -77,12 +77,18 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
         (profiles || []).map(async (profile) => {
           const authUser = authUsers?.find((u: any) => u.id === profile.id);
           
-          // Buscar tickets criados
+          const userEmail = authUser?.email || '';
+          
+          // Buscar tickets criados (inclui contact_email para usuários cliente)
+          const ticketFilter = userEmail
+            ? `analyst_id.eq.${profile.id},lock_owner_id.eq.${profile.id},contact_email.eq.${userEmail}`
+            : `analyst_id.eq.${profile.id},lock_owner_id.eq.${profile.id}`;
+          
           const { count: ticketsCount } = await supabase
             .from("tickets")
             .select("*", { count: "exact", head: true })
             .eq("client_id", tenantId)
-            .or(`analyst_id.eq.${profile.id},lock_owner_id.eq.${profile.id}`);
+            .or(ticketFilter);
 
           // Buscar comentários criados
           const { count: commentsCount } = await supabase
