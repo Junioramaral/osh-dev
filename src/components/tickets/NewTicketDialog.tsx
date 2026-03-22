@@ -138,23 +138,29 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
 
-  // Check if analyst (not super_admin/tenant_admin) to restrict by team
+  // Check if analyst (not super_admin/tenant_admin) to restrict by queues
   const isAnalystOnly = isOtimizzoUser && (hasRole('analyst_db') || hasRole('analyst_app')) && !isSuperAdmin && !isTenantAdmin;
 
-  // Fetch analyst's team data (segment)
-  const { data: analystTeam } = useQuery({
-    queryKey: ["analyst-team", profile?.team_id],
+  // Derive analyst segments from roles instead of team
+  const analystSegments: string[] = [];
+  if (isAnalystOnly) {
+    if (hasRole('analyst_db')) analystSegments.push('DB');
+    if (hasRole('analyst_app')) analystSegments.push('APP');
+  }
+
+  // Fetch analyst's assigned queues from user_queues
+  const { data: analystQueues } = useQuery({
+    queryKey: ["analyst-user-queues", profile?.id],
     queryFn: async () => {
-      if (!profile?.team_id) return null;
+      if (!profile?.id) return [];
       const { data, error } = await supabase
-        .from("teams")
-        .select("id, name, segment")
-        .eq("id", profile.team_id)
-        .single();
+        .from("user_queues")
+        .select("queue_id")
+        .eq("user_id", profile.id);
       if (error) throw error;
-      return data;
+      return data.map(uq => uq.queue_id);
     },
-    enabled: !!profile?.team_id && isAnalystOnly,
+    enabled: !!profile?.id && isAnalystOnly,
   });
 
   // Fetch selected client data (when Otimizzo user selects a different client)
@@ -189,10 +195,10 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const hasOnlyOneSegment = availableSegments.length === 1;
   const availableDbEngines = effectiveClientData?.db_engines || [];
 
-  // For analysts, force segment to team segment
-  const analystSegmentForced = isAnalystOnly && analystTeam;
+  // For analysts, force segment based on roles
+  const analystSegmentForced = isAnalystOnly && analystSegments.length > 0;
   const effectiveAvailableSegments = analystSegmentForced
-    ? allSegments?.filter(s => s.code === analystTeam.segment) || []
+    ? allSegments?.filter(s => analystSegments.includes(s.code)) || []
     : availableSegments;
   const effectiveHasOnlyOneSegment = effectiveAvailableSegments.length === 1;
 
@@ -200,9 +206,12 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   useEffect(() => {
     if (analystSegmentForced) {
       // Force analyst segment and clear client_id (analyst must choose)
-      if (segment !== analystTeam.segment) {
-        setSegment(analystTeam.segment);
-        setValue("segment", analystTeam.segment);
+      if (analystSegments.length === 1 && segment !== analystSegments[0]) {
+        setSegment(analystSegments[0]);
+        setValue("segment", analystSegments[0]);
+      } else if (segment === null && analystSegments.length > 0) {
+        setSegment(analystSegments[0]);
+        setValue("segment", analystSegments[0]);
       }
       // Clear the default Otimizzo client_id so analyst must pick a client
       if (watch("client_id") === effectiveTenantId) {
@@ -225,7 +234,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       });
     }
-  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId, analystSegmentForced, analystTeam]);
+  }, [currentTenant, availableSegments, segment, reset, effectiveTenantId, analystSegmentForced, analystSegments]);
 
   // Fetch clients
   const { data: clients } = useQuery({
@@ -237,9 +246,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
-  // Filter clients for analysts: only show clients with matching team segment (exclude otimizzo tenant)
-  const filteredClients = isAnalystOnly && analystTeam
-    ? clients?.filter(c => c.tenant_type !== 'otimizzo' && c.segments?.includes(analystTeam.segment))
+  // Filter clients for analysts: only show clients with matching analyst segments (exclude otimizzo tenant)
+  const filteredClients = isAnalystOnly && analystSegments.length > 0
+    ? clients?.filter(c => c.tenant_type !== 'otimizzo' && c.segments?.some(s => analystSegments.includes(s)))
     : clients?.filter(c => c.tenant_type !== 'otimizzo');
 
   // Fetch DB instances
@@ -659,11 +668,11 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         {/* Formulário Suporte (fluxo existente) */}
         {recordType === "suporte" && (
         <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-          {/* Analyst without team warning */}
-          {isAnalystOnly && !profile?.team_id && (
+          {/* Analyst without queues warning */}
+          {isAnalystOnly && (!analystQueues || analystQueues.length === 0) && (
             <div className="flex items-center gap-2 rounded-md border border-destructive/50 bg-destructive/10 p-3 text-sm text-destructive">
               <AlertCircle className="h-4 w-4 flex-shrink-0" />
-              <span>Você precisa ser atribuído a uma equipe antes de abrir tickets. Contate o administrador.</span>
+              <span>Você precisa ter filas de atendimento atribuídas antes de abrir tickets. Contate o administrador.</span>
             </div>
           )}
 
@@ -674,7 +683,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <Select
                 value={watch("client_id")}
                 onValueChange={(value) => setValue("client_id", value)}
-                disabled={isAnalystOnly && !profile?.team_id}
+                disabled={isAnalystOnly && (!analystQueues || analystQueues.length === 0)}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Selecione o cliente" />
@@ -1258,7 +1267,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               disabled={
                 isSubmitting || 
                 isUploading ||
-                (isAnalystOnly && !profile?.team_id) ||
+                (isAnalystOnly && (!analystQueues || analystQueues.length === 0)) ||
                 (segment === "DB" && dbInstances?.length === 0 && !!selectedDbEngine) ||
                 (segment === "APP" && appInstances?.length === 0 && !!selectedAppProductId)
               }

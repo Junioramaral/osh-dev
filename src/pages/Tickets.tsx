@@ -28,7 +28,7 @@ import { cn } from "@/lib/utils";
 
 export default function Tickets() {
   const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst } = useAuth();
-  const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasTeam, hasQueues } = useAnalystQueues();
+  const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
@@ -423,16 +423,12 @@ export default function Tickets() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        {/* Warning for analysts without team or queues */}
-        {shouldRestrictView && (!hasTeam || !hasQueues) && (
+        {/* Warning for analysts without queues */}
+        {shouldRestrictView && !hasQueues && (
           <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              {!hasTeam 
-                ? "Você não está associado a nenhum time. Contate um administrador para configurar seu time."
-                : "Seu time não possui filas atribuídas. Contate um administrador para configurar as filas do seu time."
-              }
-              {" "}Enquanto isso, você verá apenas tickets sem fila atribuída.
+              Você não possui filas atribuídas. Contate um administrador para configurar suas filas de atendimento. Enquanto isso, você verá apenas tickets sem fila atribuída.
             </AlertDescription>
           </Alert>
         )}

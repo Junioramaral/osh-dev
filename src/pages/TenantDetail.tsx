@@ -32,6 +32,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
 import { RoleCheckboxGroup, getRolesLabel } from "@/components/tenants/RoleCheckboxGroup";
+import { QueueCheckboxGroup } from "@/components/tenants/QueueCheckboxGroup";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -83,6 +84,7 @@ const TenantDetail = () => {
     phone: "",
     roles: [] as string[],
     team_id: "" as string,
+    queue_ids: [] as string[],
   });
 
   const [editForm, setEditForm] = useState({
@@ -116,18 +118,7 @@ const TenantDetail = () => {
     isResending,
   } = useTenantUsers(tenantId);
 
-  // Query to fetch teams for analyst assignment
-  const { data: teams } = useQuery({
-    queryKey: ["teams-list"],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("teams")
-        .select("id, name, segment")
-        .order("name");
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Teams query removed - now using QueueCheckboxGroup which fetches queues internally
 
   // Query para buscar admins do tenant
   const {
@@ -343,12 +334,13 @@ const TenantDetail = () => {
         phone: editUserForm.phone ? cleanPhone(editUserForm.phone) : "",
         roles: editUserForm.roles,
         team_id: hasAnalystRole ? (editUserForm.team_id || null) : null,
+        queue_ids: hasAnalystRole ? editUserForm.queue_ids : [],
       },
       {
         onSuccess: () => {
           setIsEditUserDialogOpen(false);
           setUserToEdit(null);
-          setEditUserForm({ full_name: "", email: "", phone: "", roles: [], team_id: "" });
+          setEditUserForm({ full_name: "", email: "", phone: "", roles: [], team_id: "", queue_ids: [] });
         },
       }
     );
@@ -756,7 +748,7 @@ const TenantDetail = () => {
                       <TableHead>Email</TableHead>
                       <TableHead>Telefone</TableHead>
                       <TableHead>Função</TableHead>
-                      <TableHead>Time</TableHead>
+                      <TableHead>Filas</TableHead>
                       <TableHead>Status</TableHead>
                       <TableHead className="text-right">Ações</TableHead>
                       </TableRow>
@@ -777,6 +769,7 @@ const TenantDetail = () => {
                                 phone: user.phone || "",
                                 roles: user.roles,
                                 team_id: user.team_id || "",
+                                queue_ids: user.queue_ids || [],
                               });
                               setIsEditUserDialogOpen(true);
                             }}
@@ -787,7 +780,9 @@ const TenantDetail = () => {
                             <TableCell>{getRolesLabel(user.roles)}</TableCell>
                             <TableCell>
                               {user.roles.some(r => r === 'analyst_db' || r === 'analyst_app')
-                                ? (user.team_name || <span className="text-muted-foreground">—</span>)
+                                ? (user.queue_names.length > 0 
+                                    ? user.queue_names.join(", ") 
+                                    : <span className="text-muted-foreground">—</span>)
                                 : <span className="text-muted-foreground">—</span>
                               }
                             </TableCell>
@@ -934,27 +929,10 @@ const TenantDetail = () => {
             />
 
             {editUserForm.roles.some(r => r === 'analyst_db' || r === 'analyst_app') && (
-              <div className="space-y-2">
-                <Label htmlFor="edit-team">Time</Label>
-                <Select
-                  value={editUserForm.team_id}
-                  onValueChange={(value) => setEditUserForm({ ...editUserForm, team_id: value })}
-                >
-                  <SelectTrigger id="edit-team">
-                    <SelectValue placeholder="Selecione um time" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {teams?.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>
-                        {team.name} ({team.segment})
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-muted-foreground">
-                  O time define quais clientes e segmentos o analista pode atender
-                </p>
-              </div>
+              <QueueCheckboxGroup
+                selectedQueueIds={editUserForm.queue_ids}
+                onQueuesChange={(queue_ids) => setEditUserForm({ ...editUserForm, queue_ids })}
+              />
             )}
 
             <DialogFooter>
