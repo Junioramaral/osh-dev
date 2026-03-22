@@ -1,42 +1,37 @@
 
 
-# Remove Duplicate "Permissões" Page
+# Restringir Abertura de Tickets por Analistas Otimizzo (por Filas/Equipe)
 
-## Analysis
+## Problema
 
-Both screens manage the same thing — user roles stored in `user_roles` table:
+Atualmente, todos os usuários do tenant Otimizzo (incluindo analistas) veem o seletor de clientes e podem abrir tickets para qualquer cliente. O seletor está desabilitado para analistas (linha 626), mas o `client_id` já está definido como o tenant Otimizzo, o que não faz sentido para abertura de tickets de suporte.
 
-| Feature | Admin Tenants (TenantDetail) | Permissões (UserPermissions) |
-|---------|------|------|
-| Edit user roles | Yes (RoleCheckboxGroup) | Yes (RoleCheckboxGroup) |
-| Multi-role support | Yes | Yes |
-| Self-protection | No | Yes (super_admin) |
-| Grouped by client | Yes (single tenant) | Yes (accordion all tenants) |
-| Additional features | Invite, edit name/email/phone, deactivate, delete, resend invite, report | Only role editing |
+## Solução
 
-**Conclusion**: UserPermissions is a subset of TenantDetail functionality. The role management in TenantDetail is more complete (includes user lifecycle management). The only unique feature in UserPermissions is the cross-tenant view with accordion grouping and self-protection for super_admin.
+Filtrar a lista de clientes disponíveis para analistas Otimizzo com base no segmento da equipe do analista, e restringir os segmentos disponíveis conforme as filas da equipe.
 
-## Plan
+### Lógica
 
-### 1. Remove the Permissões menu item and route
+1. **Analistas Otimizzo (analyst_db/analyst_app)** sem role de super_admin ou tenant_admin:
+   - Buscar a equipe do analista (`profile.team_id`) e seu segmento
+   - Filtrar a lista de clientes para mostrar apenas clientes que possuem o segmento da equipe do analista (ex: analista DB vê apenas clientes com segmento "DB")
+   - Restringir o seletor de segmento ao segmento da equipe
+   - Habilitar o seletor de clientes (atualmente está disabled para analistas)
 
-**`src/components/layout/AppLayout.tsx`**: Remove the "Permissões" entry from `adminNav`.
+2. **Super Admin / Tenant Admin Otimizzo**: mantém comportamento atual (todos os clientes, todos os segmentos)
 
-**`src/App.tsx`**: Remove the `/admin/permissions` route and the `UserPermissions` import.
+### Mudanças em `src/components/tickets/NewTicketDialog.tsx`
 
-### 2. Delete the page file
+1. **Buscar dados da equipe do analista**: Nova query para obter o segmento da equipe (`teams.segment`) usando `profile.team_id`
 
-Delete `src/pages/UserPermissions.tsx`.
+2. **Filtrar clientes**: Quando o usuário é analista Otimizzo, filtrar a lista de `clients` para mostrar apenas clientes que incluem o segmento da equipe em seu array `segments`
 
-### 3. Keep the hook (still used)
+3. **Restringir segmento**: Para analistas, forçar o segmento para o da equipe (não permitir trocar)
 
-`src/hooks/useUserPermissions.ts` — verify if it's used elsewhere. If only used by UserPermissions, delete it too.
+4. **Habilitar seletor de clientes**: Remover o `disabled` do seletor de clientes para analistas (eles precisam escolher o cliente, mas da lista filtrada)
 
-### Technical details
+5. **Tratar analista sem equipe**: Se o analista não tem equipe atribuída, exibir mensagem informando que precisa ser atribuído a uma equipe antes de abrir tickets
 
-- Remove nav item at line ~61 of `AppLayout.tsx`
-- Remove route at line ~62 of `App.tsx`
-- Delete `src/pages/UserPermissions.tsx`
-- Check and potentially delete `src/hooks/useUserPermissions.ts`
-- The `RoleCheckboxGroup` component stays (used by TenantDetail)
+### Arquivo editado
+- `src/components/tickets/NewTicketDialog.tsx`
 
