@@ -355,7 +355,6 @@ export default function MyTickets() {
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
               Você não possui filas atribuídas. Contate um administrador para configurar suas filas de atendimento.
-              }
             </AlertDescription>
           </Alert>
         )}

@@ -428,9 +428,7 @@ export default function Tickets() {
           <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
             <AlertTriangle className="h-4 w-4" />
             <AlertDescription>
-              Você não possui filas atribuídas. Contate um administrador para configurar suas filas de atendimento.
-              }
-              {" "}Enquanto isso, você verá apenas tickets sem fila atribuída.
+              Você não possui filas atribuídas. Contate um administrador para configurar suas filas de atendimento. Enquanto isso, você verá apenas tickets sem fila atribuída.
             </AlertDescription>
           </Alert>
         )}
