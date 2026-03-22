@@ -5,6 +5,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { ArrowLeft, UserPlus, Shield, ShieldCheck, ShieldOff, Trash2, Mail, Edit, Loader2, MoreHorizontal } from "lucide-react";
 import {
   DropdownMenu,
