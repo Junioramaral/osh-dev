@@ -1,51 +1,32 @@
 
 
-# Auto-alocacao de Analista em Qualquer Interacao com o Ticket
+# Fix: Ticket Count and Last Activity in Tenant User Report
 
-## Problema Identificado
+## Root Cause
 
-Atualmente, o sistema so aloca o analista ao ticket quando ele explicitamente "Assume" o ticket (lock). Porem, quando um analista:
-- **Resolve um ticket** (via `resolveTicketWithReason`)
-- **Altera o status** (via `updateTicketStatus`)
-- **Conclui uma RFC** (via `handleMarkConcluida` em RFCExecution)
-- **Adiciona um comentario** (via `addCommentMutation` em TicketComments)
+In `TenantUserReport.tsx`, the queries for ticket count and last activity filter by `analyst_id` or `lock_owner_id`. Client users create tickets and are identified by `contact_email`, not by analyst fields. So their tickets are never counted.
 
-...o `analyst_id` nao e preenchido automaticamente se estava vazio. O campo `resolved_by` tambem fica vazio em alguns fluxos bulk.
+## Solution
 
-## Solucao
+Modify `src/components/tenants/TenantUserReport.tsx` to query tickets using the user's email (`contact_email`) in addition to `analyst_id`/`lock_owner_id`.
 
-Adicionar auto-alocacao (`analyst_id`, `lock_status`, `lock_owner_id`) em todos os pontos de interacao do analista Otimizzo/SuperAdmin, caso o ticket ainda nao tenha analista atribuido.
+### Changes in the `queryFn` (single file)
 
-### Arquivos a modificar
+**Ticket count query (line 81-85):** Replace the `.or(analyst_id, lock_owner_id)` filter with a broader filter that also matches `contact_email.eq.{userEmail}`:
 
-**1. `src/hooks/useTicketActions.ts`**
-
-- `resolveTicketWithReason`: Antes do update, verificar se o ticket tem `analyst_id`. Se nao, incluir `analyst_id: userId`, `lock_status: 'locked'`, `lock_owner_id: userId` no update.
-- `updateTicketStatus`: Buscar o ticket atual para checar `analyst_id`. Se vazio, incluir auto-alocacao no update junto com o status.
-
-**2. `src/pages/RFCExecution.tsx`**
-
-- `handleMarkConcluida`: Buscar `analyst_id` do ticket. Se nao tiver, incluir `analyst_id: user.id`, `lock_status: 'locked'`, `lock_owner_id: user.id` no update de resolucao.
-
-**3. `src/components/tickets/TicketComments.tsx`**
-
-- `addCommentMutation`: Apos inserir o comentario, verificar se `ticketData.analyst_id` e null e se o usuario e Otimizzo/SuperAdmin. Se sim, fazer update do ticket com `analyst_id: user.id`, `lock_status: 'locked'`, `lock_owner_id: user.id`.
-
-**4. `src/hooks/useBulkTicketActions.ts`**
-
-- `bulkChangeStatusWithReason`: Adicionar `analyst_id: userId`, `lock_status: 'locked'`, `lock_owner_id: userId` ao update quando o ticket nao tem analista (buscar tickets sem analyst_id e aplicar separadamente).
-
-### Logica comum
-
-Em cada ponto de interacao:
-```text
-SE ticket.analyst_id == null E usuario e Otimizzo/SuperAdmin:
-  incluir no update:
-    analyst_id = userId
-    lock_status = 'locked'
-    lock_owner_id = userId
-    lock_at = now()
+```typescript
+.or(`analyst_id.eq.${profile.id},lock_owner_id.eq.${profile.id},contact_email.eq.${email}`)
 ```
 
-Isso garante que qualquer interacao de um analista com o ticket o aloca automaticamente, sem necessidade de clicar "Assumir Ticket" separadamente.
+Where `email` comes from the already-fetched `authUser`.
+
+**Last ticket activity query (lines 102-108):** Same fix -- include `contact_email.eq.${email}` in the `.or()` filter so tickets created by the user are also considered for last activity.
+
+**Last activity should also consider `created_at`:** Currently only checks `updated_at` on tickets. For a user who just created a ticket, `created_at` is the relevant timestamp. We should use `created_at` as well (or keep `updated_at` since it defaults to `now()` on creation, which should work).
+
+### Summary
+
+- **File**: `src/components/tenants/TenantUserReport.tsx`
+- **What changes**: Two `.or()` filters gain a `contact_email.eq.{email}` condition
+- **No database changes needed**
 
