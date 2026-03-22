@@ -334,6 +334,7 @@ export const TenantUserReport = ({ tenantId, tenantName = "Tenant" }: TenantUser
                 <td style="text-align: center">${user.ticketsCreated}</td>
                 <td style="text-align: center">${user.commentsCreated}</td>
                 <td>${user.lastActivity ? format(new Date(user.lastActivity), "dd/MM/yyyy HH:mm") : "-"}</td>
+                <td>${user.lastLogin ? format(new Date(user.lastLogin), "dd/MM/yyyy HH:mm") : "Nunca"}</td>
                 <td>${format(new Date(user.createdAt), "dd/MM/yyyy")}</td>
               </tr>
             `).join("")}
