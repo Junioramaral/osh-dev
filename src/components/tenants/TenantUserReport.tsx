@@ -37,6 +37,7 @@ interface UserStats {
   role: string;
   createdAt: string;
   lastActivity: string | null;
+  lastLogin: string | null;
   ticketsCreated: number;
   commentsCreated: number;
 }
