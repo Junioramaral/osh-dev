@@ -1267,7 +1267,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               disabled={
                 isSubmitting || 
                 isUploading ||
-                (isAnalystOnly && !profile?.team_id) ||
+                (isAnalystOnly && (!analystQueues || analystQueues.length === 0)) ||
                 (segment === "DB" && dbInstances?.length === 0 && !!selectedDbEngine) ||
                 (segment === "APP" && appInstances?.length === 0 && !!selectedAppProductId)
               }
