@@ -22,7 +22,7 @@ import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
 import SLAAcknowledge from "./pages/SLAAcknowledge";
 import CSATDashboard from "./pages/CSATDashboard";
-import UserPermissions from "./pages/UserPermissions";
+
 import SystemSettings from "./pages/SystemSettings";
 import Reports from "./pages/Reports";
 import NotFound from "./pages/NotFound";
