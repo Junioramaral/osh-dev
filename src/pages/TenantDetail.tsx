@@ -333,6 +333,8 @@ const TenantDetail = () => {
       return;
     }
 
+    const hasAnalystRole = editUserForm.roles.some(r => r === 'analyst_db' || r === 'analyst_app');
+
     updateUser(
       {
         userId: userToEdit.id,
@@ -340,6 +342,7 @@ const TenantDetail = () => {
         email: editUserForm.email,
         phone: editUserForm.phone ? cleanPhone(editUserForm.phone) : "",
         roles: editUserForm.roles,
+        team_id: hasAnalystRole ? (editUserForm.team_id || null) : null,
       },
       {
         onSuccess: () => {
