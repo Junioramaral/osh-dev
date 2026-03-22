@@ -154,7 +154,7 @@ const RFCExecution = () => {
       // 1. Fetch ticket data for email
       const { data: ticketData, error: ticketError } = await supabase
         .from("tickets")
-        .select("contact_email, contact_name, created_at, ticket_number, title")
+        .select("contact_email, contact_name, created_at, ticket_number, title, analyst_id")
         .eq("id", selectedRfcId)
         .single();
       if (ticketError || !ticketData) throw new Error("Erro ao buscar dados do ticket");
@@ -167,11 +167,24 @@ const RFCExecution = () => {
         .single();
       const analystName = profile?.full_name || "Analista";
 
-      // 3. Update ticket status
+      // 3. Update ticket status + auto-allocate if no analyst
       const resolvedAt = new Date().toISOString();
+      const updatePayload: Record<string, any> = {
+        status: "resolvido",
+        resolved_at: resolvedAt,
+        resolved_by: analystName,
+      };
+
+      if (!ticketData.analyst_id) {
+        updatePayload.analyst_id = user.id;
+        updatePayload.lock_status = "locked";
+        updatePayload.lock_owner_id = user.id;
+        updatePayload.lock_at = new Date().toISOString();
+      }
+
       const { error: updateError } = await supabase
         .from("tickets")
-        .update({ status: "resolvido", resolved_at: resolvedAt, resolved_by: analystName })
+        .update(updatePayload)
         .eq("id", selectedRfcId);
       if (updateError) throw updateError;
 

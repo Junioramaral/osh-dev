@@ -30,7 +30,7 @@ export function useTicketActions() {
       // 2. Get complete ticket data
       const { data: ticket, error: ticketError } = await supabase
         .from("tickets")
-        .select("id, ticket_number, title, contact_email, contact_name, created_at")
+        .select("id, ticket_number, title, contact_email, contact_name, created_at, analyst_id")
         .eq("id", ticketId)
         .single();
 
@@ -40,14 +40,23 @@ export function useTicketActions() {
 
       const resolvedAt = new Date().toISOString();
 
-      // 3. Update ticket status
+      // 3. Update ticket status + auto-allocate if no analyst
+      const updateData: Record<string, any> = {
+        status: "resolvido" as TicketStatus,
+        resolved_at: resolvedAt,
+        resolved_by: authorName,
+      };
+
+      if (!ticket.analyst_id) {
+        updateData.analyst_id = userId;
+        updateData.lock_status = "locked";
+        updateData.lock_owner_id = userId;
+        updateData.lock_at = new Date().toISOString();
+      }
+
       const { error: updateError } = await supabase
         .from("tickets")
-        .update({
-          status: "resolvido" as TicketStatus,
-          resolved_at: resolvedAt,
-          resolved_by: authorName,
-        })
+        .update(updateData)
         .eq("id", ticketId);
 
       if (updateError) throw updateError;
@@ -124,10 +133,26 @@ export function useTicketActions() {
     }) => {
       const updateData: Record<string, any> = { status };
 
-      // If resolving, also set resolved_by and resolved_at
-      if (status === "resolvido") {
-        const { data: { user } } = await supabase.auth.getUser();
-        if (user) {
+      const { data: { user } } = await supabase.auth.getUser();
+
+      // Check current ticket for auto-allocation
+      if (user) {
+        const { data: currentTicket } = await supabase
+          .from("tickets")
+          .select("analyst_id")
+          .eq("id", ticketId)
+          .single();
+
+        // Auto-allocate if no analyst assigned
+        if (currentTicket && !currentTicket.analyst_id) {
+          updateData.analyst_id = user.id;
+          updateData.lock_status = "locked";
+          updateData.lock_owner_id = user.id;
+          updateData.lock_at = new Date().toISOString();
+        }
+
+        // If resolving, also set resolved_by and resolved_at
+        if (status === "resolvido") {
           const { data: profile } = await supabase
             .from("profiles")
             .select("full_name")
