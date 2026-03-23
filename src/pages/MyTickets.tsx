@@ -24,7 +24,7 @@ import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
   const { profile, isSuperAdmin, isOtimizzoUser } = useAuth();
-  const { queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
+  const { queues: analystQueues, queueIds: analystQueueIds, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
