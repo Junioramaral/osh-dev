@@ -169,6 +169,35 @@ export default function SystemSettings() {
     saveInactivityMutation.mutate(days);
   };
 
+  // Save business hours config
+  const saveBusinessHoursMutation = useMutation({
+    mutationFn: async ({ start, end, days }: { start: string; end: string; days: number[] }) => {
+      const updates = [
+        supabase.from("system_configs").upsert({ key: 'business_hours_start', value: JSON.stringify(start), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+        supabase.from("system_configs").upsert({ key: 'business_hours_end', value: JSON.stringify(end), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+        supabase.from("system_configs").upsert({ key: 'business_days', value: JSON.stringify(days), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+      ];
+      const results = await Promise.all(updates);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system_configs"] });
+      toast.success("Horário comercial salvo com sucesso");
+    },
+    onError: (error) => {
+      toast.error("Erro ao salvar: " + error.message);
+    },
+  });
+
+  const handleSaveBusinessHours = () => {
+    saveBusinessHoursMutation.mutate({ start: bhStart, end: bhEnd, days: bhDays });
+  };
+
+  const toggleBusinessDay = (day: number) => {
+    setBhDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort());
+  };
+
   // Fetch database engines
   const { data: engines, isLoading: enginesLoading } = useQuery({
     queryKey: ["database_engines"],
