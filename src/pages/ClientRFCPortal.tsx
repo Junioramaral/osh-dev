@@ -467,6 +467,7 @@ const ClientRFCPortal = () => {
           </div>
         </div>
       </Card>
+      </div>
     </AppLayout>
   );
 };
