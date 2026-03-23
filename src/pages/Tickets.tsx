@@ -23,11 +23,13 @@ import { BulkAssignQueueDialog } from "@/components/tickets/BulkAssignQueueDialo
 import { BulkStatusReasonDialog } from "@/components/tickets/BulkStatusReasonDialog";
 import { TicketLockedWarningDialog } from "@/components/tickets/TicketLockedWarningDialog";
 import { ReleaseTicketDialog } from "@/components/tickets/ReleaseTicketDialog";
+import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
+import { useDeleteTickets } from "@/hooks/useDeleteTickets";
 import { cn } from "@/lib/utils";
 
 export default function Tickets() {
-  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst } = useAuth();
+  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst, isTenantAdmin } = useAuth();
   const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
@@ -50,6 +52,9 @@ export default function Tickets() {
   const [lockedTicketInfo, setLockedTicketInfo] = useState<{ lockedByName: string } | null>(null);
   const [pendingAction, setPendingAction] = useState<"lock" | "assign" | null>(null);
   const [pendingAnalystId, setPendingAnalystId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const deleteTickets = useDeleteTickets();
 
   const {
     bulkAssignAnalyst,
@@ -657,7 +662,9 @@ export default function Tickets() {
           onChangePriority={handleBulkChangePriority}
           onLockTickets={handleBulkLockTickets}
           onReleaseTickets={!isClient ? () => setShowReleaseDialog(true) : undefined}
+          onDeleteTickets={() => setShowDeleteDialog(true)}
           isClient={isClient}
+          canDelete={isSuperAdmin || isTenantAdmin}
         />
       )}
 
@@ -707,6 +714,21 @@ export default function Tickets() {
         onOpenChange={setShowReleaseDialog}
         ticketCount={selectedTickets.size}
         onConfirm={handleReleaseTickets}
+      />
+
+      <DeleteTicketDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        ticketCount={selectedTickets.size}
+        onConfirm={() => {
+          deleteTickets.mutate(Array.from(selectedTickets), {
+            onSuccess: () => {
+              setSelectedTickets(new Set());
+              setShowDeleteDialog(false);
+            },
+          });
+        }}
+        isDeleting={deleteTickets.isPending}
       />
     </AppLayout>
   );
