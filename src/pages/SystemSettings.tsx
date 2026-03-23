@@ -598,6 +598,92 @@ export default function SystemSettings() {
                 </p>
               </CardContent>
             </Card>
+
+            {/* Business Hours Configuration */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Horário Comercial (SLA P3/P4)
+                </CardTitle>
+                <CardDescription>
+                  Tickets P3 e P4 utilizam SLA em horas úteis. O relógio do SLA é pausado 
+                  fora do horário comercial e em dias não úteis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="bh-start">Início:</Label>
+                    <Input 
+                      id="bh-start"
+                      type="time" 
+                      value={bhStart}
+                      onChange={(e) => setBhStart(e.target.value)}
+                      className="w-32"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="bh-end">Fim:</Label>
+                    <Input 
+                      id="bh-end"
+                      type="time" 
+                      value={bhEnd}
+                      onChange={(e) => setBhEnd(e.target.value)}
+                      className="w-32"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="mb-2 block">Dias úteis:</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { day: 1, label: "Seg" },
+                      { day: 2, label: "Ter" },
+                      { day: 3, label: "Qua" },
+                      { day: 4, label: "Qui" },
+                      { day: 5, label: "Sex" },
+                      { day: 6, label: "Sáb" },
+                      { day: 7, label: "Dom" },
+                    ].map(({ day, label }) => (
+                      <Button
+                        key={day}
+                        variant={bhDays.includes(day) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleBusinessDay(day)}
+                        disabled={isReadOnly}
+                        className="w-12"
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {!isReadOnly && (
+                    <Button 
+                      onClick={handleSaveBusinessHours}
+                      disabled={saveBusinessHoursMutation.isPending}
+                    >
+                      {saveBusinessHoursMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Salvar
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  <strong>P1/P2</strong>: SLA em horas corridas (24x7). <strong>P3/P4</strong>: SLA em horas úteis ({bhStart}-{bhEnd}).
+                  {isReadOnly && <span className="ml-2 text-purple-600">(Somente leitura)</span>}
+                </p>
+              </CardContent>
+            </Card>
           </TabsContent>
 
           {/* Services Tab with Nested Tabs */}
