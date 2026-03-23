@@ -1,20 +1,29 @@
 
 
-# Fix: Scroll e aproveitamento de espaço na tela "Minhas RFCs"
+# Adicionar tempos de execução na visão do cliente "Minhas RFCs"
 
-## Problema
+## O que falta
 
-O layout usa `h-[calc(100vh-220px)]` (linha 128) que limita a altura do card. O painel direito tem `ScrollArea` mas o conteúdo dos passos está sendo cortado, impedindo ver o passo 4. Além disso, o card não aproveita a largura disponível da tela.
+O cliente vê apenas a timeline com status e data de conclusão, mas não vê:
+- **Tempo total de execução** na barra de progresso
+- **Tabela com Início, Fim, Duração** de cada passo (como a equipe Otimizzo vê)
 
 ## Mudanças
 
 ### `src/pages/ClientRFCPortal.tsx`
 
-1. **Expandir largura do painel de lista**: Mudar `md:grid-cols-[300px_1fr]` para `md:grid-cols-[340px_1fr]` (ganho sutil)
+1. **Incluir `started_at` na query** do `rfc_steps` (linha 87) — atualmente só busca `concluded_at`
 
-2. **Corrigir altura do container**: Aumentar a área útil reduzindo o offset — mudar `h-[calc(100vh-220px)]` para `h-[calc(100vh-180px)]` para aproveitar melhor o espaço vertical
+2. **Adicionar "Tempo total de execução"** abaixo da barra de progresso (após linha 237), usando a mesma lógica de `formatDuration` do `TicketRFCReport.tsx`
 
-3. **Garantir scroll funcional no painel direito**: O `ScrollArea` (linha 198) já existe, mas precisa garantir que o conteúdo interno não tenha constraints que impeçam o scroll. Adicionar `min-h-0` ao container flex pai do painel direito (linha 181) para que o flex item possa encolher e ativar o scroll
+3. **Adicionar tabela de tempos** entre a barra de progresso e a timeline vertical, com as colunas:
+   - Passo | Descrição | Início | Fim | Duração
+   - Linha de total no final
+   - Estilo compacto, similar ao primeiro print (tabela do relatório RFC)
 
-Essas 3 pequenas alterações resolvem ambos os problemas: o scroll passa a funcionar corretamente e o espaço em branco é reduzido.
+4. **Funções utilitárias**: Reutilizar `formatDuration` e `getDurationMinutes` do `TicketRFCReport.tsx` (copiar localmente ou extrair para utils)
+
+### Resultado visual esperado
+
+Abaixo da barra de progresso e do banner de celebração, aparecerá uma tabela compacta mostrando início, fim e duração de cada passo, com o tempo total na última linha — idêntico ao que a Otimizzo vê na aba RFC do ticket.
 
