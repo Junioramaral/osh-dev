@@ -24,7 +24,7 @@ import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
   const { profile, isSuperAdmin, isOtimizzoUser } = useAuth();
-  const { queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
+  const { queues: analystQueues, queueIds: analystQueueIds, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
@@ -321,7 +321,9 @@ export default function MyTickets() {
       (teamFilter === "none" && !ticket.team_id) || 
       ticket.team_id === teamFilter;
     const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
-    return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesType;
+    const matchesQueue = !shouldRestrictView || !hasQueues || 
+      !ticket.queue_id || analystQueueIds.includes(ticket.queue_id);
+    return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesType && matchesQueue;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
