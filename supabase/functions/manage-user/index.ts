@@ -86,7 +86,7 @@ serve(async (req) => {
     const hasSuperAdmin = roleData?.some(r => r.role === "super_admin");
     
     if (roleError || !hasSuperAdmin) {
-      console.error("[manage-user] User lacks super_admin role:", user.id);
+      console.error("[manage-user] User lacks super_admin role:", userId_auth);
       return new Response(
         JSON.stringify({ error: "Insufficient permissions" }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
