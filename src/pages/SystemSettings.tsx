@@ -87,6 +87,9 @@ export default function SystemSettings() {
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
   const [deleteSegmentId, setDeleteSegmentId] = useState<string | null>(null);
+  const [bhStart, setBhStart] = useState("09:00");
+  const [bhEnd, setBhEnd] = useState("18:00");
+  const [bhDays, setBhDays] = useState<number[]>([1, 2, 3, 4, 5]);
 
   // Fetch system configs
   const { data: systemConfigs, isLoading: configsLoading } = useQuery({
@@ -100,7 +103,7 @@ export default function SystemSettings() {
     },
   });
 
-  // Set initial inactivity days from config
+  // Set initial values from config
   useEffect(() => {
     if (systemConfigs) {
       const inactivityConfig = systemConfigs.find((c: any) => c.key === 'ticket_inactivity_days');
@@ -110,6 +113,27 @@ export default function SystemSettings() {
           : Number(inactivityConfig.value);
         setInactivityDays(value);
         setInactivityDaysInput(String(value));
+      }
+      const bhStartConfig = systemConfigs.find((c: any) => c.key === 'business_hours_start');
+      if (bhStartConfig) {
+        const val = typeof bhStartConfig.value === 'string' 
+          ? bhStartConfig.value.replace(/"/g, '') 
+          : String(bhStartConfig.value).replace(/"/g, '');
+        setBhStart(val);
+      }
+      const bhEndConfig = systemConfigs.find((c: any) => c.key === 'business_hours_end');
+      if (bhEndConfig) {
+        const val = typeof bhEndConfig.value === 'string' 
+          ? bhEndConfig.value.replace(/"/g, '') 
+          : String(bhEndConfig.value).replace(/"/g, '');
+        setBhEnd(val);
+      }
+      const bhDaysConfig = systemConfigs.find((c: any) => c.key === 'business_days');
+      if (bhDaysConfig) {
+        const val = typeof bhDaysConfig.value === 'string' 
+          ? JSON.parse(bhDaysConfig.value) 
+          : bhDaysConfig.value;
+        if (Array.isArray(val)) setBhDays(val.map(Number));
       }
     }
   }, [systemConfigs]);
@@ -143,6 +167,35 @@ export default function SystemSettings() {
     }
     setInactivityDays(days);
     saveInactivityMutation.mutate(days);
+  };
+
+  // Save business hours config
+  const saveBusinessHoursMutation = useMutation({
+    mutationFn: async ({ start, end, days }: { start: string; end: string; days: number[] }) => {
+      const updates = [
+        supabase.from("system_configs").upsert({ key: 'business_hours_start', value: JSON.stringify(start), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+        supabase.from("system_configs").upsert({ key: 'business_hours_end', value: JSON.stringify(end), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+        supabase.from("system_configs").upsert({ key: 'business_days', value: JSON.stringify(days), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+      ];
+      const results = await Promise.all(updates);
+      const error = results.find(r => r.error)?.error;
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["system_configs"] });
+      toast.success("Horário comercial salvo com sucesso");
+    },
+    onError: (error) => {
+      toast.error("Erro ao salvar: " + error.message);
+    },
+  });
+
+  const handleSaveBusinessHours = () => {
+    saveBusinessHoursMutation.mutate({ start: bhStart, end: bhEnd, days: bhDays });
+  };
+
+  const toggleBusinessDay = (day: number) => {
+    setBhDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort());
   };
 
   // Fetch database engines
@@ -541,6 +594,92 @@ export default function SystemSettings() {
                 <p className="text-sm text-muted-foreground">
                   Valor atual: <strong>{inactivityDays} dias</strong>. Tickets sem atualização por este 
                   período terão o analista removido automaticamente.
+                  {isReadOnly && <span className="ml-2 text-purple-600">(Somente leitura)</span>}
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Business Hours Configuration */}
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Clock className="h-5 w-5" />
+                  Horário Comercial (SLA P3/P4)
+                </CardTitle>
+                <CardDescription>
+                  Tickets P3 e P4 utilizam SLA em horas úteis. O relógio do SLA é pausado 
+                  fora do horário comercial e em dias não úteis.
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="flex items-center gap-6">
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="bh-start">Início:</Label>
+                    <Input 
+                      id="bh-start"
+                      type="time" 
+                      value={bhStart}
+                      onChange={(e) => setBhStart(e.target.value)}
+                      className="w-32"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Label htmlFor="bh-end">Fim:</Label>
+                    <Input 
+                      id="bh-end"
+                      type="time" 
+                      value={bhEnd}
+                      onChange={(e) => setBhEnd(e.target.value)}
+                      className="w-32"
+                      disabled={isReadOnly}
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <Label className="mb-2 block">Dias úteis:</Label>
+                  <div className="flex gap-2">
+                    {[
+                      { day: 1, label: "Seg" },
+                      { day: 2, label: "Ter" },
+                      { day: 3, label: "Qua" },
+                      { day: 4, label: "Qui" },
+                      { day: 5, label: "Sex" },
+                      { day: 6, label: "Sáb" },
+                      { day: 7, label: "Dom" },
+                    ].map(({ day, label }) => (
+                      <Button
+                        key={day}
+                        variant={bhDays.includes(day) ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => toggleBusinessDay(day)}
+                        disabled={isReadOnly}
+                        className="w-12"
+                      >
+                        {label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-4">
+                  {!isReadOnly && (
+                    <Button 
+                      onClick={handleSaveBusinessHours}
+                      disabled={saveBusinessHoursMutation.isPending}
+                    >
+                      {saveBusinessHoursMutation.isPending ? (
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      ) : (
+                        <Save className="h-4 w-4 mr-2" />
+                      )}
+                      Salvar
+                    </Button>
+                  )}
+                </div>
+                <p className="text-sm text-muted-foreground">
+                  <strong>P1/P2</strong>: SLA em horas corridas (24x7). <strong>P3/P4</strong>: SLA em horas úteis ({bhStart}-{bhEnd}).
                   {isReadOnly && <span className="ml-2 text-purple-600">(Somente leitura)</span>}
                 </p>
               </CardContent>

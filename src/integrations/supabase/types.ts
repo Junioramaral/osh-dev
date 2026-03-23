@@ -1508,6 +1508,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      add_business_minutes: {
+        Args: { _minutes: number; _start_time: string }
+        Returns: string
+      }
       can_analyst_view_ticket: {
         Args: { _ticket_queue_id: string; _user_id: string }
         Returns: boolean

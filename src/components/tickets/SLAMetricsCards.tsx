@@ -1,6 +1,8 @@
 import { Card, CardContent } from "@/components/ui/card";
 import { Clock, Target, Pause, TrendingUp } from "lucide-react";
-import { differenceInMinutes, differenceInHours } from "date-fns";
+import { differenceInMinutes } from "date-fns";
+import { Badge } from "@/components/ui/badge";
+import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOURS } from "@/lib/businessHours";
 
 interface SLAMetricsCardsProps {
   ticket: any;
@@ -24,34 +26,31 @@ function formatDuration(minutes: number): string {
 export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
   const createdAt = new Date(ticket.created_at);
   const resolvedAt = ticket.resolved_at ? new Date(ticket.resolved_at) : new Date();
-  const firstResponseAt = ticket.first_response_at ? new Date(ticket.first_response_at) : null;
+  const useBusinessHours = isBusinessHoursPriority(ticket.priority);
   
-  // Tempo total (do início até resolução ou agora)
-  const totalMinutes = differenceInMinutes(resolvedAt, createdAt);
+  // Tempo total (calendar)
+  const totalMinutesCalendar = differenceInMinutes(resolvedAt, createdAt);
   
-  // Tempo de primeira resposta
-  const firstResponseMinutes = firstResponseAt 
-    ? differenceInMinutes(firstResponseAt, createdAt)
-    : null;
+  // Tempo útil (business hours for P3/P4, same as total for P1/P2)
+  const usefulMinutes = useBusinessHours
+    ? calculateBusinessMinutes(createdAt, resolvedAt, DEFAULT_BUSINESS_HOURS)
+    : totalMinutesCalendar;
   
-  // Tempo útil (quando o ticket estava em atendimento)
-  // Para simplificar, consideramos o tempo total como útil
-  const usefulMinutes = totalMinutes;
+  // Tempo em pausa (difference between calendar and business for P3/P4)
+  const pauseMinutes = useBusinessHours
+    ? Math.max(0, totalMinutesCalendar - usefulMinutes)
+    : 0;
   
-  // Tempo em pausa (quando estava aguardando cliente)
-  // Isso seria calculado baseado no histórico, por enquanto mostramos 0
-  const pauseMinutes = 0;
-  
-  // Eficiência (% do tempo útil vs total)
-  const efficiency = pauseMinutes > 0 
-    ? ((usefulMinutes / totalMinutes) * 100).toFixed(1)
+  // Eficiência
+  const efficiency = totalMinutesCalendar > 0 
+    ? ((usefulMinutes / totalMinutesCalendar) * 100).toFixed(1)
     : "100.0";
   
   const metrics = [
     {
       icon: Clock,
       label: "Tempo Total",
-      value: formatDuration(totalMinutes),
+      value: formatDuration(totalMinutesCalendar),
       color: "text-primary",
       bgColor: "bg-primary/10",
     },
@@ -61,6 +60,7 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
       value: formatDuration(usefulMinutes),
       color: "text-success",
       bgColor: "bg-success/10",
+      badge: useBusinessHours ? "HU" : undefined,
     },
     {
       icon: Pause,
@@ -68,6 +68,7 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
       value: formatDuration(pauseMinutes),
       color: "text-warning",
       bgColor: "bg-warning/10",
+      badge: useBusinessHours ? "Fora do expediente" : undefined,
     },
     {
       icon: TrendingUp,
@@ -88,7 +89,14 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
                 <metric.icon className={`h-6 w-6 ${metric.color}`} />
               </div>
               <div>
-                <p className="text-sm text-muted-foreground">{metric.label}</p>
+                <div className="flex items-center gap-2">
+                  <p className="text-sm text-muted-foreground">{metric.label}</p>
+                  {metric.badge && (
+                    <Badge variant="outline" className="text-[10px] px-1.5 py-0">
+                      {metric.badge}
+                    </Badge>
+                  )}
+                </div>
                 <p className="text-2xl font-bold">{metric.value}</p>
               </div>
             </div>
