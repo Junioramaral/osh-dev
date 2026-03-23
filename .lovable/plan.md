@@ -1,25 +1,55 @@
 
 
-# Expandir espaço horizontal da tela "Minhas RFCs"
+# Adicionar funcionalidade de exclusão de tickets/RFCs
 
-## Problema
+## Escopo
 
-O conteúdo da página é envolvido por `<div className="container mx-auto p-6">` no `AppLayout.tsx` (linha 149). A classe `container` do Tailwind limita a largura máxima a 1400px (configurado no `tailwind.config.ts`), criando o espaço em branco nas laterais.
+Permitir que **Super Admin** e **Tenant Admin** excluam tickets (incluindo RFCs). A exclusão será em cascata, removendo também comentários, histórico, time logs, RFC steps, SLA notifications e anexos relacionados.
 
-## Solução
+## Mudanças
 
-Duas opções possíveis:
+### 1. RLS: Política de DELETE para tenant_admin
+Criar migração SQL para adicionar política de DELETE na tabela `tickets` para tenant_admin (super_admin já tem via policy ALL):
 
-**Opção A (recomendada)**: Modificar apenas `ClientRFCPortal.tsx` para usar margem negativa e largura total, sobrescrevendo o container pai. Isso não afeta outras páginas.
+```sql
+-- Tenant admins can delete their own tenant tickets
+CREATE POLICY "Tenant admins can delete own tickets"
+ON public.tickets FOR DELETE TO authenticated
+USING (
+  has_role(auth.uid(), 'tenant_admin') 
+  AND client_id = get_user_tenant_id(auth.uid())
+);
+```
 
-- Envolver o conteúdo da página com uma div que usa classes como `max-w-none -mx-6` para escapar do container e ocupar toda a largura disponível, ou usar `px-2` para manter um padding mínimo.
+Também adicionar políticas de DELETE nas tabelas dependentes (`ticket_comments`, `ticket_history`, `ticket_time_logs`, `rfc_steps`, `sla_notifications`) para super_admin e tenant_admin, para que o cascade funcione ou para permitir limpeza manual antes do delete.
 
-**Opção B**: Aceitar uma prop no `AppLayout` para desabilitar o container (ex: `fullWidth`), e usá-la no `ClientRFCPortal`.
+### 2. Hook: `useDeleteTickets` (novo)
+Criar `src/hooks/useDeleteTickets.ts`:
+- Mutation que primeiro deleta registros dependentes (comments, history, time_logs, rfc_steps, sla_notifications) e depois o ticket
+- Invalidar queries relevantes no onSuccess
 
-Vou seguir a **Opção A** por ser mais simples e isolada.
+### 3. Dialog de confirmação: `DeleteTicketDialog` (novo)
+Criar `src/components/tickets/DeleteTicketDialog.tsx`:
+- AlertDialog com aviso de que a ação é irreversível
+- Mostrar quantidade de tickets a serem excluídos
+- Ícone de alerta vermelho, botão destrutivo
 
-## Mudança
+### 4. BulkActionsBar: Botão "Excluir"
+Adicionar botão vermelho "Excluir" no `BulkActionsBar.tsx`, visível apenas para `isSuperAdmin` ou `isTenantAdmin`
 
-### `src/pages/ClientRFCPortal.tsx`
-- Envolver todo o conteúdo retornado em uma `<div className="-mx-6 px-2">` para expandir horizontalmente além do container, mantendo um padding mínimo nas bordas.
+### 5. Tickets.tsx: Integração
+- Adicionar estado para o dialog de exclusão
+- Passar `onDeleteTickets` e props de permissão ao BulkActionsBar
+- Chamar hook de exclusão na confirmação
+
+### 6. TicketDetail: Botão de exclusão individual
+Adicionar botão "Excluir" no `TicketHeader.tsx` (visível para super_admin/tenant_admin), com o mesmo dialog de confirmação
+
+## Arquivos afetados
+- `supabase/migrations/` — nova migração (RLS DELETE policies)
+- `src/hooks/useDeleteTickets.ts` — novo
+- `src/components/tickets/DeleteTicketDialog.tsx` — novo
+- `src/components/tickets/BulkActionsBar.tsx` — botão excluir
+- `src/pages/Tickets.tsx` — integração bulk delete
+- `src/components/tickets/TicketHeader.tsx` — botão excluir individual
 
