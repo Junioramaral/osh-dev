@@ -32,7 +32,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, isSuperAdmin, isViewer, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
+  const { user, profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   
@@ -57,12 +57,13 @@ const AppLayout = ({ children }: AppLayoutProps) => {
 
   const adminNav = useMemo(() => [
     { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin || isViewer },
+    { name: "Meu Tenant", href: `/admin/tenants/${tenantId}`, icon: Users, show: isTenantAdmin && !isSuperAdmin && !isViewer },
     { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || isOtimizzoUser || isViewer },
     
     { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser || isViewer },
     { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || isOtimizzoUser || isViewer },
     { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || isOtimizzoUser || isViewer },
-  ].filter(item => item.show), [isSuperAdmin, isViewer, isOtimizzoUser]);
+  ].filter(item => item.show), [isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId]);
 
   if (mustChangePassword) {
     return <Navigate to="/auth" replace />;
@@ -95,6 +96,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           profile={profile}
           userEmail={user?.email}
           isSuperAdmin={isSuperAdmin}
+          isTenantAdmin={isTenantAdmin}
           isViewer={isViewer}
           isOtimizzoUser={isOtimizzoUser}
           onClose={handleClose}
@@ -129,6 +131,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
                   profile={profile}
                   userEmail={user?.email}
                   isSuperAdmin={isSuperAdmin}
+                  isTenantAdmin={isTenantAdmin}
                   isViewer={isViewer}
                   isOtimizzoUser={isOtimizzoUser}
                   onClose={handleClose}
