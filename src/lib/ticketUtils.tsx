@@ -28,7 +28,9 @@ export const formatDuration = (minutes: number): string => {
   }
 };
 
-export const calculateSLAStatus = (ticket: any): SLAStatus => {
+export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHoursConfig): SLAStatus => {
+  const bhConfig = businessHoursConfig || DEFAULT_BUSINESS_HOURS;
+  const useBusinessHours = isBusinessHoursPriority(ticket.priority);
   // RFCs don't have SLA
   if (ticket.record_type === 'rfc') {
     return {
