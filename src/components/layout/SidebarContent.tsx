@@ -37,6 +37,7 @@ const SidebarContent = ({
   profile,
   userEmail,
   isSuperAdmin,
+  isTenantAdmin,
   isViewer,
   isOtimizzoUser,
   onClose,
