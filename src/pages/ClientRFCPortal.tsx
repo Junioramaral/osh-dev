@@ -110,7 +110,7 @@ const ClientRFCPortal = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rfc_steps")
-        .select("id, descricao, procedimento, ordem, status_concluido, concluded_at, observacao, ticket_id")
+        .select("id, descricao, procedimento, ordem, status_concluido, started_at, concluded_at, observacao, ticket_id")
         .eq("ticket_id", selectedRfcId!)
         .order("ordem");
       if (error) throw error;
