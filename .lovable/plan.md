@@ -1,29 +1,25 @@
 
 
-# Adicionar tempos de execução na visão do cliente "Minhas RFCs"
+# Expandir espaço horizontal da tela "Minhas RFCs"
 
-## O que falta
+## Problema
 
-O cliente vê apenas a timeline com status e data de conclusão, mas não vê:
-- **Tempo total de execução** na barra de progresso
-- **Tabela com Início, Fim, Duração** de cada passo (como a equipe Otimizzo vê)
+O conteúdo da página é envolvido por `<div className="container mx-auto p-6">` no `AppLayout.tsx` (linha 149). A classe `container` do Tailwind limita a largura máxima a 1400px (configurado no `tailwind.config.ts`), criando o espaço em branco nas laterais.
 
-## Mudanças
+## Solução
+
+Duas opções possíveis:
+
+**Opção A (recomendada)**: Modificar apenas `ClientRFCPortal.tsx` para usar margem negativa e largura total, sobrescrevendo o container pai. Isso não afeta outras páginas.
+
+- Envolver o conteúdo da página com uma div que usa classes como `max-w-none -mx-6` para escapar do container e ocupar toda a largura disponível, ou usar `px-2` para manter um padding mínimo.
+
+**Opção B**: Aceitar uma prop no `AppLayout` para desabilitar o container (ex: `fullWidth`), e usá-la no `ClientRFCPortal`.
+
+Vou seguir a **Opção A** por ser mais simples e isolada.
+
+## Mudança
 
 ### `src/pages/ClientRFCPortal.tsx`
-
-1. **Incluir `started_at` na query** do `rfc_steps` (linha 87) — atualmente só busca `concluded_at`
-
-2. **Adicionar "Tempo total de execução"** abaixo da barra de progresso (após linha 237), usando a mesma lógica de `formatDuration` do `TicketRFCReport.tsx`
-
-3. **Adicionar tabela de tempos** entre a barra de progresso e a timeline vertical, com as colunas:
-   - Passo | Descrição | Início | Fim | Duração
-   - Linha de total no final
-   - Estilo compacto, similar ao primeiro print (tabela do relatório RFC)
-
-4. **Funções utilitárias**: Reutilizar `formatDuration` e `getDurationMinutes` do `TicketRFCReport.tsx` (copiar localmente ou extrair para utils)
-
-### Resultado visual esperado
-
-Abaixo da barra de progresso e do banner de celebração, aparecerá uma tabela compacta mostrando início, fim e duração de cada passo, com o tempo total na última linha — idêntico ao que a Otimizzo vê na aba RFC do ticket.
+- Envolver todo o conteúdo retornado em uma `<div className="-mx-6 px-2">` para expandir horizontalmente além do container, mantendo um padding mínimo nas bordas.
 
