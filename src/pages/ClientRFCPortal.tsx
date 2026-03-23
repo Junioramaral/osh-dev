@@ -8,12 +8,38 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import {
   ClipboardList, ArrowLeft, CheckCircle2, Clock, Loader2,
-  Calendar, ChevronDown, ChevronUp, PartyPopper, MessageSquare,
+  Calendar, ChevronDown, ChevronUp, PartyPopper, MessageSquare, Timer,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+function formatDuration(startedAt: string | null, concludedAt: string | null): string {
+  if (!startedAt || !concludedAt) return "—";
+  const diffMs = new Date(concludedAt).getTime() - new Date(startedAt).getTime();
+  if (diffMs < 0) return "—";
+  const totalMinutes = Math.round(diffMs / 60000);
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+}
+
+function getDurationMinutes(startedAt: string | null, concludedAt: string | null): number {
+  if (!startedAt || !concludedAt) return 0;
+  const diffMs = new Date(concludedAt).getTime() - new Date(startedAt).getTime();
+  return diffMs > 0 ? Math.round(diffMs / 60000) : 0;
+}
+
+function formatTotalDuration(totalMinutes: number): string {
+  if (totalMinutes === 0) return "—";
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+}
 
 type RFC = {
   id: string;
