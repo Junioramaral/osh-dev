@@ -59,15 +59,27 @@ export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHo
   if (!ticket.first_response_at && ticket.sla_first_response_deadline) {
     const deadline = new Date(ticket.sla_first_response_deadline);
     const createdAt = new Date(ticket.created_at);
-    const totalTime = differenceInMinutes(deadline, createdAt);
-    const elapsed = differenceInMinutes(now, createdAt);
-    const remaining = differenceInMinutes(deadline, now);
-    const percentage = Math.min((elapsed / totalTime) * 100, 100);
+    
+    let elapsed: number, totalTime: number, remaining: number, percentage: number;
+    
+    if (useBusinessHours) {
+      elapsed = calculateBusinessMinutes(createdAt, now, bhConfig);
+      totalTime = calculateBusinessMinutes(createdAt, deadline, bhConfig);
+      remaining = totalTime - elapsed;
+      percentage = totalTime > 0 ? Math.min((elapsed / totalTime) * 100, 100) : 0;
+    } else {
+      totalTime = differenceInMinutes(deadline, createdAt);
+      elapsed = differenceInMinutes(now, createdAt);
+      remaining = differenceInMinutes(deadline, now);
+      percentage = Math.min((elapsed / totalTime) * 100, 100);
+    }
+    
+    const slaLabel = useBusinessHours ? ' (HU)' : '';
     
     if (remaining < 0) {
       return {
         type: 'overdue',
-        label: 'SLA Vencido',
+        label: 'SLA Vencido' + slaLabel,
         color: 'bg-red-100 text-red-800 border-red-300',
         icon: <AlertTriangle className="h-3 w-3" />,
         timeRemaining: `Venceu há ${formatDuration(Math.abs(remaining))}`,
@@ -77,7 +89,7 @@ export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHo
     } else if (percentage > 75) {
       return {
         type: 'warning',
-        label: 'Atenção SLA',
+        label: 'Atenção SLA' + slaLabel,
         color: 'bg-yellow-100 text-yellow-800 border-yellow-300',
         icon: <Clock className="h-3 w-3" />,
         timeRemaining: `${formatDuration(remaining)} restantes`,
@@ -87,7 +99,7 @@ export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHo
     } else {
       return {
         type: 'on-time',
-        label: 'No Prazo',
+        label: 'No Prazo' + slaLabel,
         color: 'bg-green-100 text-green-800 border-green-300',
         icon: <CheckCircle2 className="h-3 w-3" />,
         timeRemaining: `${formatDuration(remaining)} restantes`,
