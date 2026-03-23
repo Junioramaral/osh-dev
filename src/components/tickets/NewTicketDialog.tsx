@@ -801,33 +801,38 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             {errors.title && <p className="text-sm text-destructive">{errors.title.message}</p>}
           </div>
 
-          {/* Queue Selector - only for Otimizzo users */}
-          {isOtimizzoUser && queues && queues.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="queue_id" className="flex items-center gap-2">
-                <ListOrdered className="h-4 w-4" />
-                Fila de Atendimento
-              </Label>
-              <Select
-                value={watch("queue_id") || ""}
-                onValueChange={(value) => setValue("queue_id", value || null)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione uma fila (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {queues.map((queue) => (
-                    <SelectItem key={queue.id} value={queue.id}>
-                      {queue.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <p className="text-xs text-muted-foreground">
-                Direciona o ticket para a fila de atendimento específica
-              </p>
-            </div>
-          )}
+          {/* Queue Selector - only for Otimizzo users, filtered by analyst assignment */}
+          {(() => {
+            const availableQueues = isAnalystOnly && analystQueues && analystQueues.length > 0
+              ? queues?.filter(q => analystQueues.includes(q.id))
+              : queues;
+            return isOtimizzoUser && availableQueues && availableQueues.length > 0 ? (
+              <div className="space-y-2">
+                <Label htmlFor="queue_id" className="flex items-center gap-2">
+                  <ListOrdered className="h-4 w-4" />
+                  Fila de Atendimento
+                </Label>
+                <Select
+                  value={watch("queue_id") || ""}
+                  onValueChange={(value) => setValue("queue_id", value || null)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione uma fila (opcional)" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {availableQueues.map((queue) => (
+                      <SelectItem key={queue.id} value={queue.id}>
+                        {queue.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  Direciona o ticket para a fila de atendimento específica
+                </p>
+              </div>
+            ) : null;
+          })()}
 
           {/* Subcategory - only show if category is selected and has subcategories */}
           {selectedCategoryId && subcategories && subcategories.length > 0 && (
