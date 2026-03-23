@@ -1,25 +1,21 @@
 
 
-# Expandir espaço horizontal da tela "Minhas RFCs"
+# Expandir altura do card "Minhas RFCs" para ocupar toda a tela
 
 ## Problema
 
-O conteúdo da página é envolvido por `<div className="container mx-auto p-6">` no `AppLayout.tsx` (linha 149). A classe `container` do Tailwind limita a largura máxima a 1400px (configurado no `tailwind.config.ts`), criando o espaço em branco nas laterais.
+O card usa `h-[calc(100vh-180px)]` mas o offset não é suficiente para cobrir toda a altura restante, deixando espaço vazio embaixo.
 
 ## Solução
 
-Duas opções possíveis:
-
-**Opção A (recomendada)**: Modificar apenas `ClientRFCPortal.tsx` para usar margem negativa e largura total, sobrescrevendo o container pai. Isso não afeta outras páginas.
-
-- Envolver o conteúdo da página com uma div que usa classes como `max-w-none -mx-6` para escapar do container e ocupar toda a largura disponível, ou usar `px-2` para manter um padding mínimo.
-
-**Opção B**: Aceitar uma prop no `AppLayout` para desabilitar o container (ex: `fullWidth`), e usá-la no `ClientRFCPortal`.
-
-Vou seguir a **Opção A** por ser mais simples e isolada.
-
-## Mudança
-
 ### `src/pages/ClientRFCPortal.tsx`
-- Envolver todo o conteúdo retornado em uma `<div className="-mx-6 px-2">` para expandir horizontalmente além do container, mantendo um padding mínimo nas bordas.
+
+1. **Tornar o container flex vertical** — envolver o conteúdo em um layout flex com `min-h-[calc(100vh-120px)]` para o wrapper externo (`-mx-6 px-2`), com `flex flex-col`
+
+2. **Card cresce para preencher** — trocar a altura fixa do grid de `h-[calc(100vh-180px)]` para `flex-1` no Card e no grid interno, fazendo o card crescer automaticamente para ocupar todo o espaço restante
+
+Mudanças concretas:
+- Linha 143: `<div className="-mx-6 px-2">` → `<div className="-mx-6 px-2 flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>`
+- Linha 156: `<Card className="overflow-hidden">` → `<Card className="overflow-hidden flex-1 flex flex-col">`
+- Linha 157: remover `h-[calc(100vh-180px)] min-h-[500px]` e usar `flex-1 min-h-0` no grid
 
