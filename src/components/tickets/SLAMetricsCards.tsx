@@ -68,7 +68,7 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
       value: formatDuration(pauseMinutes),
       color: "text-warning",
       bgColor: "bg-warning/10",
-      badge: useBusinessHours ? "Fora do expediente" : undefined,
+      badge: useBusinessHours ? "Fora HU" : undefined,
     },
     {
       icon: TrendingUp,
@@ -83,21 +83,21 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {metrics.map((metric, index) => (
         <Card key={index}>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-lg ${metric.bgColor}`}>
-                <metric.icon className={`h-6 w-6 ${metric.color}`} />
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg shrink-0 ${metric.bgColor}`}>
+                <metric.icon className={`h-5 w-5 ${metric.color}`} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">{metric.label}</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-sm text-muted-foreground truncate">{metric.label}</p>
                   {metric.badge && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                       {metric.badge}
                     </Badge>
                   )}
                 </div>
-                <p className="text-2xl font-bold">{metric.value}</p>
+                <p className="text-xl font-bold truncate">{metric.value}</p>
               </div>
             </div>
           </CardContent>
