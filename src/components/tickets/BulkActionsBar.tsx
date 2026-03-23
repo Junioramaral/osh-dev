@@ -15,7 +15,8 @@ import {
   X,
   Lock,
   Unlock,
-  ListOrdered
+  ListOrdered,
+  Trash2
 } from "lucide-react";
 
 interface BulkActionsBarProps {
@@ -28,7 +29,9 @@ interface BulkActionsBarProps {
   onChangePriority: (priority: string) => void;
   onLockTickets: () => void;
   onReleaseTickets?: () => void;
+  onDeleteTickets?: () => void;
   isClient?: boolean;
+  canDelete?: boolean;
 }
 
 export function BulkActionsBar({ 
