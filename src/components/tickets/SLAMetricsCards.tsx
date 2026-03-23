@@ -83,14 +83,14 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
       {metrics.map((metric, index) => (
         <Card key={index}>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className={`p-3 rounded-lg ${metric.bgColor}`}>
-                <metric.icon className={`h-6 w-6 ${metric.color}`} />
+          <CardContent className="p-4">
+            <div className="flex items-center gap-3">
+              <div className={`p-2 rounded-lg shrink-0 ${metric.bgColor}`}>
+                <metric.icon className={`h-5 w-5 ${metric.color}`} />
               </div>
-              <div>
-                <div className="flex items-center gap-2">
-                  <p className="text-sm text-muted-foreground">{metric.label}</p>
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 flex-wrap">
+                  <p className="text-sm text-muted-foreground truncate">{metric.label}</p>
                   {metric.badge && (
                     <Badge variant="outline" className="text-[10px] px-1.5 py-0">
                       {metric.badge}
