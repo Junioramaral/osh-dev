@@ -1,35 +1,25 @@
 
+# SLA em Horas Úteis — Implementado ✅
 
-# Aplicar filtro de filas restrito na tela Meus Tickets
+## O que foi feito
 
-## Problema
-A tela "Meus Tickets" mostra todos os tickets atribuídos ao analista ou lockados por ele, sem filtrar por fila. Para analistas restritos, deveria mostrar apenas tickets das filas atribuídas ou tickets sem fila.
+### Backend (SQL)
+- Função `add_business_minutes()` que calcula deadlines somando apenas minutos em horário comercial
+- Trigger `calculate_sla_deadlines()` atualizado: P3/P4 usam horas úteis, P1/P2 mantêm 24x7
+- Configs padrão inseridas: `business_hours_start=09:00`, `business_hours_end=18:00`, `business_days=[1,2,3,4,5]`
 
-## Solução
+### Frontend
+- `src/lib/businessHours.ts`: funções `calculateBusinessMinutes()`, `parseBusinessHoursConfig()`, `isBusinessHoursPriority()`
+- `src/lib/ticketUtils.tsx`: `calculateSLAStatus()` agora usa business hours para P3/P4 (labels com "(HU)")
+- `src/components/tickets/SLAMetricsCards.tsx`: Tempo Útil e Pausa calculados corretamente para P3/P4
+- `src/components/tickets/SLAHistoryTable.tsx`: % e tempo usados em horas úteis com badge indicativo
+- `src/pages/SLADashboard.tsx`: refatorado para usar `calculateSLAStatus` compartilhado
+- `src/pages/SystemSettings.tsx`: UI para configurar horário comercial e dias úteis
 
-### Arquivo: `src/pages/MyTickets.tsx`
+### Edge Function
+- `sla-monitor`: busca config de business hours, calcula alertas em horas úteis para P3/P4
 
-1. **Extrair `queueIds` do hook `useAnalystQueues`** (linha 27) — já importado, só precisa desestruturar `queueIds` além de `queues`.
-
-2. **Adicionar filtro de fila no `filteredTickets`** (linhas 313-324):
-   - Para analistas com `shouldRestrictView && hasQueues`: adicionar condição que o ticket deve ter `queue_id` incluso em `queueIds` **ou** `queue_id` nulo (sem fila)
-   - Super admins e não-restritos mantêm comportamento atual
-
-3. **Adicionar um filtro de fila na UI** (opcional mas consistente com Tickets.tsx):
-   - Não necessário — a página já é "Meus Tickets" e o filtro por fila é automático. A restrição será silenciosa, apenas impedindo tickets de filas não atribuídas de aparecerem.
-
-### Mudança concreta
-
-Na linha 27, adicionar `queueIds`:
-```typescript
-const { queues: analystQueues, queueIds: analystQueueIds, shouldRestrictView, hasQueues } = useAnalystQueues();
-```
-
-No bloco `filteredTickets` (linha 313-324), adicionar:
-```typescript
-const matchesQueue = !shouldRestrictView || !hasQueues || 
-  !ticket.queue_id || analystQueueIds.includes(ticket.queue_id);
-```
-
-E incluir `matchesQueue` no return final do filter.
-
+## Fase 2 (futuro)
+- Tabela de feriados
+- Horários por cliente
+- Recálculo retroativo
