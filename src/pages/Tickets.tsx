@@ -662,7 +662,9 @@ export default function Tickets() {
           onChangePriority={handleBulkChangePriority}
           onLockTickets={handleBulkLockTickets}
           onReleaseTickets={!isClient ? () => setShowReleaseDialog(true) : undefined}
+          onDeleteTickets={() => setShowDeleteDialog(true)}
           isClient={isClient}
+          canDelete={isSuperAdmin || isTenantAdmin}
         />
       )}
 
