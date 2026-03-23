@@ -806,6 +806,30 @@ export type Database = {
         }
         Relationships: []
       }
+      sla_holidays: {
+        Row: {
+          created_at: string | null
+          holiday_date: string
+          id: string
+          is_automatic: boolean | null
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          holiday_date: string
+          id?: string
+          is_automatic?: boolean | null
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          holiday_date?: string
+          id?: string
+          is_automatic?: boolean | null
+          name?: string
+        }
+        Relationships: []
+      }
       sla_notifications: {
         Row: {
           acknowledged_at: string | null
