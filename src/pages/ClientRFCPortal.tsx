@@ -153,8 +153,8 @@ const ClientRFCPortal = () => {
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="grid md:grid-cols-[340px_1fr] h-[calc(100vh-180px)] min-h-[500px]">
+      <Card className="overflow-hidden flex-1 flex flex-col">
+        <div className="grid md:grid-cols-[340px_1fr] flex-1 min-h-0">
           {/* Left: RFC List */}
           <div className={`border-r border-border flex flex-col h-full ${showDetails ? "hidden md:flex" : "flex"}`}>
             <div className="p-4 border-b border-border">
