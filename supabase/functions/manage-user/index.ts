@@ -4,7 +4,7 @@ import { z } from "https://deno.land/x/zod@v3.22.4/mod.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 // Input validation schemas
@@ -65,9 +65,9 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const { data: claimsData, error: authError } = await supabaseAdmin.auth.getClaims(token);
     
-    if (authError || !user) {
+    if (authError || !claimsData?.claims) {
       console.error("[manage-user] Invalid token:", authError);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
@@ -75,16 +75,18 @@ serve(async (req) => {
       );
     }
 
+    const userId_auth = claimsData.claims.sub;
+
     // Check if user has super_admin role (supports multi-role system)
     const { data: roleData, error: roleError } = await supabaseAdmin
       .from("user_roles")
       .select("role")
-      .eq("user_id", user.id);
+      .eq("user_id", userId_auth);
 
     const hasSuperAdmin = roleData?.some(r => r.role === "super_admin");
     
     if (roleError || !hasSuperAdmin) {
-      console.error("[manage-user] User lacks super_admin role:", user.id);
+      console.error("[manage-user] User lacks super_admin role:", userId_auth);
       return new Response(
         JSON.stringify({ error: "Insufficient permissions" }),
         { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
