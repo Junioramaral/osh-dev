@@ -96,6 +96,7 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           profile={profile}
           userEmail={user?.email}
           isSuperAdmin={isSuperAdmin}
+          isTenantAdmin={isTenantAdmin}
           isViewer={isViewer}
           isOtimizzoUser={isOtimizzoUser}
           onClose={handleClose}
