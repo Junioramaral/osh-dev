@@ -58,6 +58,7 @@ type RFCStep = {
   procedimento: string | null;
   ordem: number;
   status_concluido: boolean;
+  started_at: string | null;
   concluded_at: string | null;
   observacao: string | null;
   ticket_id: string;
