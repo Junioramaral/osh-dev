@@ -23,7 +23,9 @@ import { BulkAssignQueueDialog } from "@/components/tickets/BulkAssignQueueDialo
 import { BulkStatusReasonDialog } from "@/components/tickets/BulkStatusReasonDialog";
 import { TicketLockedWarningDialog } from "@/components/tickets/TicketLockedWarningDialog";
 import { ReleaseTicketDialog } from "@/components/tickets/ReleaseTicketDialog";
+import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
+import { useDeleteTickets } from "@/hooks/useDeleteTickets";
 import { cn } from "@/lib/utils";
 
 export default function Tickets() {
