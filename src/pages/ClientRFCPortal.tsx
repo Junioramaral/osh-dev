@@ -140,6 +140,7 @@ const ClientRFCPortal = () => {
 
   return (
     <AppLayout>
+      <div className="-mx-6 px-2">
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
@@ -466,6 +467,7 @@ const ClientRFCPortal = () => {
           </div>
         </div>
       </Card>
+      </div>
     </AppLayout>
   );
 };
