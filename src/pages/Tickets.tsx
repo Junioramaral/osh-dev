@@ -29,7 +29,7 @@ import { useDeleteTickets } from "@/hooks/useDeleteTickets";
 import { cn } from "@/lib/utils";
 
 export default function Tickets() {
-  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst } = useAuth();
+  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst, isTenantAdmin } = useAuth();
   const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
