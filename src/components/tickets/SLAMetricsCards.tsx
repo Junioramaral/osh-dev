@@ -68,7 +68,7 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
       value: formatDuration(pauseMinutes),
       color: "text-warning",
       bgColor: "bg-warning/10",
-      badge: useBusinessHours ? "Fora do expediente" : undefined,
+      badge: useBusinessHours ? "Fora HU" : undefined,
     },
     {
       icon: TrendingUp,
