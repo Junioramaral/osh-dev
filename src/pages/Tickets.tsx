@@ -533,23 +533,29 @@ export default function Tickets() {
         </div>
 
         {/* Queue Filter Buttons */}
-        {(isOtimizzoUser || isSuperAdmin) && allQueues && allQueues.length > 0 && (
+        {(isOtimizzoUser || isSuperAdmin) && allQueues && allQueues.length > 0 && (() => {
+          const visibleQueues = shouldRestrictView && hasQueues
+            ? allQueues.filter(q => analystQueueIds.includes(q.id))
+            : allQueues;
+          return visibleQueues.length > 0 ? (
           <div className="flex flex-wrap gap-2 items-center">
             <span className="text-sm text-muted-foreground flex items-center gap-1">
               <ListOrdered className="h-4 w-4" />
               Filas:
             </span>
-            <Badge
-              variant={queueFilter === "all" ? "default" : "outline"}
-              className={cn(
-                "cursor-pointer transition-colors",
-                queueFilter === "all" && "bg-primary text-primary-foreground"
-              )}
-              onClick={() => setQueueFilter("all")}
-            >
-              Todas
-            </Badge>
-            {allQueues.map((queue) => (
+            {!(shouldRestrictView && hasQueues) && (
+              <Badge
+                variant={queueFilter === "all" ? "default" : "outline"}
+                className={cn(
+                  "cursor-pointer transition-colors",
+                  queueFilter === "all" && "bg-primary text-primary-foreground"
+                )}
+                onClick={() => setQueueFilter("all")}
+              >
+                Todas
+              </Badge>
+            )}
+            {visibleQueues.map((queue) => (
               <Badge
                 key={queue.id}
                 variant={queueFilter === queue.id ? "default" : "outline"}
@@ -573,7 +579,8 @@ export default function Tickets() {
               Sem fila
             </Badge>
           </div>
-        )}
+          ) : null;
+        })()}
 
         {isLoading ? (
           <Card>
