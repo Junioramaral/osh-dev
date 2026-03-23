@@ -148,9 +148,10 @@ export function calculateBusinessMinutes(
  */
 export function calculateBusinessMinutesRemaining(
   deadline: Date,
-  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS
+  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS,
+  holidays: string[] = []
 ): number {
   const now = new Date();
-  if (now >= deadline) return -(calculateBusinessMinutes(deadline, now, config));
-  return calculateBusinessMinutes(now, deadline, config);
+  if (now >= deadline) return -(calculateBusinessMinutes(deadline, now, config, holidays));
+  return calculateBusinessMinutes(now, deadline, config, holidays);
 }
