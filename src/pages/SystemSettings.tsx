@@ -39,6 +39,7 @@ import TeamDialog, { Team } from "@/components/settings/TeamDialog";
 import CategoryDialog, { TicketCategory } from "@/components/settings/CategoryDialog";
 import SubcategoryDialog from "@/components/settings/SubcategoryDialog";
 import SegmentDialog from "@/components/settings/SegmentDialog";
+import HolidaysSection from "@/components/settings/HolidaysSection";
 import { useSegments, type Segment } from "@/hooks/useSegments";
 
 
@@ -684,6 +685,8 @@ export default function SystemSettings() {
                 </p>
               </CardContent>
             </Card>
+
+            <HolidaysSection isReadOnly={isReadOnly} />
           </TabsContent>
 
           {/* Services Tab with Nested Tabs */}

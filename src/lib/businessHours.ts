@@ -87,7 +87,8 @@ function getBusinessEndMinutes(config: BusinessHoursConfig): number {
 export function calculateBusinessMinutes(
   startDate: Date,
   endDate: Date,
-  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS
+  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS,
+  holidays: string[] = []
 ): number {
   if (endDate <= startDate) return 0;
 
@@ -100,9 +101,10 @@ export function calculateBusinessMinutes(
 
   while (current < endDate) {
     const isoDay = getISODay(current);
+    const dateStr = current.toISOString().split('T')[0];
 
-    if (!config.businessDays.includes(isoDay)) {
-      // Skip to next day
+    if (!config.businessDays.includes(isoDay) || holidays.includes(dateStr)) {
+      // Skip non-business days and holidays
       current.setDate(current.getDate() + 1);
       current.setHours(config.startHour, config.startMinute, 0, 0);
       continue;
@@ -146,9 +148,10 @@ export function calculateBusinessMinutes(
  */
 export function calculateBusinessMinutesRemaining(
   deadline: Date,
-  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS
+  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS,
+  holidays: string[] = []
 ): number {
   const now = new Date();
-  if (now >= deadline) return -(calculateBusinessMinutes(deadline, now, config));
-  return calculateBusinessMinutes(now, deadline, config);
+  if (now >= deadline) return -(calculateBusinessMinutes(deadline, now, config, holidays));
+  return calculateBusinessMinutes(now, deadline, config, holidays);
 }

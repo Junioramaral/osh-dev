@@ -28,7 +28,7 @@ export const formatDuration = (minutes: number): string => {
   }
 };
 
-export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHoursConfig): SLAStatus => {
+export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHoursConfig, holidays: string[] = []): SLAStatus => {
   const bhConfig = businessHoursConfig || DEFAULT_BUSINESS_HOURS;
   const useBusinessHours = isBusinessHoursPriority(ticket.priority);
   // RFCs don't have SLA
@@ -63,8 +63,8 @@ export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHo
     let elapsed: number, totalTime: number, remaining: number, percentage: number;
     
     if (useBusinessHours) {
-      elapsed = calculateBusinessMinutes(createdAt, now, bhConfig);
-      totalTime = calculateBusinessMinutes(createdAt, deadline, bhConfig);
+      elapsed = calculateBusinessMinutes(createdAt, now, bhConfig, holidays);
+      totalTime = calculateBusinessMinutes(createdAt, deadline, bhConfig, holidays);
       remaining = totalTime - elapsed;
       percentage = totalTime > 0 ? Math.min((elapsed / totalTime) * 100, 100) : 0;
     } else {
@@ -116,8 +116,8 @@ export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHo
     let elapsed: number, totalTime: number, remaining: number, percentage: number;
     
     if (useBusinessHours) {
-      elapsed = calculateBusinessMinutes(createdAt, now, bhConfig);
-      totalTime = calculateBusinessMinutes(createdAt, deadline, bhConfig);
+      elapsed = calculateBusinessMinutes(createdAt, now, bhConfig, holidays);
+      totalTime = calculateBusinessMinutes(createdAt, deadline, bhConfig, holidays);
       remaining = totalTime - elapsed;
       percentage = totalTime > 0 ? Math.min((elapsed / totalTime) * 100, 100) : 0;
     } else {
