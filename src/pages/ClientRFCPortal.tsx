@@ -178,7 +178,7 @@ const ClientRFCPortal = () => {
           </div>
 
           {/* Right: Detail Panel */}
-          <div className={`flex flex-col h-full ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
+          <div className={`flex flex-col h-full min-h-0 ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
             {!selectedRfc ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-8">
                 <ClipboardList className="w-12 h-12 text-muted-foreground mb-4" />
