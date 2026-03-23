@@ -97,7 +97,7 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
                     </Badge>
                   )}
                 </div>
-                <p className="text-2xl font-bold">{metric.value}</p>
+                <p className="text-xl font-bold truncate">{metric.value}</p>
               </div>
             </div>
           </CardContent>
