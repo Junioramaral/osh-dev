@@ -6,6 +6,7 @@ import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOU
 
 interface SLAMetricsCardsProps {
   ticket: any;
+  holidays?: string[];
 }
 
 function formatDuration(minutes: number): string {
