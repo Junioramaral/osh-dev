@@ -685,6 +685,8 @@ export default function SystemSettings() {
                 </p>
               </CardContent>
             </Card>
+
+            <HolidaysSection isReadOnly={isReadOnly} />
           </TabsContent>
 
           {/* Services Tab with Nested Tabs */}
