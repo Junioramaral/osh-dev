@@ -126,7 +126,7 @@ const SidebarContent = ({
           <p className="text-sm font-medium text-sidebar-foreground truncate">{profile?.full_name}</p>
           <p className="text-xs text-sidebar-foreground/60 truncate">{userEmail}</p>
           <p className="text-xs text-sidebar-foreground/70 capitalize mt-0.5">
-            {isSuperAdmin ? 'Super Admin' : isViewer ? 'Auditor' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
+            {isSuperAdmin ? 'Super Admin' : isTenantAdmin ? 'Tenant Admin' : isViewer ? 'Auditor' : isOtimizzoUser ? 'Otimizzo' : 'Usuário'}
           </p>
         </div>
       </div>
