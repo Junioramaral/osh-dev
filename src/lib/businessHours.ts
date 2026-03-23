@@ -87,7 +87,8 @@ function getBusinessEndMinutes(config: BusinessHoursConfig): number {
 export function calculateBusinessMinutes(
   startDate: Date,
   endDate: Date,
-  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS
+  config: BusinessHoursConfig = DEFAULT_BUSINESS_HOURS,
+  holidays: string[] = []
 ): number {
   if (endDate <= startDate) return 0;
 
