@@ -32,7 +32,7 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, isSuperAdmin, isViewer, isOtimizzoUser, signOut, loading, mustChangePassword } = useAuth();
+  const { user, profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
   
