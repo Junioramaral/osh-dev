@@ -1,5 +1,6 @@
 import { differenceInMinutes } from "date-fns";
 import { AlertTriangle, Clock, CheckCircle2, Check } from "lucide-react";
+import { isBusinessHoursPriority, calculateBusinessMinutes, type BusinessHoursConfig, DEFAULT_BUSINESS_HOURS } from "./businessHours";
 
 export type SLAStatus = {
   type: 'met' | 'on-time' | 'warning' | 'overdue' | 'not-applicable';
