@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Clock } from "lucide-react";
+import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOURS } from "@/lib/businessHours";
 
 interface SLAHistoryTableProps {
   ticket: any;
@@ -21,26 +22,41 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
   const firstResponseDeadline = ticket.sla_first_response_deadline ? new Date(ticket.sla_first_response_deadline) : null;
   const resolvedAt = ticket.resolved_at ? new Date(ticket.resolved_at) : null;
   const resolutionDeadline = ticket.sla_resolution_deadline ? new Date(ticket.sla_resolution_deadline) : null;
+  const useBusinessHours = isBusinessHoursPriority(ticket.priority);
   
-  // Calcular tempo decorrido e percentual usado
   const calculateSLAUsage = (startTime: Date, actualTime: Date | null, deadlineTime: Date | null) => {
     if (!deadlineTime) return { time: "-", percentage: "-", status: "pending" };
     
     const endTime = actualTime || new Date();
-    const elapsed = endTime.getTime() - startTime.getTime();
-    const total = deadlineTime.getTime() - startTime.getTime();
-    const percentage = ((elapsed / total) * 100).toFixed(1);
     
-    const hours = Math.floor(elapsed / (1000 * 60 * 60));
-    const minutes = Math.floor((elapsed % (1000 * 60 * 60)) / (1000 * 60));
+    let elapsed: number, total: number;
     
+    if (useBusinessHours) {
+      elapsed = calculateBusinessMinutes(startTime, endTime, DEFAULT_BUSINESS_HOURS);
+      total = calculateBusinessMinutes(startTime, deadlineTime, DEFAULT_BUSINESS_HOURS);
+    } else {
+      elapsed = endTime.getTime() - startTime.getTime();
+      total = deadlineTime.getTime() - startTime.getTime();
+      // Convert to minutes for display
+      elapsed = Math.floor(elapsed / (1000 * 60));
+      total = Math.floor(total / (1000 * 60));
+    }
+    
+    const percentage = total > 0 ? ((elapsed / total) * 100).toFixed(1) : "0.0";
+    
+    const hours = Math.floor(elapsed / 60);
+    const minutes = elapsed % 60;
     const timeStr = hours > 0 ? `${hours}h ${minutes}min` : `${minutes}min`;
     
     let status = "pending";
     if (actualTime && deadlineTime) {
       status = actualTime <= deadlineTime ? "met" : "missed";
     } else if (!actualTime) {
-      status = new Date() > deadlineTime ? "overdue" : "pending";
+      if (useBusinessHours) {
+        status = elapsed > total ? "overdue" : "pending";
+      } else {
+        status = new Date() > deadlineTime ? "overdue" : "pending";
+      }
     }
     
     return { time: timeStr, percentage: `${percentage}%`, status };
@@ -82,9 +98,11 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
     }
   };
   
+  const slaTypeLabel = useBusinessHours ? " (HU)" : "";
+  
   const slaRows = [
     {
-      type: "Primeira Resposta",
+      type: `Primeira Resposta${slaTypeLabel}`,
       originalDeadline: firstResponseDeadline 
         ? format(firstResponseDeadline, "dd/MM/yyyy HH:mm", { locale: ptBR })
         : "-",
@@ -96,7 +114,7 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
       status: firstResponseData.status,
     },
     {
-      type: "Resolução",
+      type: `Resolução${slaTypeLabel}`,
       originalDeadline: resolutionDeadline 
         ? format(resolutionDeadline, "dd/MM/yyyy HH:mm", { locale: ptBR })
         : "-",
@@ -110,29 +128,39 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
   ];
   
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Tipo de SLA</TableHead>
-          <TableHead>Prazo Original</TableHead>
-          <TableHead>Tempo Real</TableHead>
-          <TableHead>Tempo Usado</TableHead>
-          <TableHead>% Usado</TableHead>
-          <TableHead>Status</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {slaRows.map((row, index) => (
-          <TableRow key={index}>
-            <TableCell className="font-medium">{row.type}</TableCell>
-            <TableCell>{row.originalDeadline}</TableCell>
-            <TableCell>{row.actualTime}</TableCell>
-            <TableCell>{row.timeUsed}</TableCell>
-            <TableCell>{row.percentageUsed}</TableCell>
-            <TableCell>{getStatusBadge(row.status)}</TableCell>
+    <div>
+      {useBusinessHours && (
+        <div className="mb-3">
+          <Badge variant="secondary" className="text-xs">
+            <Clock className="h-3 w-3 mr-1" />
+            SLA em Horas Úteis (09:00-18:00, Seg-Sex)
+          </Badge>
+        </div>
+      )}
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Tipo de SLA</TableHead>
+            <TableHead>Prazo Original</TableHead>
+            <TableHead>Tempo Real</TableHead>
+            <TableHead>Tempo Usado</TableHead>
+            <TableHead>% Usado</TableHead>
+            <TableHead>Status</TableHead>
           </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+        </TableHeader>
+        <TableBody>
+          {slaRows.map((row, index) => (
+            <TableRow key={index}>
+              <TableCell className="font-medium">{row.type}</TableCell>
+              <TableCell>{row.originalDeadline}</TableCell>
+              <TableCell>{row.actualTime}</TableCell>
+              <TableCell>{row.timeUsed}</TableCell>
+              <TableCell>{row.percentageUsed}</TableCell>
+              <TableCell>{getStatusBadge(row.status)}</TableCell>
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
+    </div>
   );
 }

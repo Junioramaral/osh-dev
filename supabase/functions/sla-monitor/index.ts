@@ -23,18 +23,85 @@ interface TicketAlert {
   escalate: boolean;
 }
 
-interface TicketWithClient {
-  id: string;
-  ticket_number: string;
-  title: string;
-  priority: string;
-  status: string;
-  created_at: string;
-  first_response_at: string | null;
-  resolved_at: string | null;
-  sla_first_response_deadline: string | null;
-  sla_resolution_deadline: string | null;
-  clients: { name: string } | null;
+interface BusinessHoursConfig {
+  startHour: number;
+  startMinute: number;
+  endHour: number;
+  endMinute: number;
+  businessDays: number[];
+}
+
+const DEFAULT_BH: BusinessHoursConfig = {
+  startHour: 9, startMinute: 0,
+  endHour: 18, endMinute: 0,
+  businessDays: [1, 2, 3, 4, 5],
+};
+
+function parseBusinessHoursConfig(configs: any[]): BusinessHoursConfig {
+  const config = { ...DEFAULT_BH };
+  const startC = configs.find((c: any) => c.key === 'business_hours_start');
+  if (startC) {
+    const val = String(startC.value).replace(/"/g, '');
+    const [h, m] = val.split(':').map(Number);
+    if (!isNaN(h)) config.startHour = h;
+    if (!isNaN(m)) config.startMinute = m;
+  }
+  const endC = configs.find((c: any) => c.key === 'business_hours_end');
+  if (endC) {
+    const val = String(endC.value).replace(/"/g, '');
+    const [h, m] = val.split(':').map(Number);
+    if (!isNaN(h)) config.endHour = h;
+    if (!isNaN(m)) config.endMinute = m;
+  }
+  const daysC = configs.find((c: any) => c.key === 'business_days');
+  if (daysC) {
+    const val = typeof daysC.value === 'string' ? JSON.parse(daysC.value) : daysC.value;
+    if (Array.isArray(val)) config.businessDays = val.map(Number);
+  }
+  return config;
+}
+
+function getISODay(date: Date): number {
+  const day = date.getDay();
+  return day === 0 ? 7 : day;
+}
+
+function calculateBusinessMinutes(startDate: Date, endDate: Date, config: BusinessHoursConfig): number {
+  if (endDate <= startDate) return 0;
+  const bhStart = config.startHour * 60 + config.startMinute;
+  const bhEnd = config.endHour * 60 + config.endMinute;
+  let totalMinutes = 0;
+  const current = new Date(startDate);
+  while (current < endDate) {
+    const isoDay = getISODay(current);
+    if (!config.businessDays.includes(isoDay)) {
+      current.setDate(current.getDate() + 1);
+      current.setHours(config.startHour, config.startMinute, 0, 0);
+      continue;
+    }
+    const currentMinutes = current.getHours() * 60 + current.getMinutes();
+    const effectiveStart = Math.max(currentMinutes, bhStart);
+    if (effectiveStart >= bhEnd) {
+      current.setDate(current.getDate() + 1);
+      current.setHours(config.startHour, config.startMinute, 0, 0);
+      continue;
+    }
+    const endOfDay = new Date(current);
+    endOfDay.setHours(config.endHour, config.endMinute, 0, 0);
+    const dayEnd = endDate < endOfDay ? endDate : endOfDay;
+    const dayEndMinutes = dayEnd.getHours() * 60 + dayEnd.getMinutes();
+    const effectiveEnd = Math.min(dayEndMinutes, bhEnd);
+    if (effectiveEnd > effectiveStart) {
+      totalMinutes += effectiveEnd - effectiveStart;
+    }
+    current.setDate(current.getDate() + 1);
+    current.setHours(config.startHour, config.startMinute, 0, 0);
+  }
+  return totalMinutes;
+}
+
+function isBusinessHoursPriority(priority: string): boolean {
+  return priority === 'P3' || priority === 'P4';
 }
 
 serve(async (req) => {
@@ -51,9 +118,15 @@ serve(async (req) => {
     const adminClient = createClient(supabaseUrl, supabaseServiceKey);
 
     const now = new Date();
-    const THROTTLE_HOURS = 12; // Silence notifications for 12 hours after acknowledgment
+    const THROTTLE_HOURS = 12;
 
-    // ========== BUSCAR TICKETS EM RISCO ==========
+    // Fetch business hours config
+    const { data: sysConfigs } = await adminClient
+      .from("system_configs")
+      .select("key, value")
+      .in("key", ["business_hours_start", "business_hours_end", "business_days"]);
+    
+    const bhConfig = parseBusinessHoursConfig(sysConfigs || []);
 
     const { data: tickets, error: ticketsError } = await adminClient
       .from("tickets")
@@ -81,8 +154,6 @@ serve(async (req) => {
 
     console.log(`📊 Found ${tickets?.length || 0} active tickets`);
 
-    // ========== ANALISAR CADA TICKET ==========
-
     const alerts: TicketAlert[] = [];
 
     for (const ticket of tickets || []) {
@@ -90,16 +161,28 @@ serve(async (req) => {
         ? (ticket as any).clients[0]?.name || 'N/A'
         : (ticket as any).clients?.name || 'N/A';
 
-      // Verificar First Response SLA
+      const useBH = isBusinessHoursPriority(ticket.priority);
+
+      // Check First Response SLA
       if (!ticket.first_response_at && ticket.sla_first_response_deadline) {
         const deadline = new Date(ticket.sla_first_response_deadline);
-        const minutesRemaining = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60));
         const createdAt = new Date(ticket.created_at);
-        const totalMinutes = Math.floor((deadline.getTime() - createdAt.getTime()) / (1000 * 60));
-        const percentage = ((totalMinutes - minutesRemaining) / totalMinutes) * 100;
+        
+        let minutesRemaining: number;
+        let percentage: number;
+        
+        if (useBH) {
+          const elapsed = calculateBusinessMinutes(createdAt, now, bhConfig);
+          const totalBH = calculateBusinessMinutes(createdAt, deadline, bhConfig);
+          minutesRemaining = totalBH - elapsed;
+          percentage = totalBH > 0 ? (elapsed / totalBH) * 100 : 0;
+        } else {
+          minutesRemaining = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60));
+          const totalMinutes = Math.floor((deadline.getTime() - createdAt.getTime()) / (1000 * 60));
+          percentage = ((totalMinutes - minutesRemaining) / totalMinutes) * 100;
+        }
 
         let alertType: 'warning' | 'overdue' | null = null;
-
         if (minutesRemaining < 0) {
           alertType = 'overdue';
         } else if (percentage > 75) {
@@ -108,14 +191,8 @@ serve(async (req) => {
 
         if (alertType) {
           const shouldSendResult = await shouldSendNotification(
-            adminClient,
-            ticket.id,
-            "first_response",
-            alertType,
-            now,
-            THROTTLE_HOURS
+            adminClient, ticket.id, "first_response", alertType, now, THROTTLE_HOURS
           );
-
           if (shouldSendResult.shouldSend) {
             alerts.push({
               id: ticket.id,
@@ -134,16 +211,26 @@ serve(async (req) => {
         }
       }
 
-      // Verificar Resolution SLA
+      // Check Resolution SLA
       if (ticket.first_response_at && !ticket.resolved_at && ticket.sla_resolution_deadline) {
         const deadline = new Date(ticket.sla_resolution_deadline);
-        const minutesRemaining = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60));
         const createdAt = new Date(ticket.created_at);
-        const totalMinutes = Math.floor((deadline.getTime() - createdAt.getTime()) / (1000 * 60));
-        const percentage = ((totalMinutes - minutesRemaining) / totalMinutes) * 100;
+        
+        let minutesRemaining: number;
+        let percentage: number;
+        
+        if (useBH) {
+          const elapsed = calculateBusinessMinutes(createdAt, now, bhConfig);
+          const totalBH = calculateBusinessMinutes(createdAt, deadline, bhConfig);
+          minutesRemaining = totalBH - elapsed;
+          percentage = totalBH > 0 ? (elapsed / totalBH) * 100 : 0;
+        } else {
+          minutesRemaining = Math.floor((deadline.getTime() - now.getTime()) / (1000 * 60));
+          const totalMinutes = Math.floor((deadline.getTime() - createdAt.getTime()) / (1000 * 60));
+          percentage = ((totalMinutes - minutesRemaining) / totalMinutes) * 100;
+        }
 
         let alertType: 'warning' | 'overdue' | null = null;
-
         if (minutesRemaining < 0) {
           alertType = 'overdue';
         } else if (percentage > 75) {
@@ -152,14 +239,8 @@ serve(async (req) => {
 
         if (alertType) {
           const shouldSendResult = await shouldSendNotification(
-            adminClient,
-            ticket.id,
-            "resolution",
-            alertType,
-            now,
-            THROTTLE_HOURS
+            adminClient, ticket.id, "resolution", alertType, now, THROTTLE_HOURS
           );
-
           if (shouldSendResult.shouldSend) {
             alerts.push({
               id: ticket.id,
@@ -188,10 +269,8 @@ serve(async (req) => {
       );
     }
 
-    // ========== BUSCAR EMAILS DO TIME OTIMIZZO ==========
-
+    // Fetch Otimizzo team emails
     const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
-
     const { data: otimizzoUsers, error: usersError } = await adminClient
       .from("profiles")
       .select("id")
@@ -204,22 +283,15 @@ serve(async (req) => {
     }
 
     const userIds = otimizzoUsers.map(u => u.id);
-
-    // Buscar emails do auth.users
     const { data: authUsers, error: authError } = await adminClient.auth.admin.listUsers();
-
-    if (authError) {
-      console.error("❌ Error fetching auth users:", authError);
-      throw authError;
-    }
+    if (authError) throw authError;
 
     const otimizzoEmails = authUsers.users
       .filter(u => userIds.includes(u.id))
       .map(u => u.email!)
       .filter(Boolean);
 
-    // ========== BUSCAR SUPER ADMINS PARA ESCALONAMENTO ==========
-
+    // Fetch super admins for escalation
     const hasEscalatedAlerts = alerts.some(a => a.escalate);
     let superAdminEmails: string[] = [];
 
@@ -235,26 +307,20 @@ serve(async (req) => {
           .filter(u => superAdminIds.includes(u.id))
           .map(u => u.email!)
           .filter(Boolean);
-
         console.log(`📧 Including ${superAdminEmails.length} Super Admins in escalated alerts`);
       }
     }
 
     console.log(`📧 Sending alerts to ${otimizzoEmails.length} Otimizzo users`);
 
-    // ========== AGRUPAR ALERTAS POR TIPO ==========
-
     const overdueAlerts = alerts.filter(a => a.alert_type === 'overdue');
     const warningAlerts = alerts.filter(a => a.alert_type === 'warning');
     const escalatedAlerts = alerts.filter(a => a.escalate);
-
-    // ========== GERAR HTML DO EMAIL ==========
 
     const formatTime = (minutes: number): string => {
       const absMinutes = Math.abs(minutes);
       const hours = Math.floor(absMinutes / 60);
       const mins = absMinutes % 60;
-      
       if (hours > 24) {
         const days = Math.floor(hours / 24);
         const remainingHours = hours % 24;
@@ -266,7 +332,7 @@ serve(async (req) => {
       }
     };
 
-    // First, insert notifications to get IDs and tokens
+    // Insert notifications
     const notificationsToInsert = alerts.map(alert => ({
       ticket_id: alert.id,
       alert_type: alert.alert_type,
@@ -290,7 +356,6 @@ serve(async (req) => {
       console.error("⚠️ Error recording notifications:", insertError);
     }
 
-    // Create a map of ticket_id to notification data
     const notificationMap = new Map(
       (insertedNotifications || []).map(n => [n.ticket_id, { id: n.id, token: n.acknowledgment_token }])
     );
@@ -301,6 +366,7 @@ serve(async (req) => {
         : `<span style="color: #f59e0b; font-weight: bold;">${formatTime(alert.time_remaining_minutes)} restantes</span>`;
 
       const slaTypeText = alert.sla_type === 'first_response' ? 'Primeira Resposta' : 'Resolução';
+      const bhLabel = isBusinessHoursPriority(alert.priority) ? ' (HU)' : '';
       const priorityColor = alert.priority === 'P1' ? '#dc2626' : alert.priority === 'P2' ? '#f59e0b' : '#3b82f6';
       
       const notificationData = notificationMap.get(alert.id);
@@ -324,7 +390,7 @@ serve(async (req) => {
               ${alert.priority}
             </span>
           </td>
-          <td style="padding: 12px;">${slaTypeText}</td>
+          <td style="padding: 12px;">${slaTypeText}${bhLabel}</td>
           <td style="padding: 12px;">${timeText}</td>
           <td style="padding: 12px;">
             ${ackUrl ? `
@@ -342,9 +408,7 @@ serve(async (req) => {
     const emailHtml = `
       <!DOCTYPE html>
       <html>
-        <head>
-          <meta charset="utf-8">
-        </head>
+        <head><meta charset="utf-8"></head>
         <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; background: #f3f4f6;">
           <div style="max-width: 900px; margin: 0 auto; padding: 20px;">
             <div style="background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -360,54 +424,42 @@ serve(async (req) => {
             <div style="background: white; padding: 30px; border-radius: 0 0 8px 8px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
               ${overdueAlerts.length > 0 ? `
                 <div style="margin-bottom: 30px;">
-                  <h2 style="color: #dc2626; margin-top: 0;">
-                    ⚠️ SLAs Vencidos (${overdueAlerts.length})
-                  </h2>
-                  <p style="color: #6b7280; margin-bottom: 15px;">
-                    Estes tickets já ultrapassaram o prazo do SLA e precisam de ação urgente:
-                  </p>
+                  <h2 style="color: #dc2626; margin-top: 0;">⚠️ SLAs Vencidos (${overdueAlerts.length})</h2>
+                  <p style="color: #6b7280; margin-bottom: 15px;">Estes tickets já ultrapassaram o prazo do SLA e precisam de ação urgente:</p>
                   <table style="width: 100%; border-collapse: collapse; background: #fef2f2; border-radius: 8px; overflow: hidden;">
                     <thead>
                       <tr style="background: #fee2e2; text-align: left;">
-                        <th style="padding: 12px; font-weight: 600;">Ticket</th>
-                        <th style="padding: 12px; font-weight: 600;">Título</th>
-                        <th style="padding: 12px; font-weight: 600;">Cliente</th>
-                        <th style="padding: 12px; font-weight: 600;">Prioridade</th>
-                        <th style="padding: 12px; font-weight: 600;">Tipo SLA</th>
-                        <th style="padding: 12px; font-weight: 600;">Status</th>
-                        <th style="padding: 12px; font-weight: 600;">Ação</th>
+                        <th style="padding: 12px;">Ticket</th>
+                        <th style="padding: 12px;">Título</th>
+                        <th style="padding: 12px;">Cliente</th>
+                        <th style="padding: 12px;">Prioridade</th>
+                        <th style="padding: 12px;">Tipo SLA</th>
+                        <th style="padding: 12px;">Status</th>
+                        <th style="padding: 12px;">Ação</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      ${overdueAlerts.map(generateTicketRow).join('')}
-                    </tbody>
+                    <tbody>${overdueAlerts.map(generateTicketRow).join('')}</tbody>
                   </table>
                 </div>
               ` : ''}
               
               ${warningAlerts.length > 0 ? `
                 <div>
-                  <h2 style="color: #f59e0b; margin-top: 0;">
-                    ⏰ SLAs em Risco (${warningAlerts.length})
-                  </h2>
-                  <p style="color: #6b7280; margin-bottom: 15px;">
-                    Estes tickets estão próximos de vencer (>75% do tempo decorrido):
-                  </p>
+                  <h2 style="color: #f59e0b; margin-top: 0;">⏰ SLAs em Risco (${warningAlerts.length})</h2>
+                  <p style="color: #6b7280; margin-bottom: 15px;">Estes tickets estão próximos de vencer (>75% do tempo decorrido):</p>
                   <table style="width: 100%; border-collapse: collapse; background: #fffbeb; border-radius: 8px; overflow: hidden;">
                     <thead>
                       <tr style="background: #fef3c7; text-align: left;">
-                        <th style="padding: 12px; font-weight: 600;">Ticket</th>
-                        <th style="padding: 12px; font-weight: 600;">Título</th>
-                        <th style="padding: 12px; font-weight: 600;">Cliente</th>
-                        <th style="padding: 12px; font-weight: 600;">Prioridade</th>
-                        <th style="padding: 12px; font-weight: 600;">Tipo SLA</th>
-                        <th style="padding: 12px; font-weight: 600;">Tempo Restante</th>
-                        <th style="padding: 12px; font-weight: 600;">Ação</th>
+                        <th style="padding: 12px;">Ticket</th>
+                        <th style="padding: 12px;">Título</th>
+                        <th style="padding: 12px;">Cliente</th>
+                        <th style="padding: 12px;">Prioridade</th>
+                        <th style="padding: 12px;">Tipo SLA</th>
+                        <th style="padding: 12px;">Tempo Restante</th>
+                        <th style="padding: 12px;">Ação</th>
                       </tr>
                     </thead>
-                    <tbody>
-                      ${warningAlerts.map(generateTicketRow).join('')}
-                    </tbody>
+                    <tbody>${warningAlerts.map(generateTicketRow).join('')}</tbody>
                   </table>
                 </div>
               ` : ''}
@@ -425,6 +477,7 @@ serve(async (req) => {
                   <li>Clique em <strong>"Ciente"</strong> para confirmar que você viu este alerta</li>
                   <li>Após confirmar, você não receberá novas notificações sobre este ticket por 12 horas</li>
                   <li>Se ninguém confirmar em 12 horas, o alerta será escalado para Super Admins</li>
+                  <li><strong>HU</strong> = Horas Úteis (P3/P4: contagem apenas em horário comercial)</li>
                 </ul>
               </div>
             </div>
@@ -438,9 +491,6 @@ serve(async (req) => {
       </html>
     `;
 
-    // ========== ENVIAR EMAIL ==========
-
-    // Combine recipients for escalated alerts
     const allRecipients = hasEscalatedAlerts 
       ? [...new Set([...otimizzoEmails, ...superAdminEmails])]
       : otimizzoEmails;
@@ -469,24 +519,17 @@ serve(async (req) => {
         escalated: escalatedAlerts.length,
         recipients: allRecipients.length,
       }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {
     console.error("❌ Unexpected error in sla-monitor:", error);
     return new Response(
       JSON.stringify({ error: error.message || "Internal server error" }),
-      {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      }
+      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 });
 
-// Helper function to check if we should send a notification
 async function shouldSendNotification(
   adminClient: any,
   ticketId: string,
@@ -506,36 +549,27 @@ async function shouldSendNotification(
     .maybeSingle();
 
   if (!recentNotification) {
-    // First notification for this ticket/SLA
     return { shouldSend: true, nextLevel: 1, escalate: false };
   }
 
   const sentAt = new Date(recentNotification.sent_at);
   const hoursSinceSent = (now.getTime() - sentAt.getTime()) / (1000 * 60 * 60);
 
-  // If acknowledged within throttle period, don't send
   if (recentNotification.acknowledged_at) {
     const ackAt = new Date(recentNotification.acknowledged_at);
     const hoursSinceAck = (now.getTime() - ackAt.getTime()) / (1000 * 60 * 60);
-    
     if (hoursSinceAck < throttleHours) {
       console.log(`⏳ Ticket ${ticketId}: Silenced (acknowledged ${hoursSinceAck.toFixed(1)}h ago)`);
       return { shouldSend: false, nextLevel: recentNotification.notification_level, escalate: false };
     }
   }
 
-  // If not acknowledged and past throttle period, escalate
   if (!recentNotification.acknowledged_at && hoursSinceSent >= throttleHours) {
     console.log(`⚡ Ticket ${ticketId}: Escalating to Super Admin (${hoursSinceSent.toFixed(1)}h without acknowledgment)`);
-    return { 
-      shouldSend: true, 
-      nextLevel: recentNotification.notification_level + 1, 
-      escalate: true 
-    };
+    return { shouldSend: true, nextLevel: recentNotification.notification_level + 1, escalate: true };
   }
 
-  // If recently sent and not acknowledged, wait for throttle period
-  if (hoursSinceSent < 1) { // Keep 1 hour minimum between emails
+  if (hoursSinceSent < 1) {
     console.log(`⏳ Ticket ${ticketId}: Waiting (last sent ${hoursSinceSent.toFixed(1)}h ago)`);
     return { shouldSend: false, nextLevel: recentNotification.notification_level, escalate: false };
   }
