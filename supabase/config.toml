@@ -13,7 +13,7 @@ verify_jwt = false
 verify_jwt = true
 
 [functions.manage-user]
-verify_jwt = true
+verify_jwt = false
 
 [functions.send-comment-notification]
 verify_jwt = false
