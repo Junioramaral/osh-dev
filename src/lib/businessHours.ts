@@ -101,9 +101,10 @@ export function calculateBusinessMinutes(
 
   while (current < endDate) {
     const isoDay = getISODay(current);
+    const dateStr = current.toISOString().split('T')[0];
 
-    if (!config.businessDays.includes(isoDay)) {
-      // Skip to next day
+    if (!config.businessDays.includes(isoDay) || holidays.includes(dateStr)) {
+      // Skip non-business days and holidays
       current.setDate(current.getDate() + 1);
       current.setHours(config.startHour, config.startMinute, 0, 0);
       continue;
