@@ -21,6 +21,7 @@ interface SidebarContentProps {
   profile: { full_name: string; avatar_url: string | null } | null;
   userEmail: string | undefined;
   isSuperAdmin: boolean;
+  isTenantAdmin: boolean;
   isViewer: boolean;
   isOtimizzoUser: boolean;
   onClose: () => void;
