@@ -124,6 +124,7 @@ const ClientRFCPortal = () => {
   const progressPercent = selectedRfc?.rfc_progress ?? 0;
   const completedCount = steps.filter((s) => s.status_concluido).length;
   const totalCount = steps.length;
+  const totalDurationMinutes = steps.reduce((acc, s) => acc + getDurationMinutes(s.started_at, s.concluded_at), 0);
 
   const handleSelectRfc = (id: string) => {
     setSelectedRfcId(id);
