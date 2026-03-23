@@ -103,7 +103,7 @@ export default function SystemSettings() {
     },
   });
 
-  // Set initial inactivity days from config
+  // Set initial values from config
   useEffect(() => {
     if (systemConfigs) {
       const inactivityConfig = systemConfigs.find((c: any) => c.key === 'ticket_inactivity_days');
@@ -113,6 +113,27 @@ export default function SystemSettings() {
           : Number(inactivityConfig.value);
         setInactivityDays(value);
         setInactivityDaysInput(String(value));
+      }
+      const bhStartConfig = systemConfigs.find((c: any) => c.key === 'business_hours_start');
+      if (bhStartConfig) {
+        const val = typeof bhStartConfig.value === 'string' 
+          ? bhStartConfig.value.replace(/"/g, '') 
+          : String(bhStartConfig.value).replace(/"/g, '');
+        setBhStart(val);
+      }
+      const bhEndConfig = systemConfigs.find((c: any) => c.key === 'business_hours_end');
+      if (bhEndConfig) {
+        const val = typeof bhEndConfig.value === 'string' 
+          ? bhEndConfig.value.replace(/"/g, '') 
+          : String(bhEndConfig.value).replace(/"/g, '');
+        setBhEnd(val);
+      }
+      const bhDaysConfig = systemConfigs.find((c: any) => c.key === 'business_days');
+      if (bhDaysConfig) {
+        const val = typeof bhDaysConfig.value === 'string' 
+          ? JSON.parse(bhDaysConfig.value) 
+          : bhDaysConfig.value;
+        if (Array.isArray(val)) setBhDays(val.map(Number));
       }
     }
   }, [systemConfigs]);
