@@ -427,7 +427,7 @@ export default function Tickets() {
 
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="-mx-6 px-2 space-y-6">
         {/* Warning for analysts without queues */}
         {shouldRestrictView && !hasQueues && (
           <Alert variant="destructive" className="border-amber-500 bg-amber-50 text-amber-900 dark:bg-amber-950 dark:text-amber-100">
@@ -600,7 +600,7 @@ export default function Tickets() {
           </Card>
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <Card>
-            <Table>
+            <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
