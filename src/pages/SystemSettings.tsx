@@ -87,6 +87,9 @@ export default function SystemSettings() {
   const [segmentDialogOpen, setSegmentDialogOpen] = useState(false);
   const [selectedSegment, setSelectedSegment] = useState<Segment | null>(null);
   const [deleteSegmentId, setDeleteSegmentId] = useState<string | null>(null);
+  const [bhStart, setBhStart] = useState("09:00");
+  const [bhEnd, setBhEnd] = useState("18:00");
+  const [bhDays, setBhDays] = useState<number[]>([1, 2, 3, 4, 5]);
 
   // Fetch system configs
   const { data: systemConfigs, isLoading: configsLoading } = useQuery({
