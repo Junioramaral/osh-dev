@@ -600,7 +600,7 @@ export default function Tickets() {
           </Card>
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <Card>
-            <Table>
+            <Table className="min-w-[1200px]">
               <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
