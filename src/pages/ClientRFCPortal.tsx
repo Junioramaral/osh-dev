@@ -140,7 +140,7 @@ const ClientRFCPortal = () => {
 
   return (
     <AppLayout>
-      <div className="-mx-6 px-2">
+      <div className="-mx-6 px-2 flex flex-col" style={{ minHeight: 'calc(100vh - 120px)' }}>
       <div className="mb-6">
         <div className="flex items-center gap-3">
           <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary/10">
@@ -153,8 +153,8 @@ const ClientRFCPortal = () => {
         </div>
       </div>
 
-      <Card className="overflow-hidden">
-        <div className="grid md:grid-cols-[340px_1fr] h-[calc(100vh-180px)] min-h-[500px]">
+      <Card className="overflow-hidden flex-1 flex flex-col">
+        <div className="grid md:grid-cols-[340px_1fr] flex-1 min-h-0">
           {/* Left: RFC List */}
           <div className={`border-r border-border flex flex-col h-full ${showDetails ? "hidden md:flex" : "flex"}`}>
             <div className="p-4 border-b border-border">
