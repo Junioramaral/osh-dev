@@ -38,3 +38,6 @@ verify_jwt = false
 
 [functions.send-rfc-decision-notification]
 verify_jwt = false
+
+[functions.fetch-holidays]
+verify_jwt = false
