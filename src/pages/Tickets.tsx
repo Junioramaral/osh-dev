@@ -715,6 +715,21 @@ export default function Tickets() {
         ticketCount={selectedTickets.size}
         onConfirm={handleReleaseTickets}
       />
+
+      <DeleteTicketDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        ticketCount={selectedTickets.size}
+        onConfirm={() => {
+          deleteTickets.mutate(Array.from(selectedTickets), {
+            onSuccess: () => {
+              setSelectedTickets(new Set());
+              setShowDeleteDialog(false);
+            },
+          });
+        }}
+        isDeleting={deleteTickets.isPending}
+      />
     </AppLayout>
   );
 }
