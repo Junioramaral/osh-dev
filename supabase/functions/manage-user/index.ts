@@ -65,15 +65,17 @@ serve(async (req) => {
     }
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: { user }, error: authError } = await supabaseAdmin.auth.getUser(token);
+    const { data: claimsData, error: authError } = await supabaseAdmin.auth.getClaims(token);
     
-    if (authError || !user) {
+    if (authError || !claimsData?.claims) {
       console.error("[manage-user] Invalid token:", authError);
       return new Response(
         JSON.stringify({ error: "Unauthorized" }),
         { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    const userId_auth = claimsData.claims.sub;
 
     // Check if user has super_admin role (supports multi-role system)
     const { data: roleData, error: roleError } = await supabaseAdmin
