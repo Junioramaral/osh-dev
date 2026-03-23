@@ -24,7 +24,7 @@ function formatDuration(minutes: number): string {
   }
 }
 
-export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
+export default function SLAMetricsCards({ ticket, holidays = [] }: SLAMetricsCardsProps) {
   const createdAt = new Date(ticket.created_at);
   const resolvedAt = ticket.resolved_at ? new Date(ticket.resolved_at) : new Date();
   const useBusinessHours = isBusinessHoursPriority(ticket.priority);
@@ -34,7 +34,7 @@ export default function SLAMetricsCards({ ticket }: SLAMetricsCardsProps) {
   
   // Tempo útil (business hours for P3/P4, same as total for P1/P2)
   const usefulMinutes = useBusinessHours
-    ? calculateBusinessMinutes(createdAt, resolvedAt, DEFAULT_BUSINESS_HOURS)
+    ? calculateBusinessMinutes(createdAt, resolvedAt, DEFAULT_BUSINESS_HOURS, holidays)
     : totalMinutesCalendar;
   
   // Tempo em pausa (difference between calendar and business for P3/P4)
