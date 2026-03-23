@@ -283,6 +283,66 @@ const ClientRFCPortal = () => {
                       </div>
                     )}
 
+                    {/* Execution Time Table */}
+                    {steps.some(s => s.started_at || s.concluded_at) && (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Timer className="w-4 h-4 text-primary" />
+                            <p className="text-sm font-medium text-foreground">Tempos de Execução</p>
+                          </div>
+                          <div className="rounded-lg border border-border overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="h-9 text-xs w-12">#</TableHead>
+                                  <TableHead className="h-9 text-xs">Descrição</TableHead>
+                                  <TableHead className="h-9 text-xs w-[120px]">Início</TableHead>
+                                  <TableHead className="h-9 text-xs w-[120px]">Fim</TableHead>
+                                  <TableHead className="h-9 text-xs w-[90px] text-right">Duração</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {steps.map((step) => (
+                                  <TableRow key={step.id}>
+                                    <TableCell className="py-2 text-xs font-mono text-muted-foreground">
+                                      {String(step.ordem + 1).padStart(2, "0")}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-foreground line-clamp-1">
+                                      {step.descricao}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-muted-foreground">
+                                      {step.started_at
+                                        ? format(new Date(step.started_at), "dd/MM HH:mm", { locale: ptBR })
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-muted-foreground">
+                                      {step.concluded_at
+                                        ? format(new Date(step.concluded_at), "dd/MM HH:mm", { locale: ptBR })
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-right font-medium text-foreground">
+                                      {formatDuration(step.started_at, step.concluded_at)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                              <TableFooter>
+                                <TableRow>
+                                  <TableCell colSpan={4} className="py-2 text-xs font-semibold text-foreground">
+                                    Tempo Total
+                                  </TableCell>
+                                  <TableCell className="py-2 text-xs text-right font-bold text-primary">
+                                    {formatTotalDuration(totalDurationMinutes)}
+                                  </TableCell>
+                                </TableRow>
+                              </TableFooter>
+                            </Table>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
                     <Separator />
 
                     {/* Vertical Timeline */}
