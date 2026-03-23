@@ -152,6 +152,21 @@ export function BulkActionsBar({
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {canDelete && onDeleteTickets && (
+          <>
+            <div className="h-6 w-px bg-primary-foreground/20" />
+            <Button
+              variant="secondary"
+              size="sm"
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              onClick={onDeleteTickets}
+            >
+              <Trash2 className="h-4 w-4 mr-2" />
+              Excluir
+            </Button>
+          </>
+        )}
         
         <Button
           variant="ghost"
