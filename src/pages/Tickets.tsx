@@ -52,6 +52,9 @@ export default function Tickets() {
   const [lockedTicketInfo, setLockedTicketInfo] = useState<{ lockedByName: string } | null>(null);
   const [pendingAction, setPendingAction] = useState<"lock" | "assign" | null>(null);
   const [pendingAnalystId, setPendingAnalystId] = useState<string | null>(null);
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+
+  const deleteTickets = useDeleteTickets();
 
   const {
     bulkAssignAnalyst,
