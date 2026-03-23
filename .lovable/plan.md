@@ -1,19 +1,59 @@
 
 
-# Corrigir overflow nos cards de SLA Metrics
+# Corrigir isolamento de dados para role Viewer (Auditor)
 
 ## Problema
-Os cards de métricas SLA estão com conteúdo extrapolando os limites, especialmente o badge "Fora do expediente" e valores longos como "13h 28min". O padding `p-6` e gap `gap-4` são grandes demais para 4 colunas, e o badge "Fora do expediente" é texto longo.
+
+A role "viewer" (Auditor) possui políticas RLS que concedem acesso a **todos os dados de todos os tenants**. O usuário "Junior Amaral" do cliente Lexisflow (Auditor) consegue ver tickets do cliente Sec4File. Isso é uma **falha grave de isolamento de dados**.
+
+## Causa raiz
+
+A migração original criou todas as policies do viewer com `USING (is_viewer(auth.uid()))` sem filtrar por `tenant_id`/`client_id`. O viewer deveria ver apenas dados do seu próprio tenant.
 
 ## Solução
 
-### Arquivo: `src/components/tickets/SLAMetricsCards.tsx`
+Criar uma migração SQL que **substitua** as políticas do viewer nas tabelas sensíveis, adicionando filtro por tenant (`get_user_tenant_id(auth.uid())`).
 
-1. **Reduzir padding** dos cards: `p-6` → `p-4`
-2. **Reduzir gap** entre ícone e texto: `gap-4` → `gap-3`
-3. **Reduzir tamanho do ícone container**: `p-3` → `p-2`, ícone `h-6 w-6` → `h-5 w-5`
-4. **Reduzir tamanho do valor**: `text-2xl` → `text-xl`
-5. **Encurtar badge** "Fora do expediente" → "Fora HU" (mais compacto)
-6. **Adicionar `min-w-0`** no container de texto e `truncate` no label para prevenir overflow
-7. **Flex wrap** no container label+badge para que o badge quebre linha se necessário
+### Tabelas que precisam de restrição por tenant:
+
+| Tabela | Filtro a adicionar |
+|--------|-------------------|
+| `tickets` | `client_id = get_user_tenant_id(auth.uid())` |
+| `ticket_comments` | via subquery em tickets (já usa EXISTS) |
+| `ticket_history` | via subquery em tickets (já usa EXISTS) |
+| `ticket_time_logs` | via subquery em tickets |
+| `machines` | `client_id = get_user_tenant_id(auth.uid())` |
+| `database_instances` | `client_id = get_user_tenant_id(auth.uid())` |
+| `application_instances` | `client_id = get_user_tenant_id(auth.uid())` |
+| `client_contacts` | `client_id = get_user_tenant_id(auth.uid())` |
+| `client_projects` | `client_id = get_user_tenant_id(auth.uid())` |
+| `clients` | `id = get_user_tenant_id(auth.uid())` |
+| `profiles` | próprio perfil + perfis do mesmo tenant |
+| `faq_articles` | mesma regra de clients (client_specific + global) |
+
+### Tabelas que podem manter acesso global (não sensíveis):
+
+- `system_configs` — configurações globais do sistema
+- `queues` — lista de filas (sem dados de cliente)
+- `segments` — lista de segmentos
+- `user_roles` — restringir ao próprio tenant também
+
+### Migração SQL
+
+Uma única migração que:
+1. DROP de cada policy antiga do viewer
+2. CREATE da nova policy com filtro por tenant
+
+Exemplo para tickets:
+```sql
+DROP POLICY IF EXISTS "Viewers can view all tickets" ON public.tickets;
+CREATE POLICY "Viewers can view tenant tickets"
+  ON public.tickets FOR SELECT TO authenticated
+  USING (is_viewer(auth.uid()) AND client_id = get_user_tenant_id(auth.uid()));
+```
+
+### Impacto
+- Nenhuma mudança no frontend
+- Viewers passam a ver apenas dados do próprio cliente
+- Tabelas de configuração global continuam acessíveis
 
