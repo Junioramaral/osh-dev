@@ -1,25 +1,19 @@
 
-# SLA em Horas Úteis — Implementado ✅
 
-## O que foi feito
+# Corrigir overflow nos cards de SLA Metrics
 
-### Backend (SQL)
-- Função `add_business_minutes()` que calcula deadlines somando apenas minutos em horário comercial
-- Trigger `calculate_sla_deadlines()` atualizado: P3/P4 usam horas úteis, P1/P2 mantêm 24x7
-- Configs padrão inseridas: `business_hours_start=09:00`, `business_hours_end=18:00`, `business_days=[1,2,3,4,5]`
+## Problema
+Os cards de métricas SLA estão com conteúdo extrapolando os limites, especialmente o badge "Fora do expediente" e valores longos como "13h 28min". O padding `p-6` e gap `gap-4` são grandes demais para 4 colunas, e o badge "Fora do expediente" é texto longo.
 
-### Frontend
-- `src/lib/businessHours.ts`: funções `calculateBusinessMinutes()`, `parseBusinessHoursConfig()`, `isBusinessHoursPriority()`
-- `src/lib/ticketUtils.tsx`: `calculateSLAStatus()` agora usa business hours para P3/P4 (labels com "(HU)")
-- `src/components/tickets/SLAMetricsCards.tsx`: Tempo Útil e Pausa calculados corretamente para P3/P4
-- `src/components/tickets/SLAHistoryTable.tsx`: % e tempo usados em horas úteis com badge indicativo
-- `src/pages/SLADashboard.tsx`: refatorado para usar `calculateSLAStatus` compartilhado
-- `src/pages/SystemSettings.tsx`: UI para configurar horário comercial e dias úteis
+## Solução
 
-### Edge Function
-- `sla-monitor`: busca config de business hours, calcula alertas em horas úteis para P3/P4
+### Arquivo: `src/components/tickets/SLAMetricsCards.tsx`
 
-## Fase 2 (futuro)
-- Tabela de feriados
-- Horários por cliente
-- Recálculo retroativo
+1. **Reduzir padding** dos cards: `p-6` → `p-4`
+2. **Reduzir gap** entre ícone e texto: `gap-4` → `gap-3`
+3. **Reduzir tamanho do ícone container**: `p-3` → `p-2`, ícone `h-6 w-6` → `h-5 w-5`
+4. **Reduzir tamanho do valor**: `text-2xl` → `text-xl`
+5. **Encurtar badge** "Fora do expediente" → "Fora HU" (mais compacto)
+6. **Adicionar `min-w-0`** no container de texto e `truncate` no label para prevenir overflow
+7. **Flex wrap** no container label+badge para que o badge quebre linha se necessário
+
