@@ -8,12 +8,38 @@ import { Progress } from "@/components/ui/progress";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow, TableFooter } from "@/components/ui/table";
 import {
   ClipboardList, ArrowLeft, CheckCircle2, Clock, Loader2,
-  Calendar, ChevronDown, ChevronUp, PartyPopper, MessageSquare,
+  Calendar, ChevronDown, ChevronUp, PartyPopper, MessageSquare, Timer,
 } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+
+function formatDuration(startedAt: string | null, concludedAt: string | null): string {
+  if (!startedAt || !concludedAt) return "—";
+  const diffMs = new Date(concludedAt).getTime() - new Date(startedAt).getTime();
+  if (diffMs < 0) return "—";
+  const totalMinutes = Math.round(diffMs / 60000);
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+}
+
+function getDurationMinutes(startedAt: string | null, concludedAt: string | null): number {
+  if (!startedAt || !concludedAt) return 0;
+  const diffMs = new Date(concludedAt).getTime() - new Date(startedAt).getTime();
+  return diffMs > 0 ? Math.round(diffMs / 60000) : 0;
+}
+
+function formatTotalDuration(totalMinutes: number): string {
+  if (totalMinutes === 0) return "—";
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+}
 
 type RFC = {
   id: string;
@@ -32,6 +58,7 @@ type RFCStep = {
   procedimento: string | null;
   ordem: number;
   status_concluido: boolean;
+  started_at: string | null;
   concluded_at: string | null;
   observacao: string | null;
   ticket_id: string;
@@ -84,7 +111,7 @@ const ClientRFCPortal = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("rfc_steps")
-        .select("id, descricao, procedimento, ordem, status_concluido, concluded_at, observacao, ticket_id")
+        .select("id, descricao, procedimento, ordem, status_concluido, started_at, concluded_at, observacao, ticket_id")
         .eq("ticket_id", selectedRfcId!)
         .order("ordem");
       if (error) throw error;
@@ -97,6 +124,7 @@ const ClientRFCPortal = () => {
   const progressPercent = selectedRfc?.rfc_progress ?? 0;
   const completedCount = steps.filter((s) => s.status_concluido).length;
   const totalCount = steps.length;
+  const totalDurationMinutes = steps.reduce((acc, s) => acc + getDurationMinutes(s.started_at, s.concluded_at), 0);
 
   const handleSelectRfc = (id: string) => {
     setSelectedRfcId(id);
@@ -253,6 +281,66 @@ const ClientRFCPortal = () => {
                           </div>
                         </div>
                       </div>
+                    )}
+
+                    {/* Execution Time Table */}
+                    {steps.some(s => s.started_at || s.concluded_at) && (
+                      <>
+                        <div className="space-y-2">
+                          <div className="flex items-center gap-2">
+                            <Timer className="w-4 h-4 text-primary" />
+                            <p className="text-sm font-medium text-foreground">Tempos de Execução</p>
+                          </div>
+                          <div className="rounded-lg border border-border overflow-hidden">
+                            <Table>
+                              <TableHeader>
+                                <TableRow className="bg-muted/50">
+                                  <TableHead className="h-9 text-xs w-12">#</TableHead>
+                                  <TableHead className="h-9 text-xs">Descrição</TableHead>
+                                  <TableHead className="h-9 text-xs w-[120px]">Início</TableHead>
+                                  <TableHead className="h-9 text-xs w-[120px]">Fim</TableHead>
+                                  <TableHead className="h-9 text-xs w-[90px] text-right">Duração</TableHead>
+                                </TableRow>
+                              </TableHeader>
+                              <TableBody>
+                                {steps.map((step) => (
+                                  <TableRow key={step.id}>
+                                    <TableCell className="py-2 text-xs font-mono text-muted-foreground">
+                                      {String(step.ordem + 1).padStart(2, "0")}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-foreground line-clamp-1">
+                                      {step.descricao}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-muted-foreground">
+                                      {step.started_at
+                                        ? format(new Date(step.started_at), "dd/MM HH:mm", { locale: ptBR })
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-muted-foreground">
+                                      {step.concluded_at
+                                        ? format(new Date(step.concluded_at), "dd/MM HH:mm", { locale: ptBR })
+                                        : "—"}
+                                    </TableCell>
+                                    <TableCell className="py-2 text-xs text-right font-medium text-foreground">
+                                      {formatDuration(step.started_at, step.concluded_at)}
+                                    </TableCell>
+                                  </TableRow>
+                                ))}
+                              </TableBody>
+                              <TableFooter>
+                                <TableRow>
+                                  <TableCell colSpan={4} className="py-2 text-xs font-semibold text-foreground">
+                                    Tempo Total
+                                  </TableCell>
+                                  <TableCell className="py-2 text-xs text-right font-bold text-primary">
+                                    {formatTotalDuration(totalDurationMinutes)}
+                                  </TableCell>
+                                </TableRow>
+                              </TableFooter>
+                            </Table>
+                          </div>
+                        </div>
+                      </>
                     )}
 
                     <Separator />
