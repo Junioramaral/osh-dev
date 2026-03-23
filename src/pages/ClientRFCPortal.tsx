@@ -125,7 +125,7 @@ const ClientRFCPortal = () => {
       </div>
 
       <Card className="overflow-hidden">
-        <div className="grid md:grid-cols-[300px_1fr] h-[calc(100vh-220px)] min-h-[500px]">
+        <div className="grid md:grid-cols-[340px_1fr] h-[calc(100vh-180px)] min-h-[500px]">
           {/* Left: RFC List */}
           <div className={`border-r border-border flex flex-col h-full ${showDetails ? "hidden md:flex" : "flex"}`}>
             <div className="p-4 border-b border-border">
@@ -178,7 +178,7 @@ const ClientRFCPortal = () => {
           </div>
 
           {/* Right: Detail Panel */}
-          <div className={`flex flex-col h-full ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
+          <div className={`flex flex-col h-full min-h-0 ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
             {!selectedRfc ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-8">
                 <ClipboardList className="w-12 h-12 text-muted-foreground mb-4" />
