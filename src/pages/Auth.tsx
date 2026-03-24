@@ -102,7 +102,7 @@ const Auth = () => {
 
         <Card>
           <CardHeader>
-            <CardTitle>Bem-vindo -</CardTitle>
+            <CardTitle>Bem-vindo</CardTitle>
             <CardDescription>Entre com suas credenciais para continuar</CardDescription>
           </CardHeader>
           <CardContent>
