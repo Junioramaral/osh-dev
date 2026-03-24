@@ -1,20 +1,36 @@
 
+# Documentação RBAC do Sistema Otimizzo
 
-# Tornar a tabela de Tickets responsiva e ocupar toda a largura
+## O que será gerado
 
-## Problema
+Um diagrama Mermaid interativo com o fluxo RBAC completo + documento de referência detalhado, ambos baseados na análise do código atual.
 
-A tabela de tickets está contida dentro de um `Card` que está dentro do `container` do `AppLayout` (max-width: 1400px). Em telas maiores, sobra espaço horizontal não aproveitado. Em telas menores, as colunas ficam apertadas sem possibilidade de scroll horizontal.
+## Conteúdo da documentação
 
-## Solução
+### Roles existentes (da enum `app_role` + `viewer`)
+| Role | Label | Descrição | Status no sistema |
+|------|-------|-----------|-------------------|
+| `super_admin` | Super Admin | Acesso total | Implementado (RLS ALL + UI completa) |
+| `tenant_admin` | Tenant Admin | Admin do próprio tenant | Implementado (DELETE tickets, gerencia usuários do tenant) |
+| `viewer` | Auditor | Leitura total do próprio tenant | Implementado (SELECT com filtro tenant) |
+| `analyst_db` | Analista DB | Atende tickets DB | Implementado (filtro por filas) |
+| `analyst_app` | Analista APP | Atende tickets APP | Implementado (filtro por filas) |
+| `user` | Usuário | Acesso básico | Implementado (cria/vê próprios tickets) |
 
-### `src/pages/Tickets.tsx`
+### Diagrama incluirá:
+1. Hierarquia de roles
+2. Menus visíveis por role (operacionais + admin)
+3. Permissões CRUD por tabela
+4. Isolamento de dados (tenant boundary)
+5. Flags especiais (`isOtimizzoUser` via tenant_id específico)
 
-1. **Expandir horizontalmente**: Envolver todo o conteúdo da página em `<div className="-mx-6 px-2">` (mesma técnica usada no `ClientRFCPortal`) para escapar do container e ocupar toda a largura disponível
+## Artefatos a criar
 
-2. **Scroll horizontal na tabela**: O componente `Table` já possui `overflow-auto` no wrapper div. Adicionar `min-w-[1200px]` na tag `<table>` para garantir que em telas menores haja scroll horizontal ao invés de comprimir as colunas
+1. **`/mnt/documents/RBAC_Otimizzo.mmd`** — Diagrama Mermaid com fluxo visual de permissões
+2. **`/mnt/documents/RBAC_Documentacao.md`** — Documento markdown completo com todas as permissões mapeadas
 
-### Resultado
-- Em telas grandes: a tabela ocupa toda a largura disponível, sem espaço em branco
-- Em telas menores: scroll horizontal permite visualizar todas as colunas sem distorção
+## Implementação
 
+- Analisar `AppLayout.tsx` (menus), `AuthContext.tsx` (flags), RLS policies (banco), e `RoleCheckboxGroup.tsx` (roles disponíveis)
+- Mapear cada role → menus visíveis, ações permitidas (CRUD), e escopo de dados
+- Gerar ambos artefatos com dados reais do código
