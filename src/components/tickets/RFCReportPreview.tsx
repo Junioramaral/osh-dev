@@ -323,6 +323,46 @@ export default function RFCReportPreview({ ticket }: RFCReportPreviewProps) {
             </table>
           </div>
 
+          {/* Detalhamento e Observações */}
+          {steps.filter(s => s.procedimento || s.observacao).length > 0 && (
+            <div>
+              <h2 className="text-lg font-bold text-gray-800 mb-3 border-b border-gray-200 pb-1">
+                📝 Detalhamento e Observações
+              </h2>
+              <div className="space-y-3">
+                {steps
+                  .filter(s => s.procedimento || s.observacao)
+                  .map((step) => (
+                    <div
+                      key={step.id}
+                      className="border border-gray-200 rounded-lg overflow-hidden"
+                      style={{ pageBreakInside: 'avoid' }}
+                    >
+                      <div className="bg-gray-100 px-3 py-2 border-b border-gray-200">
+                        <p className="font-semibold text-sm text-gray-800">
+                          Passo {String(step.ordem + 1).padStart(2, "0")} — {step.descricao}
+                        </p>
+                      </div>
+                      <div className="p-3 space-y-2">
+                        {step.procedimento && (
+                          <div>
+                            <p className="text-xs font-semibold text-gray-500 uppercase mb-1">Procedimento</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{step.procedimento}</p>
+                          </div>
+                        )}
+                        {step.observacao && (
+                          <div className="bg-amber-50 border border-amber-200 rounded p-2">
+                            <p className="text-xs font-semibold text-amber-700 uppercase mb-1">Observações do Analista</p>
+                            <p className="text-sm text-gray-700 whitespace-pre-wrap">{step.observacao}</p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+              </div>
+            </div>
+          )}
+
           {/* Conclusion */}
           <div className="bg-green-50 border border-green-200 p-4 rounded-lg text-center">
             <p className="text-green-800 font-medium">
