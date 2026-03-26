@@ -1,45 +1,24 @@
 
+# Corrigir telefone no convite e edição de usuários
 
-# Corrigir geração de PDF multi-página no Relatório RFC
+## Problemas identificados
 
-## Problema
+1. **Convite**: O telefone preenchido no formulário é removido antes do envio. Na linha 286-290 de `TenantDetail.tsx`, o `cleanedForm` não inclui o campo `phone`. Além disso, o `inviteUser` no hook `useTenantUsers.ts` não aceita nem envia `phone` para a edge function.
 
-A lógica atual do `while (heightLeft > 0)` na função `generatePDF` adiciona a imagem inteira novamente em cada página com cálculos de posição incorretos. Isso causa:
-1. Páginas duplicadas com o mesmo conteúdo
-2. A mensagem "RFC Concluída com sucesso" no final é cortada/não aparece
+2. **Edição**: O telefone armazenado no banco é apenas dígitos (ex: `51999887766`), mas o `PhoneInput` usa máscara `(99) 99999-9999`. Ao carregar o formulário de edição, os dígitos puros não são exibidos corretamente no campo mascarado.
 
-## Correção
+## Correções
 
-Reescrever a lógica de paginação em `src/components/tickets/RFCReportPreview.tsx` (linhas 73-84) com um loop simples que desloca a posição Y da imagem negativamente a cada página:
+### 1. `src/pages/TenantDetail.tsx`
+- Incluir `phone` no `cleanedForm` do invite (linha 286-290), aplicando `cleanPhone()` antes de enviar
+- Ao popular o `editUserForm` (linha 769), formatar o telefone com `formatPhone()` para exibir corretamente no campo mascarado
 
-```text
-Página 1: addImage em Y = margin (10mm)
-Página 2: addImage em Y = margin - 1 * pageContentHeight
-Página 3: addImage em Y = margin - 2 * pageContentHeight
-... até cobrir toda a altura da imagem
-```
+### 2. `src/hooks/useTenantUsers.ts`
+- Adicionar `phone` como parâmetro aceito no `inviteUserMutation` (linha 120-131) e enviá-lo no body da chamada à edge function
 
-### Lógica corrigida:
+### 3. `src/lib/phoneUtils.ts`
+- Já possui `formatPhone` e `cleanPhone` — sem alterações necessárias
 
-```typescript
-const pageContentHeight = pdfHeight - 20; // margem top + bottom
-let heightLeft = imgHeight;
-let pageIndex = 0;
-
-// Primeira página
-pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
-heightLeft -= pageContentHeight;
-
-// Páginas seguintes
-while (heightLeft > 0) {
-  pageIndex++;
-  pdf.addPage();
-  const yOffset = -(pageContentHeight * pageIndex) + 10;
-  pdf.addImage(imgData, "PNG", 10, yOffset, imgWidth, imgHeight);
-  heightLeft -= pageContentHeight;
-}
-```
-
-## Arquivo alterado
-- `src/components/tickets/RFCReportPreview.tsx` — apenas a função `generatePDF` (linhas 73-84)
-
+## Arquivos alterados
+- `src/pages/TenantDetail.tsx` — incluir phone no invite + formatar phone no edit
+- `src/hooks/useTenantUsers.ts` — aceitar e enviar phone no invite mutation
