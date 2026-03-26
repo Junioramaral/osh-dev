@@ -1,40 +1,64 @@
 
 
-# Corrigir carregamento dos dados do Admin na edição do Tenant
+# Replicar SLA do LexisFlow para todos os clientes e definir como padrão
 
-## Problema
+## O que será feito
 
-A query `tenantAdmins` (linha 130-142 de `TenantDetail.tsx`) busca usuários com role `super_admin` no tenant. Porém, ao criar o tenant, o contato é convidado com role `user`. Resultado: nenhum admin é encontrado e os campos "Nome Completo do Admin" e "Email do Admin" ficam vazios.
+1. **Atualizar todos os clientes existentes** com os valores de SLA do LexisFlow via query de UPDATE
+2. **Alterar os defaults** no `ClientDialog.tsx` e nos defaults da tabela `clients` no banco para que novos tenants já venham com esses valores
+3. **Incluir SLA padrão na criação de tenants** em `TenantAdmin.tsx`
 
-## Correção
+## Valores de SLA do LexisFlow (que serão o novo padrão)
 
-Alterar a query `tenantAdmins` para buscar o primeiro usuário do tenant (independente do role), em vez de filtrar por `super_admin`. Isso garante que o contato cadastrado na criação seja carregado corretamente.
+| Prioridade | Segmento | First Response | Resolution |
+|------------|----------|---------------|------------|
+| P1 | DB/APP | 15 min | 240 min (4h) |
+| P2 | DB/APP | 30 min | 480 min (8h) |
+| P3 | DB/APP | 240 min (4h) | 2880 min (48h) |
+| P4 | DB/APP | 1400 min (~23h) | 4320 min (72h) |
 
-### Alteração em `src/pages/TenantDetail.tsx`
+## Etapas
 
-**Linha 141**: trocar `.eq("user_roles.role", "super_admin")` por remover esse filtro, buscando qualquer usuário ativo do tenant. Ordenar por `created_at` para pegar o primeiro cadastrado (o contato original).
+### 1. UPDATE em todos os clientes (migration SQL)
+Criar migration para atualizar todos os clientes existentes e alterar os column defaults:
 
-```typescript
-// ANTES (linha 131-142):
-const { data: profiles } = await supabase
-  .from("profiles")
-  .select(`id, full_name, user_roles!inner(role)`)
-  .eq("client_id", tenantId)
-  .eq("user_roles.role", "super_admin")  // ← problema: contato tem role 'user'
-  .eq("is_active", true);
+```sql
+-- Atualizar todos os clientes com os valores do LexisFlow
+UPDATE clients SET
+  sla_db_p1_first_response = 15, sla_db_p1_resolution = 240,
+  sla_db_p2_first_response = 30, sla_db_p2_resolution = 480,
+  sla_db_p3_first_response = 240, sla_db_p3_resolution = 2880,
+  sla_db_p4_first_response = 1400, sla_db_p4_resolution = 4320,
+  sla_app_p1_first_response = 15, sla_app_p1_resolution = 240,
+  sla_app_p2_first_response = 30, sla_app_p2_resolution = 480,
+  sla_app_p3_first_response = 240, sla_app_p3_resolution = 2880,
+  sla_app_p4_first_response = 1400, sla_app_p4_resolution = 4320;
 
-// DEPOIS:
-const { data: profiles } = await supabase
-  .from("profiles")
-  .select(`id, full_name, user_roles!inner(role)`)
-  .eq("client_id", tenantId)
-  .eq("is_active", true)
-  .order("created_at", { ascending: true })
-  .limit(1);
+-- Alterar defaults das colunas para novos tenants
+ALTER TABLE clients
+  ALTER COLUMN sla_db_p3_first_response SET DEFAULT 240,
+  ALTER COLUMN sla_db_p3_resolution SET DEFAULT 2880,
+  ALTER COLUMN sla_db_p4_first_response SET DEFAULT 1400,
+  ALTER COLUMN sla_db_p4_resolution SET DEFAULT 4320,
+  ALTER COLUMN sla_app_p3_first_response SET DEFAULT 240,
+  ALTER COLUMN sla_app_p3_resolution SET DEFAULT 2880,
+  ALTER COLUMN sla_app_p4_first_response SET DEFAULT 1400,
+  ALTER COLUMN sla_app_p4_resolution SET DEFAULT 4320;
 ```
 
-Remove o filtro por `super_admin` e pega o primeiro usuário criado no tenant (que é o contato cadastrado na criação).
+### 2. `src/components/clients/ClientDialog.tsx`
+Atualizar os defaults do Zod schema e do `defaultValues` do formulário:
+- P3 first_response: 60 → **240**
+- P3 resolution: 960 → **2880**
+- P4 first_response: 120 → **1400**
+- P4 resolution: 1920 → **4320**
+(P1 e P2 já estão com os mesmos valores)
 
-## Arquivo alterado
-- `src/pages/TenantDetail.tsx` — query `tenantAdmins` (linhas 131-142)
+### 3. `src/pages/TenantAdmin.tsx`
+Na função `handleCreateTenant`, incluir os campos de SLA no insert para que novos tenants já sejam criados com os valores padrão explícitos.
+
+## Arquivos alterados
+- Nova migration SQL (UPDATE + ALTER DEFAULT)
+- `src/components/clients/ClientDialog.tsx` — defaults do schema
+- `src/pages/TenantAdmin.tsx` — incluir SLA no insert
 
