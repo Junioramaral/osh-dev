@@ -777,7 +777,7 @@ const TenantDetail = () => {
                           >
                             <TableCell className="font-medium">{user.full_name}</TableCell>
                             <TableCell>{user.email}</TableCell>
-                            <TableCell>{user.phone || "-"}</TableCell>
+                            <TableCell>{user.phone ? formatPhone(user.phone) : "-"}</TableCell>
                             <TableCell>{getRolesLabel(user.roles)}</TableCell>
                             <TableCell>
                               {user.roles.some(r => r === 'analyst_db' || r === 'analyst_app')
