@@ -138,8 +138,9 @@ const TenantDetail = () => {
         `,
         )
         .eq("client_id", tenantId)
-        .eq("user_roles.role", "super_admin")
-        .eq("is_active", true);
+        .eq("is_active", true)
+        .order("created_at", { ascending: true })
+        .limit(1);
 
       if (profilesError) throw profilesError;
       if (!profiles || profiles.length === 0) return [];
