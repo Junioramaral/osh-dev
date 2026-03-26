@@ -1,36 +1,59 @@
 
-# Documentação RBAC do Sistema Otimizzo
 
-## O que será gerado
+# Relatório PDF de RFC com aba de preview e aprovação de envio
 
-Um diagrama Mermaid interativo com o fluxo RBAC completo + documento de referência detalhado, ambos baseados na análise do código atual.
+## Resumo
 
-## Conteúdo da documentação
+Quando uma RFC for concluída (status `resolvido`), uma nova aba **"Relatório"** aparecerá no detalhe do ticket RFC. O analista poderá visualizar o relatório completo antes de aprovar o envio por email ao cliente. O relatório será gerado como PDF no navegador usando `jspdf` + `html2canvas`.
 
-### Roles existentes (da enum `app_role` + `viewer`)
-| Role | Label | Descrição | Status no sistema |
-|------|-------|-----------|-------------------|
-| `super_admin` | Super Admin | Acesso total | Implementado (RLS ALL + UI completa) |
-| `tenant_admin` | Tenant Admin | Admin do próprio tenant | Implementado (DELETE tickets, gerencia usuários do tenant) |
-| `viewer` | Auditor | Leitura total do próprio tenant | Implementado (SELECT com filtro tenant) |
-| `analyst_db` | Analista DB | Atende tickets DB | Implementado (filtro por filas) |
-| `analyst_app` | Analista APP | Atende tickets APP | Implementado (filtro por filas) |
-| `user` | Usuário | Acesso básico | Implementado (cria/vê próprios tickets) |
+## Fluxo
 
-### Diagrama incluirá:
-1. Hierarquia de roles
-2. Menus visíveis por role (operacionais + admin)
-3. Permissões CRUD por tabela
-4. Isolamento de dados (tenant boundary)
-5. Flags especiais (`isOtimizzoUser` via tenant_id específico)
+```text
+RFC concluída (status=resolvido)
+  └─► Aba "Relatório" aparece no TicketDetail (somente RFCs resolvidas)
+        └─► Preview visual do relatório completo
+              ├─ Cabeçalho com logo Otimizzo, dados do ticket e cliente
+              ├─ Seção de planejamento (título, descrição, segmento)
+              ├─ Tabela de passos com status, início, fim, duração, responsável
+              ├─ Tempo total de execução
+              └─ Mensagem de conclusão
+        └─► Botões:
+              ├─ "Baixar PDF" — gera e baixa o PDF localmente
+              └─ "Enviar Relatório ao Cliente" — gera PDF, faz upload
+                   ao Storage e envia email com link de download
+```
 
-## Artefatos a criar
+## Mudanças
 
-1. **`/mnt/documents/RBAC_Otimizzo.mmd`** — Diagrama Mermaid com fluxo visual de permissões
-2. **`/mnt/documents/RBAC_Documentacao.md`** — Documento markdown completo com todas as permissões mapeadas
+### 1. Novo componente: `src/components/tickets/RFCReportPreview.tsx`
+- Componente que renderiza o relatório formatado para visualização e captura PDF
+- Seções: cabeçalho com dados do ticket/cliente, planejamento, tabela de execução dos passos, tempo total, mensagem de conclusão
+- Botão "Baixar PDF" que usa `jspdf` + `html2canvas` para gerar o PDF a partir do HTML renderizado
+- Botão "Enviar Relatório ao Cliente" que gera o PDF, faz upload para o bucket `ticket-attachments` no Supabase Storage, e envia email de notificação com o link do PDF
 
-## Implementação
+### 2. Atualizar `src/pages/TicketDetail.tsx`
+- Adicionar nova aba "Relatório" visível somente quando `record_type === 'rfc'` e `status === 'resolvido'`
+- Atualizar o grid-cols para acomodar a aba extra (6 colunas para RFCs resolvidas)
 
-- Analisar `AppLayout.tsx` (menus), `AuthContext.tsx` (flags), RLS policies (banco), e `RoleCheckboxGroup.tsx` (roles disponíveis)
-- Mapear cada role → menus visíveis, ações permitidas (CRUD), e escopo de dados
-- Gerar ambos artefatos com dados reais do código
+### 3. Edge Function: `supabase/functions/send-rfc-report/index.ts`
+- Nova Edge Function que recebe `ticketId`, `ticketNumber`, `contactEmail`, `contactName`, `reportUrl`
+- Envia email via Resend com template profissional contendo link para download do relatório PDF
+- Reutiliza o padrão visual dos emails existentes (header verde, badge, rodapé)
+
+### 4. Dependências
+- Instalar `jspdf` e `html2canvas` no projeto (geração de PDF no client-side)
+
+## Detalhes Técnicos
+
+- O relatório é renderizado como HTML dentro de um `div` com `ref`, capturado por `html2canvas` e convertido em PDF via `jspdf`
+- O PDF é nomeado como `RFC-{ticket_number}-Relatorio.pdf`
+- Upload do PDF para `ticket-attachments/{ticketId}/rfc-report.pdf`
+- A aba "Relatório" só aparece para analistas Otimizzo (isOtimizzoUser) em RFCs com status `resolvido`
+- O botão de envio registra um comentário interno no ticket confirmando o envio
+
+## Arquivos afetados
+- `src/components/tickets/RFCReportPreview.tsx` — novo
+- `src/pages/TicketDetail.tsx` — nova aba condicional
+- `supabase/functions/send-rfc-report/index.ts` — novo
+- `package.json` — adicionar jspdf + html2canvas
+
