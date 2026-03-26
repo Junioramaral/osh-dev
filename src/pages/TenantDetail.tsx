@@ -30,7 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
-import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
+import { cleanPhone, isValidPhone, formatPhone } from "@/lib/phoneUtils";
 import { RoleCheckboxGroup, getRolesLabel } from "@/components/tenants/RoleCheckboxGroup";
 import { QueueCheckboxGroup } from "@/components/tenants/QueueCheckboxGroup";
 import {
