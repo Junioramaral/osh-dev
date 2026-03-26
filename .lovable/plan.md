@@ -1,44 +1,45 @@
 
 
-# Adicionar seção de Detalhamento e Observações no Relatório RFC
+# Corrigir geração de PDF multi-página no Relatório RFC
 
-## O que muda
+## Problema
 
-Abaixo da tabela de execução existente, adicionar uma nova seção **"📝 Detalhamento e Observações"** que lista cada passo com:
-- Número e título do passo
-- **Procedimento** (`procedimento`) — o que foi planejado/executado
-- **Observações do Analista** (`observacao`) — notas feitas durante a execução
+A lógica atual do `while (heightLeft > 0)` na função `generatePDF` adiciona a imagem inteira novamente em cada página com cálculos de posição incorretos. Isso causa:
+1. Páginas duplicadas com o mesmo conteúdo
+2. A mensagem "RFC Concluída com sucesso" no final é cortada/não aparece
 
-Somente passos que tenham `procedimento` ou `observacao` preenchidos serão exibidos nesta seção (para não mostrar itens vazios).
+## Correção
 
-## Quebra de página
-
-O html2canvas captura tudo como uma imagem única, então a quebra de página no PDF precisa ser gerenciada dividindo o conteúdo em blocos. A abordagem será usar CSS `page-break-inside: avoid` nos cards de cada passo para que o html2canvas + jsPDF multi-page handling mantenha os blocos coesos.
-
-Cada passo será um bloco visual com borda e padding, com `style={{ pageBreakInside: 'avoid' }}` para evitar cortes.
-
-## Arquivo alterado
-
-### `src/components/tickets/RFCReportPreview.tsx`
-
-Entre a seção `{/* Steps table */}` (linha 324) e `{/* Conclusion */}` (linha 326), inserir:
+Reescrever a lógica de paginação em `src/components/tickets/RFCReportPreview.tsx` (linhas 73-84) com um loop simples que desloca a posição Y da imagem negativamente a cada página:
 
 ```text
-{/* Detalhamento e Observações */}
-- Título da seção com ícone 📝
-- Filtrar steps que tenham procedimento OU observacao
-- Para cada step filtrado, renderizar um card com:
-  - Header: "Passo XX — {descricao}" em fundo cinza
-  - Se procedimento: label "Procedimento" + texto pre-wrap
-  - Se observacao: label "Observações do Analista" + texto pre-wrap com fundo amarelo claro
-  - style={{ pageBreakInside: 'avoid' }} em cada card
+Página 1: addImage em Y = margin (10mm)
+Página 2: addImage em Y = margin - 1 * pageContentHeight
+Página 3: addImage em Y = margin - 2 * pageContentHeight
+... até cobrir toda a altura da imagem
 ```
 
-Se nenhum passo tiver procedimento ou observação, a seção inteira não será renderizada.
+### Lógica corrigida:
 
-## Detalhes técnicos
+```typescript
+const pageContentHeight = pdfHeight - 20; // margem top + bottom
+let heightLeft = imgHeight;
+let pageIndex = 0;
 
-- Os campos `procedimento` e `observacao` já existem na tabela `rfc_steps` e já são retornados pelo hook `useTicketRFCSteps`
-- Não requer mudanças no banco, hooks ou edge functions
-- Apenas 1 arquivo editado: `RFCReportPreview.tsx`
+// Primeira página
+pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+heightLeft -= pageContentHeight;
+
+// Páginas seguintes
+while (heightLeft > 0) {
+  pageIndex++;
+  pdf.addPage();
+  const yOffset = -(pageContentHeight * pageIndex) + 10;
+  pdf.addImage(imgData, "PNG", 10, yOffset, imgWidth, imgHeight);
+  heightLeft -= pageContentHeight;
+}
+```
+
+## Arquivo alterado
+- `src/components/tickets/RFCReportPreview.tsx` — apenas a função `generatePDF` (linhas 73-84)
 
