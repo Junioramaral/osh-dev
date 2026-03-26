@@ -4,6 +4,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useTicketDetail, useTicketComments } from "@/hooks/useTicketDetail";
 import TicketRFCReport from "@/components/tickets/TicketRFCReport";
+import RFCReportPreview from "@/components/tickets/RFCReportPreview";
 import TicketHeader from "@/components/tickets/TicketHeader";
 import TicketDetails from "@/components/tickets/TicketDetails";
 import TicketTimeline from "@/components/tickets/TicketTimeline";
@@ -13,11 +14,17 @@ import TicketSidebar from "@/components/tickets/TicketSidebar";
 import TicketSLATab from "@/components/tickets/TicketSLATab";
 import { AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
+import { useAuth } from "@/contexts/AuthContext";
 
 export default function TicketDetail() {
   const { ticketId } = useParams<{ ticketId: string }>();
   const { data: ticket, isLoading, error } = useTicketDetail(ticketId);
   const { data: comments } = useTicketComments(ticketId);
+  const { isOtimizzoUser, isSuperAdmin } = useAuth();
+  
+  const isRFC = ticket?.record_type === 'rfc';
+  const isResolved = ticket?.status === 'resolvido' || ticket?.status === 'fechado';
+  const showReportTab = isRFC && isResolved && (isOtimizzoUser || isSuperAdmin);
   
   if (error) {
     return (
@@ -79,28 +86,34 @@ export default function TicketDetail() {
           <main className="flex-1">
             <Tabs defaultValue="details" className="w-full">
               <TabsList className={`grid w-full ${
-                ticket.record_type === 'rfc' ? 'grid-cols-5' : 'grid-cols-5'
+                showReportTab ? 'grid-cols-6' : 'grid-cols-5'
               }`}>
                 <TabsTrigger value="details">Detalhes</TabsTrigger>
-                {ticket.record_type !== 'rfc' && <TabsTrigger value="sla">SLA</TabsTrigger>}
-                {ticket.record_type === 'rfc' && <TabsTrigger value="rfc">RFC</TabsTrigger>}
+                {!isRFC && <TabsTrigger value="sla">SLA</TabsTrigger>}
+                {isRFC && <TabsTrigger value="rfc">RFC</TabsTrigger>}
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="comments">
                   Comentários {comments && comments.length > 0 ? `(${comments.length})` : ''}
                 </TabsTrigger>
                 <TabsTrigger value="attachments">Anexos</TabsTrigger>
+                {showReportTab && <TabsTrigger value="report">Relatório</TabsTrigger>}
               </TabsList>
               <TabsContent value="details" className="mt-6">
                 <TicketDetails ticket={ticket} />
               </TabsContent>
-              {ticket.record_type !== 'rfc' && (
+              {!isRFC && (
                 <TabsContent value="sla" className="mt-6">
                   <TicketSLATab ticket={ticket} />
                 </TabsContent>
               )}
-              {ticket.record_type === 'rfc' && (
+              {isRFC && (
                 <TabsContent value="rfc" className="mt-6">
                   <TicketRFCReport ticketId={ticket.id} />
+                </TabsContent>
+              )}
+              {showReportTab && (
+                <TabsContent value="report" className="mt-6">
+                  <RFCReportPreview ticket={ticket} />
                 </TabsContent>
               )}
               <TabsContent value="timeline" className="mt-6">
