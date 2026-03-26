@@ -41,3 +41,6 @@ verify_jwt = false
 
 [functions.fetch-holidays]
 verify_jwt = false
+
+[functions.send-rfc-report]
+verify_jwt = false
