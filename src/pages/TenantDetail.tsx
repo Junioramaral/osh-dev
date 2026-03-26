@@ -30,7 +30,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
-import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
+import { cleanPhone, isValidPhone, formatPhone } from "@/lib/phoneUtils";
 import { RoleCheckboxGroup, getRolesLabel } from "@/components/tenants/RoleCheckboxGroup";
 import { QueueCheckboxGroup } from "@/components/tenants/QueueCheckboxGroup";
 import {
@@ -287,6 +287,7 @@ const TenantDetail = () => {
       email: inviteForm.email,
       full_name: inviteForm.full_name,
       roles: inviteForm.roles,
+      phone: inviteForm.phone ? cleanPhone(inviteForm.phone) : undefined,
     };
 
     inviteUser(cleanedForm, {
@@ -766,7 +767,7 @@ const TenantDetail = () => {
                               setEditUserForm({
                                 full_name: user.full_name,
                                 email: user.email,
-                                phone: user.phone || "",
+                                phone: user.phone ? formatPhone(user.phone) : "",
                                 roles: user.roles,
                                 team_id: user.team_id || "",
                                 queue_ids: user.queue_ids || [],
