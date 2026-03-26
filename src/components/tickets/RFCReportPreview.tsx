@@ -70,17 +70,19 @@ export default function RFCReportPreview({ ticket }: RFCReportPreviewProps) {
     const imgWidth = pdfWidth - 20;
     const imgHeight = (canvas.height * imgWidth) / canvas.width;
 
+    const pageContentHeight = pdfHeight - 20;
     let heightLeft = imgHeight;
-    let position = 10;
+    let pageIndex = 0;
 
-    pdf.addImage(imgData, "PNG", 10, position, imgWidth, imgHeight);
-    heightLeft -= (pdfHeight - 20);
+    pdf.addImage(imgData, "PNG", 10, 10, imgWidth, imgHeight);
+    heightLeft -= pageContentHeight;
 
     while (heightLeft > 0) {
-      position = -(pdfHeight - 20) + 10;
+      pageIndex++;
       pdf.addPage();
-      pdf.addImage(imgData, "PNG", 10, position + (pdfHeight - 20) * (Math.ceil(imgHeight / (pdfHeight - 20)) - Math.ceil(heightLeft / (pdfHeight - 20))), imgWidth, imgHeight);
-      heightLeft -= (pdfHeight - 20);
+      const yOffset = -(pageContentHeight * pageIndex) + 10;
+      pdf.addImage(imgData, "PNG", 10, yOffset, imgWidth, imgHeight);
+      heightLeft -= pageContentHeight;
     }
 
     return pdf;
