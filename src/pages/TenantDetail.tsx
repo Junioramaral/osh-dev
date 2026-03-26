@@ -287,6 +287,7 @@ const TenantDetail = () => {
       email: inviteForm.email,
       full_name: inviteForm.full_name,
       roles: inviteForm.roles,
+      phone: inviteForm.phone ? cleanPhone(inviteForm.phone) : undefined,
     };
 
     inviteUser(cleanedForm, {
@@ -766,7 +767,7 @@ const TenantDetail = () => {
                               setEditUserForm({
                                 full_name: user.full_name,
                                 email: user.email,
-                                phone: user.phone || "",
+                                phone: user.phone ? formatPhone(user.phone) : "",
                                 roles: user.roles,
                                 team_id: user.team_id || "",
                                 queue_ids: user.queue_ids || [],

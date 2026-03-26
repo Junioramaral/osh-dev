@@ -120,14 +120,16 @@ export const useTenantUsers = (tenantId: string | undefined) => {
     mutationFn: async (params: {
       email: string;
       full_name: string;
-      roles: string[]; // Changed to array
+      roles: string[];
+      phone?: string;
     }) => {
       const { data, error } = await supabase.functions.invoke("invite-user", {
         body: {
           email: params.email,
           full_name: params.full_name,
           tenant_id: tenantId,
-          roles: params.roles, // Send array
+          roles: params.roles,
+          phone: params.phone || null,
         },
       });
 
