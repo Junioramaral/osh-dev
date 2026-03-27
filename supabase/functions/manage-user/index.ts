@@ -51,7 +51,7 @@ async function verifyJwt(token: string): Promise<{ sub: string; email: string } 
       );
       
       const signatureInput = encoder.encode(`${parts[0]}.${parts[1]}`);
-      const signature = decode(parts[2]);
+      const signature = new Uint8Array(decode(parts[2]));
       
       const valid = await crypto.subtle.verify("HMAC", key, signature, signatureInput);
       if (!valid) {
