@@ -115,6 +115,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const selectedClientId = watch("client_id");
   const selectedDbEngine = watch("db_engine");
+  const selectedDbEnvironment = watch("db_environment");
+  const selectedDbMachineId = watch("db_machine_id");
   const selectedAppProductId = watch("app_product_id");
 
   // Fetch current tenant data to get segments
@@ -251,16 +253,22 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     ? clients?.filter(c => c.tenant_type !== 'otimizzo' && c.segments?.some(s => analystSegments.includes(s)))
     : clients?.filter(c => c.tenant_type !== 'otimizzo');
 
-  // Fetch DB instances
+  // Fetch DB instances (filtra por engine, ambiente e máquina em cascata)
   const { data: dbInstances } = useQuery({
-    queryKey: ["db-instances", selectedClientId, selectedDbEngine],
+    queryKey: ["db-instances", selectedClientId, selectedDbEngine, selectedDbEnvironment, selectedDbMachineId],
     queryFn: async () => {
       if (!selectedClientId || !selectedDbEngine || segment !== "DB") return [];
       let query = supabase
         .from("database_instances")
-        .select("id, instance_name, version")
+        .select("id, instance_name, version, environment, machine_id")
         .eq("client_id", selectedClientId)
         .eq("engine", selectedDbEngine);
+      if (selectedDbEnvironment) {
+        query = query.eq("environment", selectedDbEnvironment);
+      }
+      if (selectedDbMachineId) {
+        query = query.eq("machine_id", selectedDbMachineId);
+      }
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -317,15 +325,47 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!selectedClientId && !!selectedAppProductId && segment === "APP",
   });
 
-  // Fetch machines
+  // Fetch machines (para DB: filtra por engine via database_instances e por ambiente)
   const { data: machines } = useQuery({
-    queryKey: ["machines", selectedClientId],
+    queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment],
     queryFn: async () => {
       if (!selectedClientId) return [];
-      const { data, error } = await supabase
+
+      // Para segmento DB, filtra máquinas que possuem instâncias com o engine selecionado
+      if (segment === "DB" && selectedDbEngine) {
+        let instQuery = supabase
+          .from("database_instances")
+          .select("machine_id")
+          .eq("client_id", selectedClientId)
+          .eq("engine", selectedDbEngine)
+          .not("machine_id", "is", null);
+        if (selectedDbEnvironment) {
+          instQuery = instQuery.eq("environment", selectedDbEnvironment);
+        }
+        const { data: instData, error: instError } = await instQuery;
+        if (instError) throw instError;
+        const machineIds = Array.from(new Set((instData || []).map((i: any) => i.machine_id).filter(Boolean)));
+        if (machineIds.length === 0) return [];
+
+        let machQuery = supabase
+          .from("machines")
+          .select("id, hostname, environment")
+          .eq("client_id", selectedClientId)
+          .in("id", machineIds);
+        if (selectedDbEnvironment) {
+          machQuery = machQuery.eq("environment", selectedDbEnvironment);
+        }
+        const { data, error } = await machQuery;
+        if (error) throw error;
+        return data;
+      }
+
+      // Comportamento padrão (APP ou sem engine selecionado)
+      let query = supabase
         .from("machines")
-        .select("id, hostname")
+        .select("id, hostname, environment")
         .eq("client_id", selectedClientId);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
@@ -435,6 +475,30 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       setValue("db_engine", availableDbEngines[0] as any);
     }
   }, [availableDbEngines, segment, setValue]);
+
+  // Cascata DB: ao trocar Engine, limpar Ambiente, Máquina e Instância
+  useEffect(() => {
+    if (segment !== "DB") return;
+    setValue("db_environment", undefined);
+    setValue("db_machine_id", undefined);
+    setValue("db_instance_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDbEngine]);
+
+  // Cascata DB: ao trocar Ambiente, limpar Máquina e Instância
+  useEffect(() => {
+    if (segment !== "DB") return;
+    setValue("db_machine_id", undefined);
+    setValue("db_instance_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDbEnvironment]);
+
+  // Cascata DB: ao trocar Máquina, limpar Instância
+  useEffect(() => {
+    if (segment !== "DB") return;
+    setValue("db_instance_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDbMachineId]);
 
   // Limpar campos dependentes quando cliente muda (para usuários Otimizzo)
   useEffect(() => {
@@ -934,6 +998,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )
               )}
 
+              {/* Linha 1: Engine + Ambiente */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Engine: esconder se houver apenas 1 */}
                 {availableDbEngines.length === 1 ? (
@@ -970,10 +1035,56 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="db_instance_id">Instância DB *</Label>
-                  <Select value={watch("db_instance_id")} onValueChange={(value) => setValue("db_instance_id", value)}>
+                  <Label htmlFor="db_environment">Ambiente</Label>
+                  <Select
+                    value={watch("db_environment") ?? ""}
+                    onValueChange={(value: any) => setValue("db_environment", value)}
+                    disabled={!selectedDbEngine}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a instância" />
+                      <SelectValue placeholder={selectedDbEngine ? "Selecione o ambiente" : "Selecione a engine primeiro"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prod">Produção</SelectItem>
+                      <SelectItem value="hom">Homologação</SelectItem>
+                      <SelectItem value="qa">QA</SelectItem>
+                      <SelectItem value="dev">Desenvolvimento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Linha 2: Máquina + Instância DB */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="db_machine_id">Máquina</Label>
+                  <Select
+                    value={watch("db_machine_id") ?? ""}
+                    onValueChange={(value) => setValue("db_machine_id", value)}
+                    disabled={!selectedDbEngine}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedDbEngine ? "Selecione a máquina (opcional)" : "Selecione a engine primeiro"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machines?.map((machine) => (
+                        <SelectItem key={machine.id} value={machine.id}>
+                          {machine.hostname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="db_instance_id">Instância DB *</Label>
+                  <Select
+                    value={watch("db_instance_id") ?? ""}
+                    onValueChange={(value) => setValue("db_instance_id", value)}
+                    disabled={!selectedDbEngine}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedDbEngine ? "Selecione a instância" : "Selecione a engine primeiro"} />
                     </SelectTrigger>
                     <SelectContent>
                       {dbInstances?.map((instance) => (
@@ -984,39 +1095,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                     </SelectContent>
                   </Select>
                   {errors.db_instance_id && <p className="text-sm text-destructive">{errors.db_instance_id.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="db_environment">Ambiente</Label>
-                  <Select value={watch("db_environment")} onValueChange={(value: any) => setValue("db_environment", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o ambiente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prod">Produção</SelectItem>
-                      <SelectItem value="hom">Homologação</SelectItem>
-                      <SelectItem value="qa">QA</SelectItem>
-                      <SelectItem value="dev">Desenvolvimento</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="db_machine_id">Máquina</Label>
-                  <Select value={watch("db_machine_id")} onValueChange={(value) => setValue("db_machine_id", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a máquina (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {machines?.map((machine) => (
-                        <SelectItem key={machine.id} value={machine.id}>
-                          {machine.hostname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </>
