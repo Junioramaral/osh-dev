@@ -253,16 +253,22 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     ? clients?.filter(c => c.tenant_type !== 'otimizzo' && c.segments?.some(s => analystSegments.includes(s)))
     : clients?.filter(c => c.tenant_type !== 'otimizzo');
 
-  // Fetch DB instances
+  // Fetch DB instances (filtra por engine, ambiente e máquina em cascata)
   const { data: dbInstances } = useQuery({
-    queryKey: ["db-instances", selectedClientId, selectedDbEngine],
+    queryKey: ["db-instances", selectedClientId, selectedDbEngine, selectedDbEnvironment, selectedDbMachineId],
     queryFn: async () => {
       if (!selectedClientId || !selectedDbEngine || segment !== "DB") return [];
       let query = supabase
         .from("database_instances")
-        .select("id, instance_name, version")
+        .select("id, instance_name, version, environment, machine_id")
         .eq("client_id", selectedClientId)
         .eq("engine", selectedDbEngine);
+      if (selectedDbEnvironment) {
+        query = query.eq("environment", selectedDbEnvironment);
+      }
+      if (selectedDbMachineId) {
+        query = query.eq("machine_id", selectedDbMachineId);
+      }
       const { data, error } = await query;
       if (error) throw error;
       return data;
@@ -319,15 +325,47 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!selectedClientId && !!selectedAppProductId && segment === "APP",
   });
 
-  // Fetch machines
+  // Fetch machines (para DB: filtra por engine via database_instances e por ambiente)
   const { data: machines } = useQuery({
-    queryKey: ["machines", selectedClientId],
+    queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment],
     queryFn: async () => {
       if (!selectedClientId) return [];
-      const { data, error } = await supabase
+
+      // Para segmento DB, filtra máquinas que possuem instâncias com o engine selecionado
+      if (segment === "DB" && selectedDbEngine) {
+        let instQuery = supabase
+          .from("database_instances")
+          .select("machine_id")
+          .eq("client_id", selectedClientId)
+          .eq("engine", selectedDbEngine)
+          .not("machine_id", "is", null);
+        if (selectedDbEnvironment) {
+          instQuery = instQuery.eq("environment", selectedDbEnvironment);
+        }
+        const { data: instData, error: instError } = await instQuery;
+        if (instError) throw instError;
+        const machineIds = Array.from(new Set((instData || []).map((i: any) => i.machine_id).filter(Boolean)));
+        if (machineIds.length === 0) return [];
+
+        let machQuery = supabase
+          .from("machines")
+          .select("id, hostname, environment")
+          .eq("client_id", selectedClientId)
+          .in("id", machineIds);
+        if (selectedDbEnvironment) {
+          machQuery = machQuery.eq("environment", selectedDbEnvironment);
+        }
+        const { data, error } = await machQuery;
+        if (error) throw error;
+        return data;
+      }
+
+      // Comportamento padrão (APP ou sem engine selecionado)
+      let query = supabase
         .from("machines")
-        .select("id, hostname")
+        .select("id, hostname, environment")
         .eq("client_id", selectedClientId);
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
