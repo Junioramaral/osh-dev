@@ -708,16 +708,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           <DialogTitle>Novo Registro</DialogTitle>
         </DialogHeader>
 
-        {/* Seletor de Tipo de Registro */}
-        <Tabs value={recordType} onValueChange={(v) => setRecordType(v as "suporte" | "rfc")}>
-          <TabsList className="grid w-full grid-cols-2">
-            <TabsTrigger value="suporte">Suporte</TabsTrigger>
-            <TabsTrigger value="rfc">RFC (Interno)</TabsTrigger>
-          </TabsList>
-        </Tabs>
+        {/* Seletor de Tipo de Registro — RFC apenas para usuários internos (Otimizzo/SuperAdmin) */}
+        {(isOtimizzoUser || isSuperAdmin) && (
+          <Tabs value={recordType} onValueChange={(v) => setRecordType(v as "suporte" | "rfc")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="suporte">Suporte</TabsTrigger>
+              <TabsTrigger value="rfc">RFC (Interno)</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        )}
 
         {/* Formulário RFC */}
-        {recordType === "rfc" && (
+        {(isOtimizzoUser || isSuperAdmin) && recordType === "rfc" && (
           <RFCFormSection
             onSuccess={(ticket) => {
               setCreatedTicket(ticket);
