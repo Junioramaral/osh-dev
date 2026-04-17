@@ -115,6 +115,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   const selectedClientId = watch("client_id");
   const selectedDbEngine = watch("db_engine");
+  const selectedDbEnvironment = watch("db_environment");
+  const selectedDbMachineId = watch("db_machine_id");
   const selectedAppProductId = watch("app_product_id");
 
   // Fetch current tenant data to get segments
