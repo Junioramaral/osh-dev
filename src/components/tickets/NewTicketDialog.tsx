@@ -974,6 +974,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )
               )}
 
+              {/* Linha 1: Engine + Ambiente */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Engine: esconder se houver apenas 1 */}
                 {availableDbEngines.length === 1 ? (
@@ -1010,10 +1011,56 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )}
 
                 <div className="space-y-2">
-                  <Label htmlFor="db_instance_id">Instância DB *</Label>
-                  <Select value={watch("db_instance_id")} onValueChange={(value) => setValue("db_instance_id", value)}>
+                  <Label htmlFor="db_environment">Ambiente</Label>
+                  <Select
+                    value={watch("db_environment") ?? ""}
+                    onValueChange={(value: any) => setValue("db_environment", value)}
+                    disabled={!selectedDbEngine}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a instância" />
+                      <SelectValue placeholder={selectedDbEngine ? "Selecione o ambiente" : "Selecione a engine primeiro"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prod">Produção</SelectItem>
+                      <SelectItem value="hom">Homologação</SelectItem>
+                      <SelectItem value="qa">QA</SelectItem>
+                      <SelectItem value="dev">Desenvolvimento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Linha 2: Máquina + Instância DB */}
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="db_machine_id">Máquina</Label>
+                  <Select
+                    value={watch("db_machine_id") ?? ""}
+                    onValueChange={(value) => setValue("db_machine_id", value)}
+                    disabled={!selectedDbEngine}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedDbEngine ? "Selecione a máquina (opcional)" : "Selecione a engine primeiro"} />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machines?.map((machine) => (
+                        <SelectItem key={machine.id} value={machine.id}>
+                          {machine.hostname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="db_instance_id">Instância DB *</Label>
+                  <Select
+                    value={watch("db_instance_id") ?? ""}
+                    onValueChange={(value) => setValue("db_instance_id", value)}
+                    disabled={!selectedDbEngine}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder={selectedDbEngine ? "Selecione a instância" : "Selecione a engine primeiro"} />
                     </SelectTrigger>
                     <SelectContent>
                       {dbInstances?.map((instance) => (
@@ -1024,39 +1071,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                     </SelectContent>
                   </Select>
                   {errors.db_instance_id && <p className="text-sm text-destructive">{errors.db_instance_id.message}</p>}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="db_environment">Ambiente</Label>
-                  <Select value={watch("db_environment")} onValueChange={(value: any) => setValue("db_environment", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o ambiente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prod">Produção</SelectItem>
-                      <SelectItem value="hom">Homologação</SelectItem>
-                      <SelectItem value="qa">QA</SelectItem>
-                      <SelectItem value="dev">Desenvolvimento</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="db_machine_id">Máquina</Label>
-                  <Select value={watch("db_machine_id")} onValueChange={(value) => setValue("db_machine_id", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione a máquina (opcional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {machines?.map((machine) => (
-                        <SelectItem key={machine.id} value={machine.id}>
-                          {machine.hostname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
                 </div>
               </div>
             </>
