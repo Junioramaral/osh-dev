@@ -1,69 +1,29 @@
 
 
-# Reordenar campos DB e adicionar filtros em cascata no NewTicketDialog
+# Esconder aba "RFC (Interno)" para clientes finais
 
-## Objetivo
+## Problema
 
-Quando o cliente abrir um chamado de DB, os campos devem aparecer e filtrar nesta ordem:
+Na linha 715 de `src/components/tickets/NewTicketDialog.tsx`, a aba **RFC (Interno)** aparece para todos os usuários, inclusive clientes finais (LexisFlow, Sec4File, Adentro). RFC deve ser exclusiva da equipe Otimizzo (dono do sistema).
 
-**Engine → Ambiente → Máquina → Instância DB**
+## Correção
 
-E cada seleção deve filtrar a próxima:
-- **Engine** selecionado → filtra Máquinas e Instâncias que têm aquele engine
-- **Ambiente** selecionado → filtra Máquinas e Instâncias daquele ambiente
-- **Máquina** selecionada → mostra apenas Instâncias daquela máquina
+Apenas usuários internos devem ver/usar a aba RFC: **Otimizzo (`isOtimizzoUser`)** ou **Super Admin (`isSuperAdmin`)**. Essas flags já estão disponíveis no componente (linha 89).
 
-## O que precisa mudar
+### Mudanças em `src/components/tickets/NewTicketDialog.tsx`
 
-### Arquivo único: `src/components/tickets/NewTicketDialog.tsx`
+1. **Criar variável** `canCreateRFC = isOtimizzoUser || isSuperAdmin`
+2. **Renderização condicional do `<Tabs>`** (linhas 712-717):
+   - Se `canCreateRFC`: mostra as duas abas (Suporte + RFC) como hoje
+   - Se NÃO `canCreateRFC`: não renderiza o `<Tabs>` — o usuário vê direto o formulário de Suporte
+3. **Garantir** que `recordType` permaneça `"suporte"` para clientes (já é o default no `useState` linha 91, ok)
+4. **Proteção extra**: o bloco `{recordType === "rfc" && ...}` (linha 720) também recebe `canCreateRFC &&` para evitar qualquer manipulação
 
-#### 1. Reordenar JSX (linhas 938-1021)
-Mudar o layout para a sequência desejada:
-- **Linha 1 (grid 2 col)**: Engine + Ambiente
-- **Linha 2 (grid 2 col)**: Máquina + Instância DB
+## Arquivo alterado
+- `src/components/tickets/NewTicketDialog.tsx` (única alteração, ~5 linhas)
 
-#### 2. Atualizar query de Máquinas (linhas 320-333)
-Adicionar `environment` ao SELECT e filtrar por engine + ambiente:
-```ts
-// Hoje: filtra apenas por client_id
-// Novo: também filtra por engine (via database_instances) e environment
-queryKey: ["machines", selectedClientId, selectedDbEngine, selectedDbEnvironment]
-```
-Buscar máquinas que:
-- Pertencem ao cliente
-- Têm `environment` = ambiente selecionado (se selecionado)
-- Possuem ao menos uma `database_instance` com o engine selecionado (se selecionado)
-
-#### 3. Atualizar query de Instâncias DB (linhas 254-269)
-Adicionar filtros por `environment` e `machine_id`:
-```ts
-queryKey: ["db-instances", selectedClientId, selectedDbEngine, selectedDbEnvironment, selectedDbMachineId]
-```
-Filtrar por:
-- `client_id` (já existe)
-- `engine` (já existe)
-- `environment` se selecionado
-- `machine_id` se selecionado
-
-#### 4. Adicionar useEffects de limpeza em cascata
-Quando o usuário trocar:
-- **Engine** → limpar Ambiente, Máquina, Instância
-- **Ambiente** → limpar Máquina, Instância
-- **Máquina** → limpar Instância
-
-#### 5. Adicionar `watch` para os novos campos
-```ts
-const selectedDbEnvironment = watch("db_environment");
-const selectedDbMachineId = watch("db_machine_id");
-```
-
-## Pontos de atenção (sem quebrar nada)
-
-- **Ambiente vira obrigatório?** Hoje é opcional no schema. Recomendo manter opcional, mas se vazio, não filtra.
-- **Máquina continua opcional?** Sim — se não selecionar máquina, mostra todas as instâncias compatíveis com engine + ambiente.
-- **Auto-seleção de engine única** (linhas 433-437) continua funcionando.
-- **Compatibilidade**: A coluna `machines.environment` é `text` e `database_instances.environment` é enum — os valores ("prod", "hom", "qa", "dev") devem bater. Verificar dados existentes antes para confirmar consistência.
-
-## Arquivos alterados
-- `src/components/tickets/NewTicketDialog.tsx` (única alteração)
+## Sem quebrar nada
+- Otimizzo e Super Admin continuam vendo RFC normalmente
+- Clientes simplesmente não verão a aba — fluxo de Suporte intacto
+- Nenhuma alteração em banco, RLS ou outras telas
 
