@@ -476,6 +476,30 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     }
   }, [availableDbEngines, segment, setValue]);
 
+  // Cascata DB: ao trocar Engine, limpar Ambiente, Máquina e Instância
+  useEffect(() => {
+    if (segment !== "DB") return;
+    setValue("db_environment", undefined);
+    setValue("db_machine_id", undefined);
+    setValue("db_instance_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDbEngine]);
+
+  // Cascata DB: ao trocar Ambiente, limpar Máquina e Instância
+  useEffect(() => {
+    if (segment !== "DB") return;
+    setValue("db_machine_id", undefined);
+    setValue("db_instance_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDbEnvironment]);
+
+  // Cascata DB: ao trocar Máquina, limpar Instância
+  useEffect(() => {
+    if (segment !== "DB") return;
+    setValue("db_instance_id", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedDbMachineId]);
+
   // Limpar campos dependentes quando cliente muda (para usuários Otimizzo)
   useEffect(() => {
     if (isOtimizzoTenant && selectedClientId) {
