@@ -341,6 +341,12 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     queryFn: async () => {
       if (!selectedClientId) return [];
 
+  // Fetch machines (para DB: filtra por engine via database_instances; para APP: filtra por produto via application_instances)
+  const { data: machines } = useQuery({
+    queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment, selectedAppProductId, selectedAppEnvironment],
+    queryFn: async () => {
+      if (!selectedClientId) return [];
+
       // Para segmento DB, filtra máquinas que possuem instâncias com o engine selecionado
       if (segment === "DB" && selectedDbEngine) {
         let instQuery = supabase
@@ -370,7 +376,36 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         return data;
       }
 
-      // Comportamento padrão (APP ou sem engine selecionado)
+      // Para segmento APP, filtra máquinas que possuem application_instances do produto selecionado
+      if (segment === "APP" && selectedAppProductId) {
+        let instQuery = supabase
+          .from("application_instances")
+          .select("machine_id")
+          .eq("client_id", selectedClientId)
+          .eq("product_id", selectedAppProductId)
+          .not("machine_id", "is", null);
+        if (selectedAppEnvironment) {
+          instQuery = instQuery.eq("environment", selectedAppEnvironment);
+        }
+        const { data: instData, error: instError } = await instQuery;
+        if (instError) throw instError;
+        const machineIds = Array.from(new Set((instData || []).map((i: any) => i.machine_id).filter(Boolean)));
+        if (machineIds.length === 0) return [];
+
+        let machQuery = supabase
+          .from("machines")
+          .select("id, hostname, environment")
+          .eq("client_id", selectedClientId)
+          .in("id", machineIds);
+        if (selectedAppEnvironment) {
+          machQuery = machQuery.eq("environment", selectedAppEnvironment);
+        }
+        const { data, error } = await machQuery;
+        if (error) throw error;
+        return data;
+      }
+
+      // Comportamento padrão (sem filtros aplicáveis)
       let query = supabase
         .from("machines")
         .select("id, hostname, environment")
