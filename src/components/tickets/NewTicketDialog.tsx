@@ -1241,6 +1241,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )
               )}
 
+              {/* Linha 1: Produto + Ambiente */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Produto: esconder se houver apenas 1 */}
                 {appProducts && appProducts.length === 1 ? (
@@ -1277,6 +1278,40 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )}
 
                 <div className="space-y-2">
+                  <Label htmlFor="app_environment">Ambiente</Label>
+                  <Select value={watch("app_environment")} onValueChange={(value: any) => setValue("app_environment", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ambiente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prod">Produção</SelectItem>
+                      <SelectItem value="hom">Homologação</SelectItem>
+                      <SelectItem value="qa">QA</SelectItem>
+                      <SelectItem value="dev">Desenvolvimento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Linha 2: Máquina + Instância APP + Módulo */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="app_machine_id">Máquina</Label>
+                  <Select value={watch("app_machine_id")} onValueChange={(value) => setValue("app_machine_id", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Opcional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machines?.map((machine) => (
+                        <SelectItem key={machine.id} value={machine.id}>
+                          {machine.hostname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="app_instance_id">Instância APP *</Label>
                   <Select value={watch("app_instance_id")} onValueChange={(value) => setValue("app_instance_id", value)}>
                     <SelectTrigger>
@@ -1292,43 +1327,25 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   </Select>
                   {errors.app_instance_id && <p className="text-sm text-destructive">{errors.app_instance_id.message}</p>}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="app_module">Módulo</Label>
-                  <Input {...register("app_module")} placeholder="Ex: Financeiro" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="app_environment">Ambiente</Label>
-                  <Select value={watch("app_environment")} onValueChange={(value: any) => setValue("app_environment", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o ambiente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prod">Produção</SelectItem>
-                      <SelectItem value="hom">Homologação</SelectItem>
-                      <SelectItem value="qa">QA</SelectItem>
-                      <SelectItem value="dev">Desenvolvimento</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="app_machine_id">Máquina</Label>
-                  <Select value={watch("app_machine_id")} onValueChange={(value) => setValue("app_machine_id", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Opcional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {machines?.map((machine) => (
-                        <SelectItem key={machine.id} value={machine.id}>
-                          {machine.hostname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {availableModules.length > 0 ? (
+                    <Select value={watch("app_module") || ""} onValueChange={(value) => setValue("app_module", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o módulo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableModules.map((mod) => (
+                          <SelectItem key={mod} value={mod}>
+                            {mod}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input {...register("app_module")} placeholder="Ex: Financeiro" />
+                  )}
                 </div>
               </div>
             </>
