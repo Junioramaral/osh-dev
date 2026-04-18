@@ -118,6 +118,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const selectedDbEnvironment = watch("db_environment");
   const selectedDbMachineId = watch("db_machine_id");
   const selectedAppProductId = watch("app_product_id");
+  const selectedAppEnvironment = watch("app_environment");
+  const selectedAppMachineId = watch("app_machine_id");
+  const selectedAppInstanceId = watch("app_instance_id");
 
   // Fetch current tenant data to get segments
   // Usar effectiveTenantId para habilitar a query assim que profile carregar (antes dos roles)
@@ -311,23 +314,30 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   // Fetch APP instances
   const { data: appInstances } = useQuery({
-    queryKey: ["app-instances", selectedClientId, selectedAppProductId],
+    queryKey: ["app-instances", selectedClientId, selectedAppProductId, selectedAppEnvironment, selectedAppMachineId],
     queryFn: async () => {
       if (!selectedClientId || !selectedAppProductId || segment !== "APP") return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("application_instances")
-        .select("id, version, environment")
+        .select("id, version, environment, machine_id, active_modules")
         .eq("client_id", selectedClientId)
         .eq("product_id", selectedAppProductId);
+      if (selectedAppEnvironment) {
+        query = query.eq("environment", selectedAppEnvironment);
+      }
+      if (selectedAppMachineId) {
+        query = query.eq("machine_id", selectedAppMachineId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
     enabled: !!selectedClientId && !!selectedAppProductId && segment === "APP",
   });
 
-  // Fetch machines (para DB: filtra por engine via database_instances e por ambiente)
+  // Fetch machines (para DB: filtra por engine via database_instances; para APP: filtra por produto via application_instances)
   const { data: machines } = useQuery({
-    queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment],
+    queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment, selectedAppProductId, selectedAppEnvironment],
     queryFn: async () => {
       if (!selectedClientId) return [];
 
@@ -360,7 +370,36 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         return data;
       }
 
-      // Comportamento padrão (APP ou sem engine selecionado)
+      // Para segmento APP, filtra máquinas que possuem application_instances do produto selecionado
+      if (segment === "APP" && selectedAppProductId) {
+        let instQuery = supabase
+          .from("application_instances")
+          .select("machine_id")
+          .eq("client_id", selectedClientId)
+          .eq("product_id", selectedAppProductId)
+          .not("machine_id", "is", null);
+        if (selectedAppEnvironment) {
+          instQuery = instQuery.eq("environment", selectedAppEnvironment);
+        }
+        const { data: instData, error: instError } = await instQuery;
+        if (instError) throw instError;
+        const machineIds = Array.from(new Set((instData || []).map((i: any) => i.machine_id).filter(Boolean)));
+        if (machineIds.length === 0) return [];
+
+        let machQuery = supabase
+          .from("machines")
+          .select("id, hostname, environment")
+          .eq("client_id", selectedClientId)
+          .in("id", machineIds);
+        if (selectedAppEnvironment) {
+          machQuery = machQuery.eq("environment", selectedAppEnvironment);
+        }
+        const { data, error } = await machQuery;
+        if (error) throw error;
+        return data;
+      }
+
+      // Comportamento padrão (sem filtros aplicáveis)
       let query = supabase
         .from("machines")
         .select("id, hostname, environment")
@@ -499,6 +538,64 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     setValue("db_instance_id", undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDbMachineId]);
+
+  // Cascata APP: ao trocar Produto, limpar Ambiente, Máquina, Instância e Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_environment", undefined);
+    setValue("app_machine_id", undefined);
+    setValue("app_instance_id", undefined);
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppProductId]);
+
+  // Cascata APP: ao trocar Ambiente, limpar Máquina, Instância e Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_machine_id", undefined);
+    setValue("app_instance_id", undefined);
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppEnvironment]);
+
+  // Cascata APP: ao trocar Máquina, limpar Instância e Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_instance_id", undefined);
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppMachineId]);
+
+  // Cascata APP: ao trocar Instância, limpar Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppInstanceId]);
+
+  // Auto-selecionar máquina quando houver apenas 1 (APP, com filtros aplicados)
+  useEffect(() => {
+    if (segment === "APP" && machines && machines.length === 1 && selectedAppProductId) {
+      setValue("app_machine_id", machines[0].id);
+    }
+  }, [machines, segment, selectedAppProductId, setValue]);
+
+  // Buscar módulos disponíveis da instância APP selecionada
+  const { data: appInstanceDetail } = useQuery({
+    queryKey: ["app-instance-modules", selectedAppInstanceId],
+    queryFn: async () => {
+      if (!selectedAppInstanceId) return null;
+      const { data, error } = await supabase
+        .from("application_instances")
+        .select("active_modules")
+        .eq("id", selectedAppInstanceId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedAppInstanceId && segment === "APP",
+  });
+  const availableModules = (appInstanceDetail?.active_modules as string[] | null) || [];
 
   // Limpar campos dependentes quando cliente muda (para usuários Otimizzo)
   useEffect(() => {
@@ -1144,6 +1241,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )
               )}
 
+              {/* Linha 1: Produto + Ambiente */}
               <div className="grid grid-cols-2 gap-4">
                 {/* Produto: esconder se houver apenas 1 */}
                 {appProducts && appProducts.length === 1 ? (
@@ -1180,6 +1278,40 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                 )}
 
                 <div className="space-y-2">
+                  <Label htmlFor="app_environment">Ambiente</Label>
+                  <Select value={watch("app_environment")} onValueChange={(value: any) => setValue("app_environment", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecione o ambiente" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="prod">Produção</SelectItem>
+                      <SelectItem value="hom">Homologação</SelectItem>
+                      <SelectItem value="qa">QA</SelectItem>
+                      <SelectItem value="dev">Desenvolvimento</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              {/* Linha 2: Máquina + Instância APP + Módulo */}
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2">
+                  <Label htmlFor="app_machine_id">Máquina</Label>
+                  <Select value={watch("app_machine_id")} onValueChange={(value) => setValue("app_machine_id", value)}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Opcional" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {machines?.map((machine) => (
+                        <SelectItem key={machine.id} value={machine.id}>
+                          {machine.hostname}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div className="space-y-2">
                   <Label htmlFor="app_instance_id">Instância APP *</Label>
                   <Select value={watch("app_instance_id")} onValueChange={(value) => setValue("app_instance_id", value)}>
                     <SelectTrigger>
@@ -1195,43 +1327,25 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   </Select>
                   {errors.app_instance_id && <p className="text-sm text-destructive">{errors.app_instance_id.message}</p>}
                 </div>
-              </div>
 
-              <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="app_module">Módulo</Label>
-                  <Input {...register("app_module")} placeholder="Ex: Financeiro" />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="app_environment">Ambiente</Label>
-                  <Select value={watch("app_environment")} onValueChange={(value: any) => setValue("app_environment", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione o ambiente" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="prod">Produção</SelectItem>
-                      <SelectItem value="hom">Homologação</SelectItem>
-                      <SelectItem value="qa">QA</SelectItem>
-                      <SelectItem value="dev">Desenvolvimento</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="app_machine_id">Máquina</Label>
-                  <Select value={watch("app_machine_id")} onValueChange={(value) => setValue("app_machine_id", value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Opcional" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {machines?.map((machine) => (
-                        <SelectItem key={machine.id} value={machine.id}>
-                          {machine.hostname}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  {availableModules.length > 0 ? (
+                    <Select value={watch("app_module") || ""} onValueChange={(value) => setValue("app_module", value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Selecione o módulo" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {availableModules.map((mod) => (
+                          <SelectItem key={mod} value={mod}>
+                            {mod}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  ) : (
+                    <Input {...register("app_module")} placeholder="Ex: Financeiro" />
+                  )}
                 </div>
               </div>
             </>
