@@ -539,6 +539,64 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedDbMachineId]);
 
+  // Cascata APP: ao trocar Produto, limpar Ambiente, Máquina, Instância e Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_environment", undefined);
+    setValue("app_machine_id", undefined);
+    setValue("app_instance_id", undefined);
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppProductId]);
+
+  // Cascata APP: ao trocar Ambiente, limpar Máquina, Instância e Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_machine_id", undefined);
+    setValue("app_instance_id", undefined);
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppEnvironment]);
+
+  // Cascata APP: ao trocar Máquina, limpar Instância e Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_instance_id", undefined);
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppMachineId]);
+
+  // Cascata APP: ao trocar Instância, limpar Módulo
+  useEffect(() => {
+    if (segment !== "APP") return;
+    setValue("app_module", undefined);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedAppInstanceId]);
+
+  // Auto-selecionar máquina quando houver apenas 1 (APP, com filtros aplicados)
+  useEffect(() => {
+    if (segment === "APP" && machines && machines.length === 1 && selectedAppProductId) {
+      setValue("app_machine_id", machines[0].id);
+    }
+  }, [machines, segment, selectedAppProductId, setValue]);
+
+  // Buscar módulos disponíveis da instância APP selecionada
+  const { data: appInstanceDetail } = useQuery({
+    queryKey: ["app-instance-modules", selectedAppInstanceId],
+    queryFn: async () => {
+      if (!selectedAppInstanceId) return null;
+      const { data, error } = await supabase
+        .from("application_instances")
+        .select("active_modules")
+        .eq("id", selectedAppInstanceId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!selectedAppInstanceId && segment === "APP",
+  });
+  const availableModules = (appInstanceDetail?.active_modules as string[] | null) || [];
+
   // Limpar campos dependentes quando cliente muda (para usuários Otimizzo)
   useEffect(() => {
     if (isOtimizzoTenant && selectedClientId) {
