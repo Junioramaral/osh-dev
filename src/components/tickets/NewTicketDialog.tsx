@@ -118,6 +118,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const selectedDbEnvironment = watch("db_environment");
   const selectedDbMachineId = watch("db_machine_id");
   const selectedAppProductId = watch("app_product_id");
+  const selectedAppEnvironment = watch("app_environment");
+  const selectedAppMachineId = watch("app_machine_id");
+  const selectedAppInstanceId = watch("app_instance_id");
 
   // Fetch current tenant data to get segments
   // Usar effectiveTenantId para habilitar a query assim que profile carregar (antes dos roles)
