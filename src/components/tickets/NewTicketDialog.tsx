@@ -335,12 +335,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!selectedClientId && !!selectedAppProductId && segment === "APP",
   });
 
-  // Fetch machines (para DB: filtra por engine via database_instances e por ambiente)
-  const { data: machines } = useQuery({
-    queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment],
-    queryFn: async () => {
-      if (!selectedClientId) return [];
-
   // Fetch machines (para DB: filtra por engine via database_instances; para APP: filtra por produto via application_instances)
   const { data: machines } = useQuery({
     queryKey: ["machines", selectedClientId, segment, selectedDbEngine, selectedDbEnvironment, selectedAppProductId, selectedAppEnvironment],
