@@ -314,14 +314,21 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   // Fetch APP instances
   const { data: appInstances } = useQuery({
-    queryKey: ["app-instances", selectedClientId, selectedAppProductId],
+    queryKey: ["app-instances", selectedClientId, selectedAppProductId, selectedAppEnvironment, selectedAppMachineId],
     queryFn: async () => {
       if (!selectedClientId || !selectedAppProductId || segment !== "APP") return [];
-      const { data, error } = await supabase
+      let query = supabase
         .from("application_instances")
-        .select("id, version, environment")
+        .select("id, version, environment, machine_id, active_modules")
         .eq("client_id", selectedClientId)
         .eq("product_id", selectedAppProductId);
+      if (selectedAppEnvironment) {
+        query = query.eq("environment", selectedAppEnvironment);
+      }
+      if (selectedAppMachineId) {
+        query = query.eq("machine_id", selectedAppMachineId);
+      }
+      const { data, error } = await query;
       if (error) throw error;
       return data;
     },
