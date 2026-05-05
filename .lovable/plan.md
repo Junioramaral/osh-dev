@@ -1,90 +1,48 @@
-# Plano: Correção da Sidebar e Padronização dos Filtros de Período nos Relatórios
+## Adicionar legenda explicativa no Ranking de Encerramento (modo comparativo)
 
-## Problema 1 — Menu (sidebar) sumindo
+### Contexto
+Atualmente o relatório exibe apenas dois badges na coluna "Analista" do modo comparativo: **NOVO** (verde) e **INATIVO** (cinza). A nomenclatura é confusa porque "INATIVO" sugere que o usuário está desativado no sistema, mas na verdade indica apenas que não resolveu tickets em um dos períodos comparados. Os termos **EVOLUIU** e **REGREDIU** são definidos internamente como `trend` (`improved`/`declined`), mas hoje só aparecem em texto livre nos cards de destaque, não como badges.
 
-Três relatórios renderizam o conteúdo direto, sem envolver em `<AppLayout>`, por isso a sidebar desaparece:
+### Mudanças
 
-- `src/components/reports/ClosureRankingReport.tsx` — retorna `<div className="print-container">`
-- `src/components/reports/ClientHoursReport.tsx` — retorna `<div className="space-y-6">`
-- `src/components/reports/AnalystHoursManagementReport.tsx` — retorna `<div className="space-y-6">`
+**1. `src/components/reports/ClosureRankingReport.tsx`**
 
-Os demais (Monthly, AnalystPerformance, Categories, PeriodComparison, ResolutionTime, QueueWorkload) já envolvem com `<AppLayout>` e mantêm a sidebar.
+Adicionar um bloco de **legenda fixa** logo abaixo do título "Tabela Comparativa Detalhada" (acima da `Card` da tabela), visível somente no modo comparativo. Conteúdo:
 
-**Correção:** envolver o JSX retornado dos três componentes acima com `<AppLayout>...</AppLayout>` (importando de `@/components/layout/AppLayout`).
+- Título: "Como interpretar as tendências"
+- Quatro itens com o badge colorido + descrição curta do critério:
+  - **NOVO** (verde) — Analista resolveu tickets apenas no período mais recente; não havia atividade no período anterior.
+  - **INATIVO** (cinza) — Analista resolveu tickets apenas no período anterior; não houve atividade no período mais recente. Não significa que a conta está desativada.
+  - **EVOLUIU** (verde) — Volume resolvido cresceu mais de **+10%** em relação ao período anterior.
+  - **REGREDIU** (vermelho) — Volume resolvido caiu mais de **−10%** em relação ao período anterior.
+- Nota de rodapé: "Variações entre −10% e +10% são consideradas estáveis e não recebem badge. O cálculo considera apenas tickets resolvidos no período (RFCs são excluídos)."
 
-## Problema 2 — Filtros de período inconsistentes
+Estilo: um `Card` discreto com fundo `bg-muted/30`, ícone `Info` à esquerda do título, badges renderizados inline com a mesma classe atual (`text-xs`, mesmas cores).
 
-Hoje cada relatório tem opções diferentes:
+**2. Adicionar badges EVOLUIU/REGREDIU na tabela**
 
-| Relatório | Opções atuais |
-|---|---|
-| AnalystPerformance | Mês Atual / Mês Anterior / Dois Meses Atrás |
-| Categories | Mês Atual / Mês Anterior / Dois Meses Atrás |
-| QueueWorkload | Mês Atual / Mês Anterior / Dois Meses Atrás |
-| ResolutionTime | Mês Atual / Mês Anterior / Últimos 3 / Últimos 6 |
-| ClientHours | Mês Atual / Anterior / Últimos 3 / Últimos 6 |
-| AnalystHoursManagement | Mês Atual / Anterior / Últimos 3 / Últimos 6 |
-| ClosureRanking | Já tem 4 opções + modo Comparativo |
-| MonthlyClient | Próprio seletor mês/ano |
-| PeriodComparison | Próprio comparativo |
+Hoje a tabela só mostra NOVO e INATIVO. Para a legenda fazer sentido visual, incluir também:
+- `analyst.trend === "improved"` → Badge verde "EVOLUIU"
+- `analyst.trend === "declined"` → Badge vermelho "REGREDIU"
 
-**Padronização:** todos os relatórios passam a oferecer **dois modos** (toggle igual ao do ClosureRanking):
+Renderizados ao lado do nome do analista, mesmo padrão dos atuais. Trends `stable` continuam sem badge.
 
-1. **Período único**: Mês Atual, Mês Anterior, Últimos 3 Meses, Últimos 6 Meses, **Mês específico (mês + ano)**.
-2. **Comparativo entre meses**: dois seletores de mês/ano (Período A vs Período B), exibindo métricas lado a lado e variação percentual.
+### Layout (esboço)
 
-### Componente reutilizável
-
-Criar `src/components/reports/ReportPeriodFilter.tsx` exportando:
-
-- `<ReportPeriodFilter mode viewMode onModeChange onPeriodChange />` — encapsula o toggle Período/Comparativo, os 4 presets, o seletor mês/ano específico e os dois seletores do modo comparativo.
-- Helpers `getDateRangeFromPreset(preset)` e `getDateRangeFromMonthYear(month, year)` em `src/lib/reportPeriod.ts` retornando `{ start, end, label }`.
-
-Tipos:
-```ts
-type PeriodPreset = "current-month" | "last-month" | "last-3-months" | "last-6-months" | "specific";
-type ReportPeriod =
-  | { mode: "single"; preset: PeriodPreset; month?: number; year?: number }
-  | { mode: "comparison"; a: { month: number; year: number }; b: { month: number; year: number } };
+```text
+Tabela Comparativa Detalhada
+┌────────────────────────────────────────────────────────────┐
+│ ℹ Como interpretar as tendências                           │
+│  [NOVO]      Resolveu apenas no período mais recente       │
+│  [INATIVO]   Resolveu apenas no período anterior           │
+│  [EVOLUIU]   Volume cresceu mais de +10%                   │
+│  [REGREDIU]  Volume caiu mais de -10%                      │
+│  Variações entre -10% e +10% são consideradas estáveis.    │
+└────────────────────────────────────────────────────────────┘
+[Tabela existente...]
 ```
 
-### Aplicação em cada relatório
+### Arquivos afetados
+- `src/components/reports/ClosureRankingReport.tsx` (somente este)
 
-Substituir o `<Select period>` atual por `<ReportPeriodFilter>` em:
-
-- AnalystPerformanceReport — remover opção "Dois Meses Atrás"; usar novo filtro; adicionar render condicional de comparativo (recalcula métricas para período B e mostra coluna de variação).
-- CategoriesReport — idem.
-- QueueWorkloadReport — idem.
-- ResolutionTimeReport — adiciona modo específico/comparativo às 4 opções já existentes.
-- ClientHoursReport — idem.
-- AnalystHoursManagementReport — idem.
-- ClosureRankingReport — já tem; refatorar para usar o componente compartilhado e ganhar o preset "Mês específico".
-- MonthlyClientReport — adicionar suporte aos presets além de mês/ano específico (mantendo o atual como modo "specific").
-- PeriodComparisonReport — sem mudança (já é comparativo nativo).
-
-### Modo comparativo — exibição
-
-Para os relatórios que hoje só têm um período, o modo comparativo:
-- Faz a mesma query duas vezes (período A e B) com o hook existente.
-- Exibe os cards/tabelas em duas colunas (A | B) com badge de variação (igual ao padrão do ClosureRanking).
-- Gráficos de barra recebem duas séries (A e B).
-
-## Resumo dos arquivos alterados
-
-- Novo: `src/lib/reportPeriod.ts`
-- Novo: `src/components/reports/ReportPeriodFilter.tsx`
-- Editado (envolver com AppLayout + trocar filtro):
-  - `src/components/reports/ClosureRankingReport.tsx`
-  - `src/components/reports/ClientHoursReport.tsx`
-  - `src/components/reports/AnalystHoursManagementReport.tsx`
-- Editado (apenas trocar filtro + adicionar modo comparativo):
-  - `src/components/reports/AnalystPerformanceReport.tsx`
-  - `src/components/reports/CategoriesReport.tsx`
-  - `src/components/reports/QueueWorkloadReport.tsx`
-  - `src/components/reports/ResolutionTimeReport.tsx`
-  - `src/components/reports/MonthlyClientReport.tsx`
-
-## Fora do escopo
-
-- PeriodComparisonReport (já é comparativo).
-- Edge function `send-monthly-report` (envio por e-mail mantém lógica atual).
+Sem alterações em hooks, banco ou outros relatórios.

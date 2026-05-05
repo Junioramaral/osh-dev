@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, TrendingDown, Minus, Star, ArrowLeftRight, UserMinus, UserPlus } from "lucide-react";
+import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, TrendingDown, Minus, Star, ArrowLeftRight, UserMinus, UserPlus, Info } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -1180,6 +1180,37 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
               <PrintPage>
                 <div className="space-y-6">
                   <h2 className="text-xl font-semibold print:text-lg">Tabela Comparativa Detalhada</h2>
+                  <Card className="bg-muted/30 print:bg-transparent">
+                    <CardContent className="pt-4 pb-4">
+                      <div className="flex items-start gap-3">
+                        <Info className="h-4 w-4 mt-0.5 text-muted-foreground shrink-0" />
+                        <div className="space-y-2 text-sm">
+                          <p className="font-medium">Como interpretar as tendências</p>
+                          <ul className="space-y-1.5">
+                            <li className="flex items-start gap-2">
+                              <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300 shrink-0">NOVO</Badge>
+                              <span className="text-muted-foreground">Resolveu tickets apenas no período mais recente; não havia atividade no período anterior.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Badge variant="outline" className="text-xs bg-gray-100 text-gray-500 border-gray-300 shrink-0">INATIVO</Badge>
+                              <span className="text-muted-foreground">Resolveu tickets apenas no período anterior; não houve atividade no período mais recente. <strong>Não significa que a conta está desativada.</strong></span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300 shrink-0">EVOLUIU</Badge>
+                              <span className="text-muted-foreground">Volume resolvido cresceu mais de <strong>+10%</strong> em relação ao período anterior.</span>
+                            </li>
+                            <li className="flex items-start gap-2">
+                              <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-300 shrink-0">REGREDIU</Badge>
+                              <span className="text-muted-foreground">Volume resolvido caiu mais de <strong>−10%</strong> em relação ao período anterior.</span>
+                            </li>
+                          </ul>
+                          <p className="text-xs text-muted-foreground pt-1 border-t">
+                            Variações entre −10% e +10% são consideradas estáveis e não recebem badge. O cálculo considera apenas tickets resolvidos no período (RFCs são excluídos).
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                   <Card>
                     <CardContent className="pt-6 overflow-auto">
                       <Table>
@@ -1216,6 +1247,12 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
                                   )}
                                   {analyst.trend === "inactive" && (
                                     <Badge variant="outline" className="text-xs bg-gray-100 text-gray-500 border-gray-300">INATIVO</Badge>
+                                  )}
+                                  {analyst.trend === "improved" && (
+                                    <Badge variant="outline" className="text-xs bg-green-100 text-green-700 border-green-300">EVOLUIU</Badge>
+                                  )}
+                                  {analyst.trend === "declined" && (
+                                    <Badge variant="outline" className="text-xs bg-red-100 text-red-700 border-red-300">REGREDIU</Badge>
                                   )}
                                 </div>
                               </TableCell>
