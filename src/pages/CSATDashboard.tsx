@@ -16,11 +16,22 @@ import {
 import { format, parseISO, formatDistanceToNow } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Link } from "react-router-dom";
+import ReportPeriodFilter from "@/components/reports/ReportPeriodFilter";
+import {
+  ReportPeriodState,
+  defaultReportPeriodState,
+  rangeFromSingle,
+} from "@/lib/reportPeriod";
 
 const CSATDashboard = () => {
-  const [days, setDays] = useState("30");
+  const [periodState, setPeriodState] = useState<ReportPeriodState>(defaultReportPeriodState());
   const [segment, setSegment] = useState("all");
   const [clientId, setClientId] = useState<string | undefined>();
+
+  const range =
+    periodState.mode === "single"
+      ? rangeFromSingle(periodState.period)
+      : rangeFromSingle({ preset: "current-month" });
 
   const { data: clients } = useQuery({
     queryKey: ["clients-csat"],
@@ -36,7 +47,8 @@ const CSATDashboard = () => {
   });
 
   const { data, isLoading } = useCSATData({
-    days: parseInt(days),
+    startDate: range.start,
+    endDate: range.end,
     segment: segment !== "all" ? segment : undefined,
     clientId,
   });
@@ -78,43 +90,41 @@ const CSATDashboard = () => {
         </div>
 
         {/* Filters */}
-        <div className="flex flex-wrap gap-4">
-          <Select value={days} onValueChange={setDays}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="7">Últimos 7 dias</SelectItem>
-              <SelectItem value="30">Últimos 30 dias</SelectItem>
-              <SelectItem value="60">Últimos 60 dias</SelectItem>
-              <SelectItem value="90">Últimos 90 dias</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="space-y-3">
+          <ReportPeriodFilter
+            value={periodState}
+            onChange={setPeriodState}
+            allowComparison={false}
+          />
+          <div className="flex flex-wrap gap-4">
+            <Select value={segment} onValueChange={setSegment}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="Segmento" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos</SelectItem>
+                <SelectItem value="DB">Banco de Dados</SelectItem>
+                <SelectItem value="APP">Aplicação</SelectItem>
+              </SelectContent>
+            </Select>
 
-          <Select value={segment} onValueChange={setSegment}>
-            <SelectTrigger className="w-40">
-              <SelectValue placeholder="Segmento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="DB">Banco de Dados</SelectItem>
-              <SelectItem value="APP">Aplicação</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? undefined : v)}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Cliente" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os Clientes</SelectItem>
-              {clients?.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+            <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? undefined : v)}>
+              <SelectTrigger className="w-48">
+                <SelectValue placeholder="Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os Clientes</SelectItem>
+                {clients?.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <div className="flex items-center text-sm text-muted-foreground">
+              Período: <span className="font-medium ml-1 text-foreground">{range.label}</span>
+            </div>
+          </div>
         </div>
 
         {isLoading ? (
