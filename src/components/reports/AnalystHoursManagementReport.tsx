@@ -18,17 +18,12 @@ import PrintPage from "./PrintPage";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import AppLayout from "@/components/layout/AppLayout";
+import ReportPeriodFilter from "./ReportPeriodFilter";
+import { ReportPeriodState, defaultReportPeriodState, rangeFromSingle } from "@/lib/reportPeriod";
 
 interface AnalystHoursManagementReportProps {
   onBack: () => void;
 }
-
-const PERIOD_OPTIONS = [
-  { value: "current", label: "Mês Atual" },
-  { value: "previous", label: "Mês Anterior" },
-  { value: "last3", label: "Últimos 3 Meses" },
-  { value: "last6", label: "Últimos 6 Meses" },
-];
 
 const COLORS = ["hsl(var(--primary))", "hsl(var(--secondary))", "hsl(var(--accent))", "#f59e0b", "#10b981", "#8b5cf6"];
 
@@ -39,7 +34,7 @@ const getCoverageColor = (rate: number) => {
 };
 
 const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportProps) => {
-  const [period, setPeriod] = useState<PeriodFilter>("current");
+  const [periodState, setPeriodState] = useState<ReportPeriodState>(defaultReportPeriodState());
   const [clientId, setClientId] = useState<string>("");
   const [analystId, setAnalystId] = useState<string>("");
   const [segment, setSegment] = useState<string>("");
@@ -74,16 +69,26 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
     },
   });
 
+  const range =
+    periodState.mode === "single"
+      ? rangeFromSingle(periodState.period)
+      : rangeFromSingle({ preset: "current-month" });
+  const customRange = {
+    startDate: format(range.start, "yyyy-MM-dd"),
+    endDate: format(range.end, "yyyy-MM-dd"),
+  };
+  const periodLabel = range.label;
+
   const { data, isLoading } = useAnalystHoursManagementData(
-    period,
+    "current" as PeriodFilter,
     clientId && clientId !== "__all__" ? clientId : undefined,
     analystId && analystId !== "__all__" ? analystId : undefined,
     segment && segment !== "__all__" ? (segment as "DB" | "APP") : null,
-    onlyWithoutLogs
+    onlyWithoutLogs,
+    customRange
   );
 
   const handlePrint = () => {
-    const periodLabel = PERIOD_OPTIONS.find(p => p.value === period)?.label || period;
     const clientName = clientId && clientId !== "__all__"
       ? clients?.find(c => c.id === clientId)?.name || "Cliente"
       : "Todos_Clientes";
