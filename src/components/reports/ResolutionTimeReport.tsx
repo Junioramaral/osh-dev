@@ -12,6 +12,8 @@ import { ptBR } from "date-fns/locale";
 import PrintPage from "./PrintPage";
 import ReportCover from "./ReportCover";
 import ReportFooter from "./ReportFooter";
+import ReportPeriodFilter from "./ReportPeriodFilter";
+import { ReportPeriodState, defaultReportPeriodState, rangeFromSingle } from "@/lib/reportPeriod";
 
 interface ResolutionTimeReportProps {
   onBack: () => void;
@@ -28,29 +30,18 @@ function formatDuration(minutes: number): string {
 }
 
 export default function ResolutionTimeReport({ onBack }: ResolutionTimeReportProps) {
-  const [period, setPeriod] = useState("last-month");
+  const [periodState, setPeriodState] = useState<ReportPeriodState>({
+    mode: "single",
+    period: { preset: "last-month" },
+  });
   const [segment, setSegment] = useState("all");
 
-  // Calculate date range based on period
-  const getDateRange = () => {
-    const now = new Date();
-    switch (period) {
-      case "current-month":
-        return { start: startOfMonth(now), end: now };
-      case "last-month":
-        const lastMonth = subMonths(now, 1);
-        return { start: startOfMonth(lastMonth), end: endOfMonth(lastMonth) };
-      case "last-3-months":
-        return { start: startOfMonth(subMonths(now, 3)), end: now };
-      case "last-6-months":
-        return { start: startOfMonth(subMonths(now, 6)), end: now };
-      default:
-        const lm = subMonths(now, 1);
-        return { start: startOfMonth(lm), end: endOfMonth(lm) };
-    }
-  };
-
-  const { start, end } = getDateRange();
+  const range =
+    periodState.mode === "single"
+      ? rangeFromSingle(periodState.period)
+      : rangeFromSingle({ preset: "current-month" });
+  const start = range.start;
+  const end = range.end;
   const startDate = format(start, "yyyy-MM-dd");
   const endDate = format(end, "yyyy-MM-dd");
 
@@ -66,10 +57,7 @@ export default function ResolutionTimeReport({ onBack }: ResolutionTimeReportPro
   };
 
   const exportToPDF = () => {
-    const periodLabel = period === "current-month" ? "Mes_Atual" : 
-                        period === "last-month" ? format(subMonths(new Date(), 1), "MMM_yyyy", { locale: ptBR }) :
-                        period === "last-3-months" ? "Ultimos_3_Meses" : "Ultimos_6_Meses";
-    const title = `Tempo_Resolucao_${sanitizeForFilename(periodLabel)}`;
+    const title = `Tempo_Resolucao_${sanitizeForFilename(range.label)}`;
     
     const originalTitle = document.title;
     document.title = title;
@@ -104,8 +92,7 @@ export default function ResolutionTimeReport({ onBack }: ResolutionTimeReportPro
     tickets: pri.total_resolved,
   }));
 
-  const periodLabel = format(start, "MMM yyyy", { locale: ptBR }) + 
-    (period !== "current-month" && period !== "last-month" ? ` - ${format(end, "MMM yyyy", { locale: ptBR })}` : "");
+  const periodLabel = range.label;
 
   return (
     <AppLayout>
@@ -130,20 +117,8 @@ export default function ResolutionTimeReport({ onBack }: ResolutionTimeReportPro
         {/* Filters - não impresso */}
         <Card className="print:hidden">
           <CardContent className="pt-6">
-            <div className="flex gap-4 flex-wrap">
-              <div className="w-48">
-                <Select value={period} onValueChange={setPeriod}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Período" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="current-month">Mês Atual</SelectItem>
-                    <SelectItem value="last-month">Mês Anterior</SelectItem>
-                    <SelectItem value="last-3-months">Últimos 3 Meses</SelectItem>
-                    <SelectItem value="last-6-months">Últimos 6 Meses</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
+            <div className="flex gap-4 flex-wrap items-end">
+              <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
               <div className="w-48">
                 <Select value={segment} onValueChange={setSegment}>
                   <SelectTrigger>

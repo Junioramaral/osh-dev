@@ -16,6 +16,9 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import ReportCover from "./ReportCover";
 import PrintPage from "./PrintPage";
 import ReportFooter from "./ReportFooter";
+import AppLayout from "@/components/layout/AppLayout";
+import ReportPeriodFilter from "./ReportPeriodFilter";
+import { ReportPeriodState, defaultReportPeriodState, rangeFromSingle } from "@/lib/reportPeriod";
 
 interface ClosureRankingReportProps {
   onBack: () => void;
@@ -114,7 +117,7 @@ const MONTHS = [
 
 const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
   const [viewMode, setViewMode] = useState<"ranking" | "comparison">("ranking");
-  const [period, setPeriod] = useState("current-month");
+  const [periodState, setPeriodState] = useState<ReportPeriodState>(defaultReportPeriodState());
   const [segment, setSegment] = useState("all");
   const [clientId, setClientId] = useState("all");
   
@@ -132,44 +135,15 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
   
   const years = Array.from({ length: 5 }, (_, i) => (currentYear - i).toString());
 
-  const getDateRange = () => {
-    const now = new Date();
-    switch (period) {
-      case "current-month":
-        return {
-          start: format(startOfMonth(now), "yyyy-MM-dd"),
-          end: format(endOfMonth(now), "yyyy-MM-dd"),
-          label: format(now, "MMMM 'de' yyyy", { locale: ptBR }),
-        };
-      case "last-month":
-        const lastMonth = subMonths(now, 1);
-        return {
-          start: format(startOfMonth(lastMonth), "yyyy-MM-dd"),
-          end: format(endOfMonth(lastMonth), "yyyy-MM-dd"),
-          label: format(lastMonth, "MMMM 'de' yyyy", { locale: ptBR }),
-        };
-      case "last-3-months":
-        return {
-          start: format(startOfMonth(subMonths(now, 2)), "yyyy-MM-dd"),
-          end: format(endOfMonth(now), "yyyy-MM-dd"),
-          label: "Últimos 3 meses",
-        };
-      case "last-6-months":
-        return {
-          start: format(startOfMonth(subMonths(now, 5)), "yyyy-MM-dd"),
-          end: format(endOfMonth(now), "yyyy-MM-dd"),
-          label: "Últimos 6 meses",
-        };
-      default:
-        return {
-          start: format(startOfMonth(now), "yyyy-MM-dd"),
-          end: format(endOfMonth(now), "yyyy-MM-dd"),
-          label: format(now, "MMMM 'de' yyyy", { locale: ptBR }),
-        };
-    }
+  const _range =
+    periodState.mode === "single"
+      ? rangeFromSingle(periodState.period)
+      : rangeFromSingle({ preset: "current-month" });
+  const dateRange = {
+    start: format(_range.start, "yyyy-MM-dd"),
+    end: format(_range.end, "yyyy-MM-dd"),
+    label: _range.label,
   };
-
-  const dateRange = getDateRange();
 
   const { data: clients } = useQuery({
     queryKey: ["clients-for-report"],
@@ -192,7 +166,10 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
   });
 
   // Evolution data - only for multi-month periods
-  const showEvolution = period === "last-3-months" || period === "last-6-months";
+  const showEvolution =
+    periodState.mode === "single" &&
+    (periodState.period.preset === "last-3-months" ||
+      periodState.period.preset === "last-6-months");
   
   const { data: evolutionData } = useClosureRankingEvolution({
     startDate: dateRange.start,
@@ -305,6 +282,7 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
   const trendMap = new Map(evolutionData?.analysts.map(a => [a.analyst_id, a.trends]) || []);
 
   return (
+    <AppLayout>
     <div className="print-container">
       {/* Screen Header */}
       <div className="flex items-center justify-between mb-6 print:hidden">
@@ -354,18 +332,8 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
 
       {/* Filters for Ranking mode */}
       {viewMode === "ranking" && (
-        <div className="flex gap-4 mb-6 print:hidden">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current-month">Mês atual</SelectItem>
-              <SelectItem value="last-month">Mês anterior</SelectItem>
-              <SelectItem value="last-3-months">Últimos 3 meses</SelectItem>
-              <SelectItem value="last-6-months">Últimos 6 meses</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex gap-4 mb-6 print:hidden flex-wrap items-end">
+          <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
 
           <Select value={segment} onValueChange={setSegment}>
             <SelectTrigger className="w-[140px]">
@@ -1307,6 +1275,7 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
         </>
       )}
     </div>
+    </AppLayout>
   );
 };
 

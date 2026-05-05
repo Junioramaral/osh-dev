@@ -104,12 +104,13 @@ const calculateTicketHours = (createdAt: string, resolvedAt: string | null): num
 export function useClientHoursData(
   period: PeriodFilter,
   clientId?: string,
-  segment?: "DB" | "APP" | null
+  segment?: "DB" | "APP" | null,
+  customRange?: { startDate: string; endDate: string }
 ) {
   return useQuery({
-    queryKey: ["client-hours", period, clientId, segment],
+    queryKey: ["client-hours", period, clientId, segment, customRange?.startDate, customRange?.endDate],
     queryFn: async (): Promise<ClientHoursData> => {
-      const { startDate, endDate } = getPeriodDates(period);
+      const { startDate, endDate } = customRange ?? getPeriodDates(period);
 
       let query = supabase
         .from("tickets")

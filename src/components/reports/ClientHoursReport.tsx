@@ -41,17 +41,14 @@ import {
 } from "@/components/ui/table";
 import ReportFooter from "./ReportFooter";
 import PrintPage from "./PrintPage";
+import AppLayout from "@/components/layout/AppLayout";
+import ReportPeriodFilter from "./ReportPeriodFilter";
+import { ReportPeriodState, defaultReportPeriodState, rangeFromSingle } from "@/lib/reportPeriod";
+import { format } from "date-fns";
 
 interface ClientHoursReportProps {
   onBack: () => void;
 }
-
-const PERIOD_OPTIONS = [
-  { value: "current", label: "Mês Atual" },
-  { value: "previous", label: "Mês Anterior" },
-  { value: "last3", label: "Últimos 3 meses" },
-  { value: "last6", label: "Últimos 6 meses" },
-];
 
 const CHART_COLORS = [
   "hsl(var(--primary))",
@@ -74,7 +71,7 @@ function formatHours(hours: number): string {
 }
 
 const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
-  const [period, setPeriod] = useState<PeriodFilter>("current");
+  const [periodState, setPeriodState] = useState<ReportPeriodState>(defaultReportPeriodState());
   const [selectedClient, setSelectedClient] = useState<string>("all");
   const [selectedSegment, setSelectedSegment] = useState<string>("all");
 
@@ -94,24 +91,34 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
     },
   });
 
+  const range =
+    periodState.mode === "single"
+      ? rangeFromSingle(periodState.period)
+      : rangeFromSingle({ preset: "current-month" });
+  const customRange = {
+    startDate: format(range.start, "yyyy-MM-dd"),
+    endDate: format(range.end, "yyyy-MM-dd"),
+  };
+
   const { data, isLoading } = useClientHoursData(
-    period,
+    "current" as PeriodFilter,
     selectedClient !== "all" ? selectedClient : undefined,
-    selectedSegment !== "all" ? (selectedSegment as "DB" | "APP") : null
+    selectedSegment !== "all" ? (selectedSegment as "DB" | "APP") : null,
+    customRange
   );
 
   const handlePrint = () => {
     window.print();
   };
 
-  const periodLabel =
-    PERIOD_OPTIONS.find((p) => p.value === period)?.label || "Período";
+  const periodLabel = range.label;
 
   const chartConfig = {
     hours: { label: "Horas", color: "hsl(var(--primary))" },
   };
 
   return (
+    <AppLayout>
     <div className="space-y-6 print:space-y-4">
       {/* Header - Hide on print */}
       <div className="flex items-center justify-between print:hidden">
@@ -141,19 +148,8 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
       </div>
 
       {/* Filters - Hide on print */}
-      <div className="flex flex-wrap gap-4 print:hidden">
-        <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
-          <SelectTrigger className="w-[180px]">
-            <SelectValue placeholder="Período" />
-          </SelectTrigger>
-          <SelectContent>
-            {PERIOD_OPTIONS.map((opt) => (
-              <SelectItem key={opt.value} value={opt.value}>
-                {opt.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+      <div className="flex flex-wrap gap-4 print:hidden items-end">
+        <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
 
         <Select value={selectedClient} onValueChange={setSelectedClient}>
           <SelectTrigger className="w-[220px]">
@@ -457,6 +453,7 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
 
       <ReportFooter />
     </div>
+    </AppLayout>
   );
 };
 

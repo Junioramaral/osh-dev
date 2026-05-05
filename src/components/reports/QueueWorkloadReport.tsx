@@ -11,6 +11,8 @@ import { PieChart, Pie, Cell, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, 
 import { startOfMonth, endOfMonth, subMonths, format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import ReportCover from "./ReportCover";
+import ReportPeriodFilter from "./ReportPeriodFilter";
+import { ReportPeriodState, defaultReportPeriodState, rangeFromSingle } from "@/lib/reportPeriod";
 
 interface QueueWorkloadReportProps {
   onBack: () => void;
@@ -30,22 +32,16 @@ const formatDuration = (minutes: number): string => {
 };
 
 const QueueWorkloadReport = ({ onBack }: QueueWorkloadReportProps) => {
-  const [period, setPeriod] = useState("current");
+  const [periodState, setPeriodState] = useState<ReportPeriodState>(defaultReportPeriodState());
   const [segment, setSegment] = useState("all");
 
-  const now = new Date();
-  const startDate = period === "current" 
-    ? startOfMonth(now) 
-    : period === "last" 
-      ? startOfMonth(subMonths(now, 1))
-      : startOfMonth(subMonths(now, 2));
-  const endDate = period === "current" 
-    ? endOfMonth(now) 
-    : period === "last"
-      ? endOfMonth(subMonths(now, 1))
-      : endOfMonth(subMonths(now, 2));
-
-  const periodLabel = format(startDate, "MMMM 'de' yyyy", { locale: ptBR });
+  const range =
+    periodState.mode === "single"
+      ? rangeFromSingle(periodState.period)
+      : rangeFromSingle({ preset: "current-month" });
+  const startDate = range.start;
+  const endDate = range.end;
+  const periodLabel = range.label;
 
   const { data, isLoading } = useQueueWorkloadData({
     startDate,
@@ -124,17 +120,8 @@ const QueueWorkloadReport = ({ onBack }: QueueWorkloadReportProps) => {
         </div>
 
         {/* Filters - Hide on print */}
-        <div className="flex gap-4 print:hidden">
-          <Select value={period} onValueChange={setPeriod}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Período" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="current">Mês Atual</SelectItem>
-              <SelectItem value="last">Mês Anterior</SelectItem>
-              <SelectItem value="before">Dois Meses Atrás</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex gap-4 print:hidden flex-wrap items-end">
+          <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
           <Select value={segment} onValueChange={setSegment}>
             <SelectTrigger className="w-48">
               <SelectValue placeholder="Segmento" />
