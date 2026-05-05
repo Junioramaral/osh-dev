@@ -138,22 +138,9 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
       {/* Filters - Hidden on print */}
       <Card className="print:hidden">
         <CardContent className="pt-6">
-          <div className="grid gap-4 md:grid-cols-5">
-            <div className="space-y-2">
-              <label className="text-sm font-medium">Período</label>
-              <Select value={period} onValueChange={(v) => setPeriod(v as PeriodFilter)}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PERIOD_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={opt.value}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+          <div className="space-y-4">
+            <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
+            <div className="grid gap-4 md:grid-cols-4">
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Cliente</label>
@@ -216,6 +203,7 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
               </div>
             </div>
           </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -226,7 +214,7 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
           <ReportCover
             title="Gestão de Horas dos Analistas"
             subtitle="Comparativo de Horas de Vida vs Horas Registradas"
-            periodLabel={PERIOD_OPTIONS.find(p => p.value === period)?.label || ""}
+            periodLabel={periodLabel}
             clientName={clientId && clientId !== "__all__" ? clients?.find(c => c.id === clientId)?.name : undefined}
           />
         </div>
