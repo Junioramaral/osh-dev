@@ -63,6 +63,18 @@ function formatBR(date: string | null | undefined): string {
   }
 }
 
+function formatBRStacked(date: string | null | undefined): string {
+  if (!date) return "-";
+  try {
+    const d = new Date(date);
+    const day = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    return `${day}<br><span style="color:#64748b;">${time}</span>`;
+  } catch {
+    return "-";
+  }
+}
+
 async function fetch6MonthVolume(
   supabase: any,
   clientId: string,
