@@ -30,12 +30,18 @@ export function useTicketActions() {
       // 2. Get complete ticket data
       const { data: ticket, error: ticketError } = await supabase
         .from("tickets")
-        .select("id, ticket_number, title, contact_email, contact_name, created_at, analyst_id")
+        .select("id, ticket_number, title, contact_email, contact_name, created_at, analyst_id, team_id, queue_id")
         .eq("id", ticketId)
         .single();
 
       if (ticketError || !ticket) {
         throw new Error("Ticket não encontrado");
+      }
+
+      // Validação obrigatória: Analista, Time e Fila atribuídos
+      const effectiveAnalystId = ticket.analyst_id || userId; // auto-allocate caso não tenha
+      if (!effectiveAnalystId || !ticket.team_id || !ticket.queue_id) {
+        throw new Error("Atribua Analista, Time e Fila antes de resolver o ticket.");
       }
 
       const resolvedAt = new Date().toISOString();

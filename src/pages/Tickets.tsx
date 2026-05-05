@@ -21,6 +21,7 @@ import { BulkAssignAnalystDialog } from "@/components/tickets/BulkAssignAnalystD
 import { BulkAssignTeamDialog } from "@/components/tickets/BulkAssignTeamDialog";
 import { BulkAssignQueueDialog } from "@/components/tickets/BulkAssignQueueDialog";
 import { BulkStatusReasonDialog } from "@/components/tickets/BulkStatusReasonDialog";
+import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "@/components/tickets/RequiredFieldsBeforeResolveDialog";
 import { TicketLockedWarningDialog } from "@/components/tickets/TicketLockedWarningDialog";
 import { ReleaseTicketDialog } from "@/components/tickets/ReleaseTicketDialog";
 import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
@@ -45,6 +46,13 @@ export default function Tickets() {
   const [showAssignQueueDialog, setShowAssignQueueDialog] = useState(false);
   const [showStatusReasonDialog, setShowStatusReasonDialog] = useState(false);
   const [pendingStatus, setPendingStatus] = useState<string>("");
+  const [showRequiredFieldsDialog, setShowRequiredFieldsDialog] = useState(false);
+  const [savingRequiredFields, setSavingRequiredFields] = useState(false);
+  const [missingFields, setMissingFields] = useState<{ analyst: boolean; team: boolean; queue: boolean }>({
+    analyst: false,
+    team: false,
+    queue: false,
+  });
 
   // Estados para o sistema de lock/warning
   const [showLockedWarningDialog, setShowLockedWarningDialog] = useState(false);
@@ -144,6 +152,18 @@ export default function Tickets() {
   const handleBulkChangeStatus = (status: string) => {
     // Se status for resolvido, abrir dialog de motivo (para TODOS os usuários)
     if (status === "resolvido") {
+      const selectedData = filteredTickets?.filter(t => selectedTickets.has(t.id)) || [];
+      const missing = {
+        analyst: selectedData.some(t => !t.analyst_id),
+        team: selectedData.some(t => !t.team_id),
+        queue: selectedData.some(t => !t.queue_id),
+      };
+      if (missing.analyst || missing.team || missing.queue) {
+        setPendingStatus(status);
+        setMissingFields(missing);
+        setShowRequiredFieldsDialog(true);
+        return;
+      }
       setPendingStatus(status);
       setShowStatusReasonDialog(true);
       return;
@@ -154,6 +174,56 @@ export default function Tickets() {
       status,
     });
     setSelectedTickets(new Set());
+  };
+
+  const handleRequiredFieldsConfirm = async (values: RequiredFieldsValues) => {
+    setSavingRequiredFields(true);
+    try {
+      const selectedData = filteredTickets?.filter(t => selectedTickets.has(t.id)) || [];
+      if (values.analystId) {
+        const ids = selectedData.filter(t => !t.analyst_id).map(t => t.id);
+        if (ids.length > 0) {
+          const { error } = await supabase
+            .from("tickets")
+            .update({
+              analyst_id: values.analystId,
+              lock_status: "locked",
+              lock_owner_id: values.analystId,
+              lock_at: new Date().toISOString(),
+              unlocked_at: null,
+            })
+            .in("id", ids);
+          if (error) throw error;
+        }
+      }
+      if (values.teamId) {
+        const ids = selectedData.filter(t => !t.team_id).map(t => t.id);
+        if (ids.length > 0) {
+          const { error } = await supabase
+            .from("tickets")
+            .update({ team_id: values.teamId })
+            .in("id", ids);
+          if (error) throw error;
+        }
+      }
+      if (values.queueId) {
+        const ids = selectedData.filter(t => !t.queue_id).map(t => t.id);
+        if (ids.length > 0) {
+          const { error } = await supabase
+            .from("tickets")
+            .update({ queue_id: values.queueId })
+            .in("id", ids);
+          if (error) throw error;
+        }
+      }
+      setShowRequiredFieldsDialog(false);
+      setShowStatusReasonDialog(true);
+    } catch (e: any) {
+      const { toast } = await import("sonner");
+      toast.error("Erro ao salvar atribuições: " + e.message);
+    } finally {
+      setSavingRequiredFields(false);
+    }
   };
 
   const handleStatusReasonConfirm = (reason: string) => {
@@ -697,6 +767,15 @@ export default function Tickets() {
         status={pendingStatus}
         ticketCount={selectedTickets.size}
         onConfirm={handleStatusReasonConfirm}
+      />
+
+      <RequiredFieldsBeforeResolveDialog
+        open={showRequiredFieldsDialog}
+        onOpenChange={setShowRequiredFieldsDialog}
+        ticketCount={selectedTickets.size}
+        missing={missingFields}
+        onConfirm={handleRequiredFieldsConfirm}
+        isLoading={savingRequiredFields}
       />
 
       <TicketLockedWarningDialog

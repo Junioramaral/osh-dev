@@ -1,123 +1,72 @@
-## 1. Dashboard CSAT — filtro por mês/ano
+## Objetivo
 
-### Estado atual
-Hoje só existem presets fixos por dias (7/30/60/90), aplicados sobre `created_at` dos tickets resolvidos.
+Bloquear o encerramento (status "Resolvido") de qualquer ticket que não tenha **Analista**, **Time** e **Fila** atribuídos. Quando faltar uma dessas informações, o sistema deve solicitar ao usuário que as preencha antes de prosseguir com a resolução.
 
-### Mudanças
-Substituir o seletor "Período" por um **filtro padronizado** seguindo o mesmo padrão dos outros relatórios (`ReportPeriodFilter` + `reportPeriod.ts`):
+## Onde a regra será aplicada
 
-- **Mês Atual**
-- **Mês Anterior**
-- **Últimos 3 meses**
-- **Últimos 6 meses**
-- **Mês Específico** (escolher mês + ano)
-- **Comparativo** (mês A vs mês B) — opcional, ver item 3
+Existem 3 caminhos no app que mudam um ticket para "Resolvido". Todos receberão a mesma validação:
 
-O filtro continuará usando os filtros existentes de **Segmento** e **Cliente**.
+1. **Resolução individual via sidebar do ticket** — `src/components/tickets/TicketSidebar.tsx` (chama `TicketResolveDialog` → `resolveTicketWithReason`).
+2. **Resolução em lote na lista de tickets** — `src/pages/Tickets.tsx` (`BulkStatusReasonDialog` → `bulkChangeStatusWithReason`).
+3. **Resolução em lote em "Meus Tickets"** — `src/pages/MyTickets.tsx` (mesmo padrão da lista).
 
-### Critério de data
-Mudar de `created_at >= startDate` para um intervalo `[start, end]` baseado em **`csat_submitted_at`** (data da avaliação) — assim o filtro reflete *quando o cliente avaliou*, não quando o ticket foi aberto. Tickets sem CSAT entram no denominador da taxa de resposta usando `resolved_at` no mesmo intervalo.
+## Comportamento proposto
 
-### Arquivos
-- `src/hooks/useCSATData.ts` — aceitar `{ startDate, endDate }` em vez de `days`; filtrar por `csat_submitted_at` para os agregados de avaliações e `resolved_at` para o total de resolvidos.
-- `src/pages/CSATDashboard.tsx` — trocar Select de dias por `ReportPeriodFilter`; adaptar gráfico de evolução para granularidade adequada (diária para 1 mês, mensal para 3/6 meses).
+### A. Resolução individual (TicketSidebar)
 
----
+Antes de abrir o `TicketResolveDialog`, verificar `ticket.analyst_id`, `ticket.team_id`, `ticket.queue_id`.
 
-## 2. Novo Relatório: "Satisfação dos Clientes"
+- Se **todos** preenchidos → abre o diálogo de resolução normalmente.
+- Se **algum faltando** → abrir um novo diálogo `TicketRequiredFieldsDialog` que mostra apenas os campos faltantes:
+  - Analista (Select com analistas Otimizzo) — reaproveitar query já usada em `BulkAssignAnalystDialog`.
+  - Time (Select de `teams`) — reaproveitar query de `BulkAssignTeamDialog`.
+  - Fila (Select de `queues`) — reaproveitar query de `BulkAssignQueueDialog`.
+- Botão "Continuar" salva os campos faltantes no ticket e em seguida abre o `TicketResolveDialog` para o motivo da resolução.
+- Botão "Cancelar" fecha sem alterar o ticket.
 
-### Onde fica
-Adicionar um novo card em `src/pages/Reports.tsx` chamado **"Satisfação dos Clientes (CSAT)"**, ícone `Star`, ao lado dos outros relatórios. Componente novo: `src/components/reports/CSATSatisfactionReport.tsx`.
+### B. Resolução em lote (Tickets.tsx e MyTickets.tsx)
 
-### Dados disponíveis (já no schema `tickets`)
-Para cada ticket avaliado temos:
-- `ticket_number`, `id` (link)
-- `csat_rating` (1–5), `csat_comment`, `csat_submitted_at`, `feedback_token`
-- `client_id` → nome do cliente
-- `analyst_id` → nome do analista
-- `segment` (DB/APP), `priority` (P1–P4), `record_type`
-- `category`, `subcategory`
-- `created_at`, `resolved_at`, `started_at`
-- `sla_first_response_met`, `sla_resolution_met`
-- `contact_name`, `contact_email` (quem abriu)
+Em `handleBulkChangeStatus`, quando `status === "resolvido"`:
 
-### Estrutura proposta
+1. Buscar os tickets selecionados em memória (já disponíveis na lista) e identificar os que estão sem analista/time/fila.
+2. Se **algum** ticket selecionado estiver com algum desses campos vazios:
+   - Abrir um novo diálogo `BulkRequiredFieldsDialog` listando quantos tickets faltam cada campo, com Selects de Analista, Time e Fila.
+   - O usuário escolhe os valores que serão aplicados **somente nos tickets que estão faltando** aquele campo (não sobrescreve os já preenchidos).
+   - Ao confirmar: aplicar atualizações em lote (analyst_id/team_id/queue_id) nos tickets pendentes e, em seguida, prosseguir com `BulkStatusReasonDialog` para o motivo.
+3. Se todos já estiverem completos: fluxo atual sem mudanças.
 
-**a) Cabeçalho com filtros (`ReportPeriodFilter`)**
-- Período (single ou comparação) — mesmo padrão dos outros relatórios
-- Cliente (todos / específico)
-- Segmento (todos / DB / APP)
-- Analista (todos / específico)
-- Faixa de nota (todas / promotores 4–5 / neutros 3 / detratores 1–2)
+### C. Defesa em profundidade no hook
 
-**b) KPIs em destaque**
-- CSAT médio (com cor por faixa)
-- Total de avaliações
-- Taxa de resposta (avaliados / resolvidos)
-- % Promotores | % Neutros | % Detratores
-- NPS simplificado (`%Promotores − %Detratores`)
-- Variação vs período anterior (delta)
+Em `src/hooks/useTicketActions.ts` (`resolveTicketWithReason`) e `src/hooks/useBulkTicketActions.ts` (`bulkChangeStatus` / `bulkChangeStatusWithReason`):
 
-**c) Gráficos**
-- Evolução do CSAT médio (linha) ao longo do período
-- Distribuição de notas (barras horizontais 1★–5★)
-- CSAT por segmento (DB vs APP)
-- CSAT por prioridade (P1–P4)
-- Top 5 clientes mais satisfeitos / Bottom 5 menos satisfeitos
+- Antes do `update`, recarregar os tickets envolvidos e validar que `analyst_id`, `team_id` e `queue_id` estão preenchidos.
+- Caso contrário, abortar com `toast.error("Para resolver é obrigatório ter Analista, Time e Fila atribuídos.")` e não tocar no status.
 
-**d) Tabela detalhada — núcleo analítico**
-Uma linha por ticket avaliado, exportável em CSV/PDF, com:
+Isso garante que, mesmo que a UI seja contornada, a regra é mantida.
 
-| Coluna | Origem |
-|---|---|
-| Nº Ticket (link) | `ticket_number` |
-| Data da avaliação | `csat_submitted_at` |
-| Cliente | `clients.name` |
-| Segmento | `segment` |
-| Prioridade | `priority` |
-| Categoria / Subcategoria | `category`, `subcategory` |
-| Analista | `profiles.full_name` |
-| Quem abriu | `contact_name` |
-| Tempo até resolução | `resolved_at − created_at` |
-| SLA 1ª resposta | `sla_first_response_met` |
-| SLA resolução | `sla_resolution_met` |
-| Nota | `csat_rating` (com estrelas) |
-| Comentário | `csat_comment` |
+## Componentes novos
 
-Ordenação padrão: nota crescente (detratores no topo, para análise) + data desc.
+- `src/components/tickets/TicketRequiredFieldsDialog.tsx` — diálogo de coleta para 1 ticket.
+- `src/components/tickets/BulkRequiredFieldsDialog.tsx` — diálogo de coleta para N tickets.
 
-**e) Seção "Insights"**
-- Top 5 analistas com melhor CSAT (mín. 3 avaliações)
-- Top 5 com pior CSAT
-- Categorias com pior nota média (oportunidades de melhoria)
-- Lista de detratores (≤ 2★) com comentário, agrupados por cliente
-- Correlação simples: CSAT médio quando SLA cumprido vs não cumprido
+Ambos seguem o estilo dos diálogos `BulkAssign*` existentes (mesmos componentes Select/Combobox, mesmas queries).
 
-**f) Exportação**
-- Botão "Imprimir / PDF" via `PrintPage`/`window.print` (padrão dos outros relatórios)
-- Botão "Exportar CSV" da tabela detalhada
+## Arquivos a editar
 
-### Arquivos novos/afetados
-- **Novo**: `src/components/reports/CSATSatisfactionReport.tsx`
-- **Novo**: `src/hooks/useCSATSatisfactionReport.ts` (busca tickets + agregações)
-- `src/pages/Reports.tsx` — registrar novo card e roteamento (`"csat-satisfaction"`)
-- Reutilizar `ReportPeriodFilter`, `PrintPage`, `ReportFooter` existentes
+- `src/components/tickets/TicketSidebar.tsx` — encadear novo diálogo antes do `TicketResolveDialog`.
+- `src/pages/Tickets.tsx` — interceptar `handleBulkChangeStatus` quando status = resolvido.
+- `src/pages/MyTickets.tsx` — mesma alteração da lista geral.
+- `src/hooks/useTicketActions.ts` — validação server-side defensiva em `resolveTicketWithReason`.
+- `src/hooks/useBulkTicketActions.ts` — validação defensiva em `bulkChangeStatus` e `bulkChangeStatusWithReason`.
 
-### RFCs e RLS
-- Excluir `record_type = 'rfc'` dos cálculos (regra Core do projeto)
-- Visibilidade respeita RLS atual: cliente vê só seus tickets; Otimizzo/super_admin veem todos; viewer vê do tenant
+## Mensagens (PT-BR)
 
----
+- Título do diálogo: "Informações obrigatórias para resolver"
+- Subtítulo: "Antes de resolver, é necessário atribuir Analista, Time e Fila."
+- Toast de bloqueio (defesa): "Atribua Analista, Time e Fila antes de resolver o ticket."
+- Validação: campos faltantes são obrigatórios (não permite confirmar enquanto algum estiver vazio).
 
-## 3. Modo comparativo no Dashboard CSAT (opcional, mesma entrega)
+## Fora do escopo
 
-Permitir alternar para comparação A vs B (mês X vs mês Y) reutilizando o `ReportPeriodFilter`. Quando ativo, KPIs mostram lado a lado e gráfico de evolução exibe duas linhas.
-
----
-
-## Ordem de execução
-1. Refatorar `useCSATData` para aceitar intervalo de datas
-2. Trocar filtro do `CSATDashboard` por `ReportPeriodFilter` (single + comparação)
-3. Criar `useCSATSatisfactionReport`
-4. Criar `CSATSatisfactionReport` com KPIs, gráficos, tabela e exportação
-5. Registrar card no `Reports.tsx`
+- Não alterar a obrigatoriedade desses campos na criação do ticket (a regra continua valendo apenas no encerramento).
+- Não mudar regras de RFC (já excluídas do fluxo de resolução padrão).
