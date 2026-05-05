@@ -104,12 +104,13 @@ export function useAnalystHoursManagementData(
   clientId?: string,
   analystId?: string,
   segment?: "DB" | "APP" | null,
-  onlyWithoutLogs?: boolean
+  onlyWithoutLogs?: boolean,
+  customRange?: { startDate: string; endDate: string }
 ) {
   return useQuery({
-    queryKey: ["analyst-hours-management", period, clientId, analystId, segment, onlyWithoutLogs],
+    queryKey: ["analyst-hours-management", period, clientId, analystId, segment, onlyWithoutLogs, customRange?.startDate, customRange?.endDate],
     queryFn: async (): Promise<AnalystHoursManagementData> => {
-      const { startDate, endDate } = getPeriodDates(period);
+      const { startDate, endDate } = customRange ?? getPeriodDates(period);
 
       // Fetch tickets with related data
       let ticketsQuery = supabase
