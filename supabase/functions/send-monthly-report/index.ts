@@ -399,14 +399,13 @@ function generateReportHTML(
       ${tickets.length > 0 ? `
       <table style="table-layout: fixed; width: 100%; font-size: 11px;">
         <colgroup>
-          <col style="width: 9%;" />
-          <col style="width: 26%;" />
-          <col style="width: 8%;" />
-          <col style="width: 9%;" />
-          <col style="width: 12%;" />
-          <col style="width: 6%;" />
-          <col style="width: 15%;" />
-          <col style="width: 15%;" />
+          <col style="width: 10%;" />
+          <col style="width: 32%;" />
+          <col style="width: 10%;" />
+          <col style="width: 11%;" />
+          <col style="width: 14%;" />
+          <col style="width: 7%;" />
+          <col style="width: 16%;" />
         </colgroup>
         <tr>
           <th style="padding:6px 4px;">Número</th>
@@ -416,7 +415,6 @@ function generateReportHTML(
           <th style="padding:6px 4px;">Status</th>
           <th style="padding:6px 4px;">SLA</th>
           <th style="padding:6px 4px;">Abertura</th>
-          <th style="padding:6px 4px;">Atualizado</th>
         </tr>
         ${tickets.slice(0, 50).map(t => `
         <tr>
@@ -427,7 +425,6 @@ function generateReportHTML(
           <td style="padding:6px 4px;">${STATUS_LABELS[t.status] || t.status}</td>
           <td style="padding:6px 4px;"><span class="badge ${t.sla_resolution_met === true ? 'badge-success' : t.sla_resolution_met === false ? 'badge-p1' : 'badge-warning'}">${t.sla_resolution_met === true ? '✓' : t.sla_resolution_met === false ? '✗' : '⏳'}</span></td>
           <td style="padding:6px 4px; font-size:10px; line-height:1.3;">${formatBRStacked(t.created_at)}</td>
-          <td style="padding:6px 4px; font-size:10px; line-height:1.3;">${formatBRStacked(t.updated_at)}</td>
         </tr>
         `).join("")}
       </table>
