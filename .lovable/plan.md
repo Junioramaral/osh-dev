@@ -1,53 +1,73 @@
-# Ajustar numeração de tickets para começar em 00101011
+# Sincronizar Relatório Mensal: PDF (tela) ↔ Email
 
-## Situação atual
+## Diagnóstico
 
-- Existem **10 tickets** no banco, com `ticket_number` indo de `00000001` a `00000010`.
-- A função `generate_ticket_number()` calcula o próximo número via `SELECT COUNT(*) + 1 FROM tickets`, gerando sempre números pequenos e sequenciais a partir de 1.
-- O usuário quer que o próximo ticket seja **00101011**, dando aparência de uma base com muitos chamados.
+Comparando os dois geradores:
 
-## Estratégia
-
-Adicionar um **offset configurável** para que a numeração exibida seja `(COUNT + offset)` mantendo o padrão de 8 dígitos com `LPAD`. Os 10 tickets existentes ficam preservados (não vamos renumerar histórico) e o **próximo ticket** sai como `00101011`.
-
-Para que `count(*) + 1 + offset = 101011` com `count = 10`, o offset é **101000**.
+| Seção | PDF (tela) | Email | Ação |
+|---|---|---|---|
+| Resumo Executivo (4 cards) | ✅ Total / Resolvidos / Tempo Médio / SLA% | ✅ 4 cards iguais + 4 extras (Tempo Médio, SLA Atendido, SLA Não Atendido, Em Andamento) | Adicionar os 4 cards extras no PDF |
+| Distribuição de Tickets (tabelas Segmento/Prioridade com %) | ❌ Ausente (só gráficos) | ✅ Duas tabelas | Adicionar tabelas no PDF |
+| Top 5 Categorias com % | ⚠️ Lista sem % | ✅ Tabela com % | Reformatar para tabela com % |
+| Resumo Numérico 6 meses | ✅ Tabela completa | ❌ Ausente | Adicionar tabela no email |
+| Listagem de tickets — Segmento | ❌ tem na tela mas não no email | — | Adicionar coluna Segmento no email |
+| Listagem de tickets — Datas | Email tem só `created_at` (dd/MM/yyyy, sem hora) | — | Mostrar Abertura **dd/MM/yyyy HH:mm** + Última atualização **dd/MM/yyyy HH:mm** |
+| Legenda SLA (✓ ✗ ⏳) | — | sem explicação | Adicionar legenda abaixo da tabela |
 
 ## Mudanças
 
-### 1. Migration: alterar a função `generate_ticket_number()`
+### 1. `src/components/reports/MonthlyClientReport.tsx` (PDF/tela)
+
+**Resumo Executivo — adicionar segunda linha de 4 cards** (após o grid existente, linhas 322-375):
+- Tempo Médio Resolução (`avgResolutionHours`h) — já existe, mover para 2ª linha junto com os 3 abaixo
+- SLA Atendido (verde) → contar `sla_resolution_met === true`
+- SLA Não Atendido (vermelho) → `=== false`
+- Em Andamento (cinza) → `=== null`
+
+Manter na 1ª linha: Total / Resolvidos / Em Aberto (`pending`) / SLA%.
+
+> Nota: `useReportData` já calcula `total`, `resolved`, `pending`, `slaMetRate`, `avgResolutionHours`. Para SLA Atendido/Não/Andamento usaremos o array existente `slaCompliance` (que já separa esses 3 valores).
+
+**Adicionar nova seção "Distribuição de Tickets"** entre o Resumo Executivo e "Análise de Performance":
+- Tabela 1: Segmento (DB / APP) — Quantidade — %
+- Tabela 2: Prioridade (P1/P2/P3/P4) — Quantidade — %
+
+Usa dados já disponíveis em `metrics.bySegment` e `metrics.byPriority`.
+
+**Top 5 Categorias** (linhas 516-535) — converter de lista para tabela com colunas Categoria | Quantidade | %.
+
+### 2. `supabase/functions/send-monthly-report/index.ts` (Email)
+
+**Adicionar seção "Resumo Numérico (Últimos 6 Meses)"** — buscar dados dos 6 meses anteriores:
 
 ```sql
-CREATE OR REPLACE FUNCTION public.generate_ticket_number()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $function$
-DECLARE
-  counter INTEGER;
-  ticket_offset INTEGER := 101000;
-BEGIN
-  SELECT COUNT(*) + 1 + ticket_offset INTO counter FROM public.tickets;
-  NEW.ticket_number := LPAD(counter::TEXT, 8, '0');
-  RETURN NEW;
-END;
-$function$;
+-- Para cada um dos 6 meses (incluindo o atual), contar:
+--   abertos: tickets criados naquele mês (record_type != 'rfc')
+--   fechados: tickets resolvidos naquele mês (resolved_at no mês)
 ```
 
-- Próximo ticket após os 10 atuais → `LPAD(10 + 1 + 101000, 8, '0')` = **00101011** ✓
-- Os 10 tickets antigos (`00000001`–`00000010`) permanecem intactos.
-- O padrão de 8 dígitos é mantido (suporta até ~99 milhões).
+Implementar uma função `fetch6MonthVolume(supabase, clientId, targetMonth, targetYear)` que retorna `[{monthLabel, abertos, fechados, saldo}]` e renderizar como tabela HTML (replicando o estilo do PDF, com linha de Total).
 
-### 2. Sem alterações de frontend
+**Listagem de Tickets (linhas 285-307)** — atualizar tabela para:
+| Número | Título | **Segmento** | Prioridade | Status | SLA | **Abertura** | **Última atualização** |
 
-A coluna `ticket_number` continua sendo `text` de 8 caracteres — todas as telas (`Tickets.tsx`, `MyTickets.tsx`, `TicketRow`, `TicketCreatedDialog`, e-mails, busca por número) continuam funcionando sem ajustes.
+- Adicionar coluna Segmento (badge DB/APP)
+- Trocar "Data" para 2 colunas: Abertura e Última atualização
+- Formatar `dd/MM/yyyy HH:mm` (timezone America/Sao_Paulo)
+- Adicionar `updated_at` à query SELECT (linha 392)
 
-## Pontos de atenção
+**Legenda SLA** — abaixo da tabela de tickets, adicionar:
+```
+Legenda SLA: ✓ Cumprido  •  ✗ Não Cumprido  •  ⏳ Em Andamento
+```
 
-- **Ordenação**: alguns lugares (ex.: `MyTickets.tsx`) ordenam por `parseInt(ticket_number, 10)`. Como os novos números (101011+) são maiores que os antigos (1–10), a ordem decrescente continua correta — novos aparecem primeiro.
-- **Sem renumeração** dos 10 tickets existentes (evita quebrar referências em e-mails, comentários por `Reply-To: ticket-{number}@...`, links já enviados).
-- O salto de `00000010` para `00101011` é intencional e desejado pelo usuário.
+## Arquivos alterados
 
-## Arquivo alterado
+- `src/components/reports/MonthlyClientReport.tsx`
+- `supabase/functions/send-monthly-report/index.ts`
 
-- Nova migration SQL alterando `public.generate_ticket_number()`.
+## Sem quebra
+
+- Métricas calculadas a partir dos mesmos dados; nenhuma mudança em DB ou hooks.
+- `useReportData` já retorna tudo que o PDF precisa.
+- Edge Function continua com mesma assinatura (`clientId`, `month`, `year`).
