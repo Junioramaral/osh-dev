@@ -23,11 +23,15 @@ import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } fr
 import { differenceInMinutes } from "date-fns";
 import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
+import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "./RequiredFieldsBeforeResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "sonner";
+import { useQueryClient } from "@tanstack/react-query";
 
 interface TicketSidebarProps {
   ticket: any;
@@ -47,7 +51,10 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showFAQDialog, setShowFAQDialog] = useState(false);
   const [showResolveDialog, setShowResolveDialog] = useState(false);
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
+  const [showRequiredFieldsDialog, setShowRequiredFieldsDialog] = useState(false);
+  const [savingRequiredFields, setSavingRequiredFields] = useState(false);
   const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
+  const queryClient = useQueryClient();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
   const { data: history } = useTicketHistory(ticket.id);
   
@@ -92,7 +99,16 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
 
   const handleStatusChange = (newStatus: string) => {
     if (newStatus === "resolvido") {
-      setShowResolveDialog(true);
+      const missing = {
+        analyst: !ticket.analyst_id,
+        team: !ticket.team_id,
+        queue: !ticket.queue_id,
+      };
+      if (missing.analyst || missing.team || missing.queue) {
+        setShowRequiredFieldsDialog(true);
+      } else {
+        setShowResolveDialog(true);
+      }
     } else {
       updateTicketStatus.mutate({
         ticketId: ticket.id,
@@ -109,6 +125,37 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
       userId: profile.id,
     });
     setShowResolveDialog(false);
+  };
+
+  const handleRequiredFieldsConfirm = async (values: RequiredFieldsValues) => {
+    setSavingRequiredFields(true);
+    try {
+      const updates: Record<string, any> = {};
+      if (values.analystId) {
+        updates.analyst_id = values.analystId;
+        updates.lock_status = "locked";
+        updates.lock_owner_id = values.analystId;
+        updates.lock_at = new Date().toISOString();
+        updates.unlocked_at = null;
+      }
+      if (values.teamId) updates.team_id = values.teamId;
+      if (values.queueId) updates.queue_id = values.queueId;
+
+      const { error } = await supabase
+        .from("tickets")
+        .update(updates)
+        .eq("id", ticket.id);
+      if (error) throw error;
+
+      await queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      await queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      setShowRequiredFieldsDialog(false);
+      setShowResolveDialog(true);
+    } catch (e: any) {
+      toast.error("Erro ao salvar atribuições: " + e.message);
+    } finally {
+      setSavingRequiredFields(false);
+    }
   };
 
   const isResolved = ticket.status === "resolvido" || ticket.status === "fechado";
@@ -257,6 +304,19 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         }}
         onConfirm={handleResolveConfirm}
         isLoading={resolveTicketWithReason.isPending}
+      />
+
+      <RequiredFieldsBeforeResolveDialog
+        open={showRequiredFieldsDialog}
+        onOpenChange={setShowRequiredFieldsDialog}
+        ticketCount={1}
+        missing={{
+          analyst: !ticket.analyst_id,
+          team: !ticket.team_id,
+          queue: !ticket.queue_id,
+        }}
+        onConfirm={handleRequiredFieldsConfirm}
+        isLoading={savingRequiredFields}
       />
 
       {/* Time Log Dialog */}
