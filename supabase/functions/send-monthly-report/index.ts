@@ -63,6 +63,18 @@ function formatBR(date: string | null | undefined): string {
   }
 }
 
+function formatBRStacked(date: string | null | undefined): string {
+  if (!date) return "-";
+  try {
+    const d = new Date(date);
+    const day = d.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo", day: "2-digit", month: "2-digit", year: "numeric" });
+    const time = d.toLocaleTimeString("pt-BR", { timeZone: "America/Sao_Paulo", hour: "2-digit", minute: "2-digit" });
+    return `${day}<br><span style="color:#64748b;">${time}</span>`;
+  } catch {
+    return "-";
+  }
+}
+
 async function fetch6MonthVolume(
   supabase: any,
   clientId: string,
@@ -385,27 +397,37 @@ function generateReportHTML(
     <div class="section">
       <div class="section-title">📋 Listagem de Tickets (${tickets.length})</div>
       ${tickets.length > 0 ? `
-      <table>
+      <table style="table-layout: fixed; width: 100%; font-size: 11px;">
+        <colgroup>
+          <col style="width: 9%;" />
+          <col style="width: 26%;" />
+          <col style="width: 8%;" />
+          <col style="width: 9%;" />
+          <col style="width: 12%;" />
+          <col style="width: 6%;" />
+          <col style="width: 15%;" />
+          <col style="width: 15%;" />
+        </colgroup>
         <tr>
-          <th>Número</th>
-          <th>Título</th>
-          <th>Segmento</th>
-          <th>Prioridade</th>
-          <th>Status</th>
-          <th>SLA</th>
-          <th>Abertura</th>
-          <th>Última atualização</th>
+          <th style="padding:6px 4px;">Número</th>
+          <th style="padding:6px 4px;">Título</th>
+          <th style="padding:6px 4px;">Segmento</th>
+          <th style="padding:6px 4px;">Prioridade</th>
+          <th style="padding:6px 4px;">Status</th>
+          <th style="padding:6px 4px;">SLA</th>
+          <th style="padding:6px 4px;">Abertura</th>
+          <th style="padding:6px 4px;">Atualizado</th>
         </tr>
         ${tickets.slice(0, 50).map(t => `
         <tr>
-          <td><strong>${t.ticket_number}</strong></td>
-          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.title}</td>
-          <td><span class="badge ${t.segment === "DB" ? "badge-info" : "badge-success"}">${t.segment}</span></td>
-          <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
-          <td>${STATUS_LABELS[t.status] || t.status}</td>
-          <td><span class="badge ${t.sla_resolution_met === true ? 'badge-success' : t.sla_resolution_met === false ? 'badge-p1' : 'badge-warning'}">${t.sla_resolution_met === true ? '✓' : t.sla_resolution_met === false ? '✗' : '⏳'}</span></td>
-          <td style="white-space:nowrap; font-size:11px;">${formatBR(t.created_at)}</td>
-          <td style="white-space:nowrap; font-size:11px;">${formatBR(t.updated_at)}</td>
+          <td style="padding:6px 4px;"><strong>${t.ticket_number}</strong></td>
+          <td style="padding:6px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.title}</td>
+          <td style="padding:6px 4px;"><span class="badge ${t.segment === "DB" ? "badge-info" : "badge-success"}">${t.segment}</span></td>
+          <td style="padding:6px 4px;"><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
+          <td style="padding:6px 4px;">${STATUS_LABELS[t.status] || t.status}</td>
+          <td style="padding:6px 4px;"><span class="badge ${t.sla_resolution_met === true ? 'badge-success' : t.sla_resolution_met === false ? 'badge-p1' : 'badge-warning'}">${t.sla_resolution_met === true ? '✓' : t.sla_resolution_met === false ? '✗' : '⏳'}</span></td>
+          <td style="padding:6px 4px; font-size:10px; line-height:1.3;">${formatBRStacked(t.created_at)}</td>
+          <td style="padding:6px 4px; font-size:10px; line-height:1.3;">${formatBRStacked(t.updated_at)}</td>
         </tr>
         `).join("")}
       </table>

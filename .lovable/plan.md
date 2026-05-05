@@ -1,73 +1,42 @@
-# Sincronizar Relatório Mensal: PDF (tela) ↔ Email
+## Corrigir overflow das colunas de data no email do relatório mensal
 
-## Diagnóstico
+No template HTML do email (`supabase/functions/send-monthly-report/index.ts`), a tabela "Listagem de Tickets" tem 8 colunas e as duas últimas (`Abertura` e `Última atualização`) estouram a largura porque o formato `dd/MM/yyyy, HH:mm` força `white-space: nowrap` em ~110px cada.
 
-Comparando os dois geradores:
+### Estratégia: compactar antes de remover
 
-| Seção | PDF (tela) | Email | Ação |
-|---|---|---|---|
-| Resumo Executivo (4 cards) | ✅ Total / Resolvidos / Tempo Médio / SLA% | ✅ 4 cards iguais + 4 extras (Tempo Médio, SLA Atendido, SLA Não Atendido, Em Andamento) | Adicionar os 4 cards extras no PDF |
-| Distribuição de Tickets (tabelas Segmento/Prioridade com %) | ❌ Ausente (só gráficos) | ✅ Duas tabelas | Adicionar tabelas no PDF |
-| Top 5 Categorias com % | ⚠️ Lista sem % | ✅ Tabela com % | Reformatar para tabela com % |
-| Resumo Numérico 6 meses | ✅ Tabela completa | ❌ Ausente | Adicionar tabela no email |
-| Listagem de tickets — Segmento | ❌ tem na tela mas não no email | — | Adicionar coluna Segmento no email |
-| Listagem de tickets — Datas | Email tem só `created_at` (dd/MM/yyyy, sem hora) | — | Mostrar Abertura **dd/MM/yyyy HH:mm** + Última atualização **dd/MM/yyyy HH:mm** |
-| Legenda SLA (✓ ✗ ⏳) | — | sem explicação | Adicionar legenda abaixo da tabela |
+Vou primeiro tentar caber as duas colunas. Se visualmente continuar apertado em clientes de email estreitos, a remoção fica como fallback simples (1 linha alterada).
 
-## Mudanças
+### Mudanças no `send-monthly-report/index.ts`
 
-### 1. `src/components/reports/MonthlyClientReport.tsx` (PDF/tela)
+1. **Quebrar data e hora em duas linhas** dentro da mesma célula:
+   - Nova função `formatBRStacked(date)` retornando `dd/MM/yyyy<br><span style="color:#64748b">HH:mm</span>`.
+   - Usada nas células `Abertura` e `Última atualização`.
+   - Reduz a largura necessária de ~110px para ~70px por coluna.
 
-**Resumo Executivo — adicionar segunda linha de 4 cards** (após o grid existente, linhas 322-375):
-- Tempo Médio Resolução (`avgResolutionHours`h) — já existe, mover para 2ª linha junto com os 3 abaixo
-- SLA Atendido (verde) → contar `sla_resolution_met === true`
-- SLA Não Atendido (vermelho) → `=== false`
-- Em Andamento (cinza) → `=== null`
+2. **Renomear cabeçalhos** para versões curtas:
+   - `Abertura` → `Abertura` (mantém)
+   - `Última atualização` → `Atualizado` (mais curto, evita quebra dupla no header).
 
-Manter na 1ª linha: Total / Resolvidos / Em Aberto (`pending`) / SLA%.
+3. **Ajustar estilos da tabela de tickets**:
+   - Adicionar `table-layout: fixed; width: 100%;` à tabela de tickets.
+   - Definir larguras explícitas nas colunas:
+     ```
+     Número 9% | Título 28% | Segmento 8% | Prioridade 9% |
+     Status 12% | SLA 6% | Abertura 14% | Atualizado 14%
+     ```
+   - Reduzir `font-size` da tabela de tickets para `11px` e `padding` para `6px 4px`.
+   - Manter `text-overflow: ellipsis` no título com `max-width` removido (a largura fixa da coluna já controla).
 
-> Nota: `useReportData` já calcula `total`, `resolved`, `pending`, `slaMetRate`, `avgResolutionHours`. Para SLA Atendido/Não/Andamento usaremos o array existente `slaCompliance` (que já separa esses 3 valores).
+4. **Remover `white-space: nowrap`** das células de data (não é mais necessário com a quebra em duas linhas).
 
-**Adicionar nova seção "Distribuição de Tickets"** entre o Resumo Executivo e "Análise de Performance":
-- Tabela 1: Segmento (DB / APP) — Quantidade — %
-- Tabela 2: Prioridade (P1/P2/P3/P4) — Quantidade — %
+### Fallback (caso o usuário prefira)
 
-Usa dados já disponíveis em `metrics.bySegment` e `metrics.byPriority`.
+Se mesmo com as melhorias o layout ficar ruim em algum cliente de email, basta remover:
+- `<th>Última atualização</th>`
+- `<td>${formatBR(t.updated_at)}</td>`
+- E renomear `Abertura` para `Última atualização` (já que `updated_at` é mais informativo) — ou manter `Abertura` apenas.
 
-**Top 5 Categorias** (linhas 516-535) — converter de lista para tabela com colunas Categoria | Quantidade | %.
+Vou aplicar a estratégia principal (compactar). Se você preferir já partir direto para remover a coluna, me avise.
 
-### 2. `supabase/functions/send-monthly-report/index.ts` (Email)
-
-**Adicionar seção "Resumo Numérico (Últimos 6 Meses)"** — buscar dados dos 6 meses anteriores:
-
-```sql
--- Para cada um dos 6 meses (incluindo o atual), contar:
---   abertos: tickets criados naquele mês (record_type != 'rfc')
---   fechados: tickets resolvidos naquele mês (resolved_at no mês)
-```
-
-Implementar uma função `fetch6MonthVolume(supabase, clientId, targetMonth, targetYear)` que retorna `[{monthLabel, abertos, fechados, saldo}]` e renderizar como tabela HTML (replicando o estilo do PDF, com linha de Total).
-
-**Listagem de Tickets (linhas 285-307)** — atualizar tabela para:
-| Número | Título | **Segmento** | Prioridade | Status | SLA | **Abertura** | **Última atualização** |
-
-- Adicionar coluna Segmento (badge DB/APP)
-- Trocar "Data" para 2 colunas: Abertura e Última atualização
-- Formatar `dd/MM/yyyy HH:mm` (timezone America/Sao_Paulo)
-- Adicionar `updated_at` à query SELECT (linha 392)
-
-**Legenda SLA** — abaixo da tabela de tickets, adicionar:
-```
-Legenda SLA: ✓ Cumprido  •  ✗ Não Cumprido  •  ⏳ Em Andamento
-```
-
-## Arquivos alterados
-
-- `src/components/reports/MonthlyClientReport.tsx`
-- `supabase/functions/send-monthly-report/index.ts`
-
-## Sem quebra
-
-- Métricas calculadas a partir dos mesmos dados; nenhuma mudança em DB ou hooks.
-- `useReportData` já retorna tudo que o PDF precisa.
-- Edge Function continua com mesma assinatura (`clientId`, `month`, `year`).
+### Arquivo alterado
+- `supabase/functions/send-monthly-report/index.ts` (apenas o template HTML e helper de data)
