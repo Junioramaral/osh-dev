@@ -1,95 +1,53 @@
+# Ajustar numeração de tickets para começar em 00101011
 
+## Situação atual
 
-# Reordenar campos APP e adicionar filtros em cascata no NewTicketDialog
+- Existem **10 tickets** no banco, com `ticket_number` indo de `00000001` a `00000010`.
+- A função `generate_ticket_number()` calcula o próximo número via `SELECT COUNT(*) + 1 FROM tickets`, gerando sempre números pequenos e sequenciais a partir de 1.
+- O usuário quer que o próximo ticket seja **00101011**, dando aparência de uma base com muitos chamados.
 
-## Objetivo
+## Estratégia
 
-Quando o cliente abrir um chamado de **Aplicação (APP)**, os campos devem aparecer e filtrar nesta ordem:
+Adicionar um **offset configurável** para que a numeração exibida seja `(COUNT + offset)` mantendo o padrão de 8 dígitos com `LPAD`. Os 10 tickets existentes ficam preservados (não vamos renumerar histórico) e o **próximo ticket** sai como `00101011`.
 
-**Produto → Ambiente → Máquina → Instância APP → Módulo**
+Para que `count(*) + 1 + offset = 101011` com `count = 10`, o offset é **101000**.
 
-E cada seleção filtra a próxima:
-- **Produto** → filtra Instâncias e Máquinas relacionadas àquele produto + cliente
-- **Ambiente** → filtra Máquinas e Instâncias daquele ambiente
-- **Máquina** → mostra apenas Instâncias daquela máquina
-- **Instância** → carrega Módulos disponíveis (`active_modules` da instância)
+## Mudanças
 
-## O que precisa mudar (arquivo único: `src/components/tickets/NewTicketDialog.tsx`)
+### 1. Migration: alterar a função `generate_ticket_number()`
 
-### 1. Adicionar `watch` para novos campos APP
-```ts
-const selectedAppEnvironment = watch("app_environment");
-const selectedAppMachineId = watch("app_machine_id");
-const selectedAppInstanceId = watch("app_instance_id");
+```sql
+CREATE OR REPLACE FUNCTION public.generate_ticket_number()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  counter INTEGER;
+  ticket_offset INTEGER := 101000;
+BEGIN
+  SELECT COUNT(*) + 1 + ticket_offset INTO counter FROM public.tickets;
+  NEW.ticket_number := LPAD(counter::TEXT, 8, '0');
+  RETURN NEW;
+END;
+$function$;
 ```
 
-### 2. Atualizar query `appInstances` (linhas 313-326)
-Incluir `machine_id` e `active_modules` no SELECT, e filtrar por `environment` + `machine_id`:
-```ts
-queryKey: ["app-instances", selectedClientId, selectedAppProductId, selectedAppEnvironment, selectedAppMachineId]
-.eq("client_id", selectedClientId)
-.eq("product_id", selectedAppProductId)
-.maybeFilter("environment", selectedAppEnvironment)
-.maybeFilter("machine_id", selectedAppMachineId)
-```
+- Próximo ticket após os 10 atuais → `LPAD(10 + 1 + 101000, 8, '0')` = **00101011** ✓
+- Os 10 tickets antigos (`00000001`–`00000010`) permanecem intactos.
+- O padrão de 8 dígitos é mantido (suporta até ~99 milhões).
 
-### 3. Atualizar query `machines` (linhas 329-373)
-Adicionar bloco para segmento APP que filtra máquinas pelas que possuem `application_instances` com o produto/ambiente selecionados:
-- Se `segment === "APP"` e `selectedAppProductId`: buscar `application_instances` por `product_id` (+ `environment` se houver) → coletar `machine_id`s → buscar máquinas com `.in("id", ids)` e opcionalmente `.eq("environment", ...)`
-- Mantém comportamento DB inalterado
+### 2. Sem alterações de frontend
 
-### 4. Nova query/derivado para Módulos
-Buscar `active_modules` da instância selecionada (campo já existe em `application_instances`, conforme `ApplicationInstanceDialog.tsx`):
-```ts
-const { data: appInstanceDetail } = useQuery({
-  queryKey: ["app-instance-modules", selectedAppInstanceId],
-  queryFn: async () => {
-    const { data } = await supabase
-      .from("application_instances")
-      .select("active_modules")
-      .eq("id", selectedAppInstanceId).single();
-    return data;
-  },
-  enabled: !!selectedAppInstanceId && segment === "APP",
-});
-const availableModules = (appInstanceDetail?.active_modules as string[]) || [];
-```
+A coluna `ticket_number` continua sendo `text` de 8 caracteres — todas as telas (`Tickets.tsx`, `MyTickets.tsx`, `TicketRow`, `TicketCreatedDialog`, e-mails, busca por número) continuam funcionando sem ajustes.
 
-### 5. Reordenar JSX (linhas 1147-1236)
-Nova estrutura visual em duas linhas:
-- **Linha 1 (grid 2 col)**: Produto + Ambiente
-- **Linha 2 (grid 3 col)**: Máquina + Instância APP + Módulo
+## Pontos de atenção
 
-O campo **Módulo** muda de `<Input>` livre para `<Select>` populado por `availableModules` (com fallback para Input livre se a instância não tiver módulos cadastrados, para não quebrar fluxos existentes).
-
-### 6. useEffects de limpeza em cascata
-```ts
-// Trocar Produto → limpar Ambiente, Máquina, Instância, Módulo
-useEffect(() => { if (segment !== "APP") return;
-  setValue("app_environment", undefined);
-  setValue("app_machine_id", undefined);
-  setValue("app_instance_id", undefined);
-  setValue("app_module", undefined);
-}, [selectedAppProductId]);
-
-// Trocar Ambiente → limpar Máquina, Instância, Módulo
-// Trocar Máquina → limpar Instância, Módulo
-// Trocar Instância → limpar Módulo
-```
-
-### 7. Auto-seleção (manter compatibilidade)
-- Auto-seleção de produto único (linhas 459-463) ✅ mantém
-- Auto-seleção de instância única (linhas 466-470) ✅ mantém
-- Adicionar: auto-seleção de máquina única quando filtrada
-
-## Pontos de atenção (sem quebrar nada)
-
-- **Ambiente continua opcional?** Hoje é opcional. Manter opcional — se vazio, não filtra.
-- **Máquina continua opcional?** Sim — instâncias podem não ter `machine_id`.
-- **Módulo continua opcional?** Sim — se a instância não tiver `active_modules`, mostra Input livre como hoje.
-- **Compatibilidade de tipos**: `application_instances.environment` é enum (`prod|hom|qa|dev`) e `machines.environment` é text — valores já alinhados.
-- **Validação Zod**: schema atual exige só `app_product_id` e `app_instance_id`. Mantém igual.
+- **Ordenação**: alguns lugares (ex.: `MyTickets.tsx`) ordenam por `parseInt(ticket_number, 10)`. Como os novos números (101011+) são maiores que os antigos (1–10), a ordem decrescente continua correta — novos aparecem primeiro.
+- **Sem renumeração** dos 10 tickets existentes (evita quebrar referências em e-mails, comentários por `Reply-To: ticket-{number}@...`, links já enviados).
+- O salto de `00000010` para `00101011` é intencional e desejado pelo usuário.
 
 ## Arquivo alterado
-- `src/components/tickets/NewTicketDialog.tsx` (única alteração)
 
+- Nova migration SQL alterando `public.generate_ticket_number()`.
