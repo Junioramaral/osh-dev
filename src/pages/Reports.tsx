@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered, Clock, ClipboardCheck } from "lucide-react";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered, Clock, ClipboardCheck, Star } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
 import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
 import CategoriesReport from "@/components/reports/CategoriesReport";
@@ -13,13 +13,14 @@ import ClosureRankingReport from "@/components/reports/ClosureRankingReport";
 import QueueWorkloadReport from "@/components/reports/QueueWorkloadReport";
 import ClientHoursReport from "@/components/reports/ClientHoursReport";
 import AnalystHoursManagementReport from "@/components/reports/AnalystHoursManagementReport";
+import CSATSatisfactionReport from "@/components/reports/CSATSatisfactionReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
 import { useAuth } from "@/contexts/AuthContext";
 
 const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | "analyst-hours-management" | null;
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | "analyst-hours-management" | "csat-satisfaction" | null;
 
 const reportTypes = [
   {
@@ -62,6 +63,13 @@ const reportTypes = [
     title: "Ranking de Encerramento",
     description: "Ranking de analistas por volume e tempo de resolução de tickets",
     icon: Trophy,
+    highlight: false,
+  },
+  {
+    id: "csat-satisfaction" as const,
+    title: "Satisfação dos Clientes (CSAT)",
+    description: "Análise detalhada das avaliações: notas, comentários, NPS, detratores e correlação com SLA",
+    icon: Star,
     highlight: false,
   },
   {
@@ -142,6 +150,10 @@ const Reports = () => {
 
   if (selectedReport === "analyst-hours-management") {
     return <AnalystHoursManagementReport onBack={() => setSelectedReport(null)} />;
+  }
+
+  if (selectedReport === "csat-satisfaction") {
+    return <CSATSatisfactionReport onBack={() => setSelectedReport(null)} />;
   }
 
   return (
