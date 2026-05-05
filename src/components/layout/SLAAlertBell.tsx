@@ -1,4 +1,5 @@
-import { Bell, Clock, ExternalLink, CheckCircle } from "lucide-react";
+import { Bell, Clock, ExternalLink, CheckCircle, CheckCheck, Loader2 } from "lucide-react";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Popover,
@@ -18,6 +19,7 @@ export const SLAAlertBell = () => {
   const { data: count = 0 } = useOverdueSLAAlertsCount();
   const { data: alerts = [] } = useOverdueSLAAlerts();
   const queryClient = useQueryClient();
+  const [acknowledgingAll, setAcknowledgingAll] = useState(false);
 
   // Only show for Otimizzo users, Super Admins, and Viewers
   if (!isSuperAdmin && !isOtimizzoUser && !isViewer) {
@@ -43,6 +45,32 @@ export const SLAAlertBell = () => {
     } catch (error) {
       console.error("Error acknowledging alert:", error);
       toast.error("Erro ao confirmar ciência");
+    }
+  };
+
+  const handleAcknowledgeAll = async () => {
+    if (alerts.length === 0 || !user?.id) return;
+    setAcknowledgingAll(true);
+    try {
+      const ids = alerts.map((a) => a.id);
+      const { error } = await supabase
+        .from("sla_notifications")
+        .update({
+          acknowledged_at: new Date().toISOString(),
+          acknowledged_by: user.id,
+        })
+        .in("id", ids);
+
+      if (error) throw error;
+
+      toast.success(`${ids.length} alerta(s) confirmado(s) com sucesso!`);
+      queryClient.invalidateQueries({ queryKey: ["overdue-sla-alerts-count"] });
+      queryClient.invalidateQueries({ queryKey: ["overdue-sla-alerts"] });
+    } catch (error) {
+      console.error("Error acknowledging all alerts:", error);
+      toast.error("Erro ao confirmar todos os alertas");
+    } finally {
+      setAcknowledgingAll(false);
     }
   };
 
@@ -74,16 +102,35 @@ export const SLAAlertBell = () => {
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="end">
         <div className="p-4 border-b">
-          <h3 className="font-semibold flex items-center gap-2">
-            <Bell className="h-4 w-4 text-destructive" />
-            Alertas de SLA Pendentes
-          </h3>
-          <p className="text-xs text-muted-foreground mt-1">
-            {count === 0 
-              ? "Nenhum alerta pendente de confirmação" 
-              : `${count} ${count === 1 ? 'ticket' : 'tickets'} aguardando ciência`
-            }
-          </p>
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex-1 min-w-0">
+              <h3 className="font-semibold flex items-center gap-2">
+                <Bell className="h-4 w-4 text-destructive" />
+                Alertas de SLA Pendentes
+              </h3>
+              <p className="text-xs text-muted-foreground mt-1">
+                {count === 0
+                  ? "Nenhum alerta pendente de confirmação"
+                  : `${count} ${count === 1 ? "ticket" : "tickets"} aguardando ciência`}
+              </p>
+            </div>
+            {alerts.length > 1 && (
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-7 text-xs shrink-0"
+                onClick={handleAcknowledgeAll}
+                disabled={acknowledgingAll}
+              >
+                {acknowledgingAll ? (
+                  <Loader2 className="h-3 w-3 mr-1 animate-spin" />
+                ) : (
+                  <CheckCheck className="h-3 w-3 mr-1" />
+                )}
+                Ciente em todos
+              </Button>
+            )}
+          </div>
         </div>
         
         <div className="max-h-80 overflow-y-auto">
