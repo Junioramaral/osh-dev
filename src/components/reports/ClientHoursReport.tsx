@@ -41,6 +41,7 @@ import {
 } from "@/components/ui/table";
 import ReportFooter from "./ReportFooter";
 import PrintPage from "./PrintPage";
+import AppLayout from "@/components/layout/AppLayout";
 
 interface ClientHoursReportProps {
   onBack: () => void;
@@ -112,6 +113,7 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
   };
 
   return (
+    <AppLayout>
     <div className="space-y-6 print:space-y-4">
       {/* Header - Hide on print */}
       <div className="flex items-center justify-between print:hidden">
@@ -457,6 +459,7 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
 
       <ReportFooter />
     </div>
+    </AppLayout>
   );
 };
 

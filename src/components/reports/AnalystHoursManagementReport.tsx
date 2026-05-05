@@ -17,6 +17,7 @@ import ReportFooter from "./ReportFooter";
 import PrintPage from "./PrintPage";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import AppLayout from "@/components/layout/AppLayout";
 
 interface AnalystHoursManagementReportProps {
   onBack: () => void;
@@ -108,6 +109,7 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
   ];
 
   return (
+    <AppLayout>
     <div className="space-y-6">
       {/* Header - Hidden on print */}
       <div className="flex items-center justify-between print:hidden">
@@ -536,6 +538,7 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
         <ReportFooter />
       </div>
     </div>
+    </AppLayout>
   );
 };
 

@@ -16,6 +16,7 @@ import { BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, R
 import ReportCover from "./ReportCover";
 import PrintPage from "./PrintPage";
 import ReportFooter from "./ReportFooter";
+import AppLayout from "@/components/layout/AppLayout";
 
 interface ClosureRankingReportProps {
   onBack: () => void;
@@ -305,6 +306,7 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
   const trendMap = new Map(evolutionData?.analysts.map(a => [a.analyst_id, a.trends]) || []);
 
   return (
+    <AppLayout>
     <div className="print-container">
       {/* Screen Header */}
       <div className="flex items-center justify-between mb-6 print:hidden">
@@ -1307,6 +1309,7 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
         </>
       )}
     </div>
+    </AppLayout>
   );
 };
 
