@@ -67,6 +67,16 @@ export function useBulkTicketActions() {
       ticketIds: string[];
       status: string;
     }) => {
+      if (status === "resolvido") {
+        const { data: check } = await supabase
+          .from("tickets")
+          .select("id, analyst_id, team_id, queue_id")
+          .in("id", ticketIds);
+        const incomplete = (check || []).find(t => !t.analyst_id || !t.team_id || !t.queue_id);
+        if (incomplete) {
+          throw new Error("Atribua Analista, Time e Fila antes de resolver os tickets.");
+        }
+      }
       const updates: any = { status };
       
       // Se status for 'resolvido', marcar resolved_at
@@ -104,6 +114,19 @@ export function useBulkTicketActions() {
       reason: string;
       userId: string;
     }) => {
+      // Validação obrigatória ao resolver: analyst, team e queue devem estar preenchidos
+      if (status === "resolvido") {
+        const { data: check } = await supabase
+          .from("tickets")
+          .select("id, analyst_id, team_id, queue_id")
+          .in("id", ticketIds);
+        const incomplete = (check || []).find(
+          t => (!t.analyst_id && !userId) || !t.team_id || !t.queue_id
+        );
+        if (incomplete) {
+          throw new Error("Atribua Analista, Time e Fila antes de resolver os tickets.");
+        }
+      }
       // 1. Buscar dados do analista (autor)
       const { data: authorProfile } = await supabase
         .from("profiles")
