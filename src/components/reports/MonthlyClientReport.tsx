@@ -349,12 +349,12 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
                 <Card className="print-break-avoid">
                   <CardContent className="pt-6">
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-yellow-500/10 rounded-lg">
-                        <Clock className="h-5 w-5 text-yellow-500" />
+                      <div className="p-2 bg-orange-500/10 rounded-lg">
+                        <AlertCircle className="h-5 w-5 text-orange-500" />
                       </div>
                       <div>
-                        <p className="text-3xl font-bold">{reportData.metrics.avgResolutionHours}h</p>
-                        <p className="text-sm text-muted-foreground">Tempo Médio</p>
+                        <p className="text-3xl font-bold">{reportData.metrics.pending}</p>
+                        <p className="text-sm text-muted-foreground">Em Aberto</p>
                       </div>
                     </div>
                   </CardContent>
@@ -370,6 +370,128 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
                         <p className="text-sm text-muted-foreground">SLA Cumprido</p>
                       </div>
                     </div>
+                  </CardContent>
+                </Card>
+              </div>
+
+              {(() => {
+                const slaMet = reportData.metrics.slaCompliance.find(s => s.name === "Cumprido")?.value ?? 0;
+                const slaNotMet = reportData.metrics.slaCompliance.find(s => s.name === "Não Cumprido")?.value ?? 0;
+                const slaInProgress = reportData.metrics.slaCompliance.find(s => s.name === "Em Andamento")?.value ?? 0;
+                return (
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                    <Card className="print-break-avoid">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-yellow-500/10 rounded-lg">
+                            <Clock className="h-5 w-5 text-yellow-500" />
+                          </div>
+                          <div>
+                            <p className="text-3xl font-bold">{reportData.metrics.avgResolutionHours}h</p>
+                            <p className="text-sm text-muted-foreground">Tempo Médio Resolução</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="print-break-avoid">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-green-500/10 rounded-lg">
+                            <CheckCircle className="h-5 w-5 text-green-500" />
+                          </div>
+                          <div>
+                            <p className="text-3xl font-bold text-green-600">{slaMet}</p>
+                            <p className="text-sm text-muted-foreground">SLA Atendido</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="print-break-avoid">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-red-500/10 rounded-lg">
+                            <AlertCircle className="h-5 w-5 text-red-500" />
+                          </div>
+                          <div>
+                            <p className="text-3xl font-bold text-red-600">{slaNotMet}</p>
+                            <p className="text-sm text-muted-foreground">SLA Não Atendido</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                    <Card className="print-break-avoid">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="p-2 bg-yellow-500/10 rounded-lg">
+                            <Clock className="h-5 w-5 text-yellow-600" />
+                          </div>
+                          <div>
+                            <p className="text-3xl font-bold">{slaInProgress}</p>
+                            <p className="text-sm text-muted-foreground">Em Andamento</p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  </div>
+                );
+              })()}
+
+              {/* Distribuição de Tickets - tabelas */}
+              <div className="grid gap-4 md:grid-cols-2">
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Distribuição por Segmento</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Segmento</TableHead>
+                          <TableHead className="text-center">Qtd</TableHead>
+                          <TableHead className="text-center">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.metrics.bySegment.map((s) => (
+                          <TableRow key={s.name}>
+                            <TableCell>{s.name}</TableCell>
+                            <TableCell className="text-center font-semibold">{s.value}</TableCell>
+                            <TableCell className="text-center">
+                              {reportData.metrics.total > 0 ? Math.round((s.value / reportData.metrics.total) * 100) : 0}%
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </CardContent>
+                </Card>
+                <Card className="print-break-avoid">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-base">Distribuição por Prioridade</CardTitle>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>Prioridade</TableHead>
+                          <TableHead className="text-center">Qtd</TableHead>
+                          <TableHead className="text-center">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.metrics.byPriority.map((p) => (
+                          <TableRow key={p.name}>
+                            <TableCell>
+                              <Badge variant={getPriorityBadgeVariant(p.name)}>{p.name}</Badge>
+                            </TableCell>
+                            <TableCell className="text-center font-semibold">{p.value}</TableCell>
+                            <TableCell className="text-center">
+                              {reportData.metrics.total > 0 ? Math.round((p.value / reportData.metrics.total) * 100) : 0}%
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               </div>
@@ -519,17 +641,28 @@ const MonthlyClientReport = ({ onBack }: MonthlyClientReportProps) => {
                     <CardTitle className="text-base">Top 5 Categorias</CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="space-y-3">
-                      {reportData.metrics.topCategories.map((cat, index) => (
-                        <div key={cat.name} className="flex items-center justify-between">
-                          <div className="flex items-center gap-3">
-                            <span className="text-lg font-bold text-muted-foreground w-8">{index + 1}.</span>
-                            <span className="font-medium">{cat.name}</span>
-                          </div>
-                          <Badge variant="secondary" className="text-lg px-3">{cat.count}</Badge>
-                        </div>
-                      ))}
-                    </div>
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead className="text-center">Qtd</TableHead>
+                          <TableHead className="text-center">%</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {reportData.metrics.topCategories.map((cat, index) => (
+                          <TableRow key={cat.name}>
+                            <TableCell className="font-bold text-muted-foreground">{index + 1}</TableCell>
+                            <TableCell className="font-medium">{cat.name}</TableCell>
+                            <TableCell className="text-center font-semibold">{cat.count}</TableCell>
+                            <TableCell className="text-center">
+                              {reportData.metrics.total > 0 ? Math.round((cat.count / reportData.metrics.total) * 100) : 0}%
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </CardContent>
                 </Card>
               )}

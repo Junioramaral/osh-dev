@@ -22,6 +22,7 @@ interface TicketData {
   segment: string;
   category: string;
   created_at: string;
+  updated_at: string | null;
   resolved_at: string | null;
   sla_first_response_met: boolean | null;
   sla_resolution_met: boolean | null;
@@ -39,6 +40,68 @@ const STATUS_LABELS: Record<string, string> = {
   resolvido: "Resolvido",
   fechado: "Fechado",
 };
+
+interface MonthlyVolumeRow {
+  monthLabel: string;
+  abertos: number;
+  fechados: number;
+}
+
+function formatBR(date: string | null | undefined): string {
+  if (!date) return "-";
+  try {
+    return new Date(date).toLocaleString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "-";
+  }
+}
+
+async function fetch6MonthVolume(
+  supabase: any,
+  clientId: string,
+  targetMonth: number,
+  targetYear: number,
+): Promise<MonthlyVolumeRow[]> {
+  const rows: MonthlyVolumeRow[] = [];
+  // 6 months: from (target-5) to target inclusive
+  for (let i = 5; i >= 0; i--) {
+    const d = new Date(targetYear, targetMonth - 1 - i, 1);
+    const m = d.getMonth();
+    const y = d.getFullYear();
+    const start = new Date(y, m, 1).toISOString();
+    const end = new Date(y, m + 1, 0, 23, 59, 59, 999).toISOString();
+
+    const { count: abertosCount } = await supabase
+      .from("tickets")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", clientId)
+      .neq("record_type", "rfc")
+      .gte("created_at", start)
+      .lte("created_at", end);
+
+    const { count: fechadosCount } = await supabase
+      .from("tickets")
+      .select("id", { count: "exact", head: true })
+      .eq("client_id", clientId)
+      .neq("record_type", "rfc")
+      .gte("resolved_at", start)
+      .lte("resolved_at", end);
+
+    rows.push({
+      monthLabel: `${MONTH_NAMES[m].slice(0, 3)}/${String(y).slice(-2)}`,
+      abertos: abertosCount || 0,
+      fechados: fechadosCount || 0,
+    });
+  }
+  return rows;
+}
 
 function calculateMetrics(tickets: TicketData[]) {
   const total = tickets.length;
@@ -105,7 +168,8 @@ function generateReportHTML(
   month: number,
   year: number,
   metrics: ReturnType<typeof calculateMetrics>,
-  tickets: TicketData[]
+  tickets: TicketData[],
+  monthlyVolume: MonthlyVolumeRow[],
 ): string {
   const monthName = MONTH_NAMES[month - 1];
   const generationDate = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
@@ -278,6 +342,44 @@ function generateReportHTML(
       </table>
     </div>
     ` : ""}
+
+    <!-- Resumo Numérico - Últimos 6 Meses -->
+    ${monthlyVolume.length > 0 ? `
+    <div class="section">
+      <div class="section-title">📅 Resumo Numérico - Últimos 6 Meses</div>
+      <table>
+        <tr>
+          <th>Mês</th>
+          <th style="text-align:center;">Abertos</th>
+          <th style="text-align:center;">Fechados</th>
+          <th style="text-align:center;">Saldo</th>
+        </tr>
+        ${monthlyVolume.map((m) => {
+          const saldo = m.fechados - m.abertos;
+          const saldoColor = saldo >= 0 ? "#16a34a" : "#dc2626";
+          return `
+          <tr>
+            <td><strong>${m.monthLabel}</strong></td>
+            <td style="text-align:center; color:#d97706; font-weight:600;">${m.abertos}</td>
+            <td style="text-align:center; color:#16a34a; font-weight:600;">${m.fechados}</td>
+            <td style="text-align:center; color:${saldoColor}; font-weight:600;">${saldo > 0 ? "+" : ""}${saldo}</td>
+          </tr>`;
+        }).join("")}
+        ${(() => {
+          const totA = monthlyVolume.reduce((s, m) => s + m.abertos, 0);
+          const totF = monthlyVolume.reduce((s, m) => s + m.fechados, 0);
+          const totS = totF - totA;
+          return `
+          <tr style="background:#f1f5f9; font-weight:bold;">
+            <td>Total</td>
+            <td style="text-align:center; color:#d97706;">${totA}</td>
+            <td style="text-align:center; color:#16a34a;">${totF}</td>
+            <td style="text-align:center; color:${totS >= 0 ? "#16a34a" : "#dc2626"};">${totS > 0 ? "+" : ""}${totS}</td>
+          </tr>`;
+        })()}
+      </table>
+    </div>
+    ` : ""}
     
     <!-- Listagem de Tickets -->
     <div class="section">
@@ -287,23 +389,33 @@ function generateReportHTML(
         <tr>
           <th>Número</th>
           <th>Título</th>
+          <th>Segmento</th>
           <th>Prioridade</th>
           <th>Status</th>
           <th>SLA</th>
-          <th>Data</th>
+          <th>Abertura</th>
+          <th>Última atualização</th>
         </tr>
         ${tickets.slice(0, 50).map(t => `
         <tr>
           <td><strong>${t.ticket_number}</strong></td>
           <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.title}</td>
+          <td><span class="badge ${t.segment === "DB" ? "badge-info" : "badge-success"}">${t.segment}</span></td>
           <td><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
           <td>${STATUS_LABELS[t.status] || t.status}</td>
           <td><span class="badge ${t.sla_resolution_met === true ? 'badge-success' : t.sla_resolution_met === false ? 'badge-p1' : 'badge-warning'}">${t.sla_resolution_met === true ? '✓' : t.sla_resolution_met === false ? '✗' : '⏳'}</span></td>
-          <td>${new Date(t.created_at).toLocaleDateString("pt-BR")}</td>
+          <td style="white-space:nowrap; font-size:11px;">${formatBR(t.created_at)}</td>
+          <td style="white-space:nowrap; font-size:11px;">${formatBR(t.updated_at)}</td>
         </tr>
         `).join("")}
       </table>
       ${tickets.length > 50 ? `<p style="text-align: center; color: #64748b; margin-top: 10px;">... e mais ${tickets.length - 50} tickets</p>` : ""}
+      <p style="margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 6px; font-size: 11px; color: #475569;">
+        <strong>Legenda SLA:</strong>
+        <span class="badge badge-success">✓</span> Cumprido &nbsp;•&nbsp;
+        <span class="badge badge-p1">✗</span> Não Cumprido &nbsp;•&nbsp;
+        <span class="badge badge-warning">⏳</span> Em Andamento
+      </p>
       ` : `<p style="text-align: center; color: #64748b;">Nenhum ticket registrado neste período.</p>`}
     </div>
     
@@ -390,7 +502,7 @@ const handler = async (req: Request): Promise<Response> => {
           .from("tickets")
           .select(`
             id, ticket_number, title, priority, status, segment, category,
-            created_at, resolved_at, sla_first_response_met, sla_resolution_met
+            created_at, updated_at, resolved_at, sla_first_response_met, sla_resolution_met
           `)
           .eq("client_id", client.id)
           .neq("record_type", "rfc")
@@ -408,13 +520,17 @@ const handler = async (req: Request): Promise<Response> => {
         // Calculate metrics
         const metrics = calculateMetrics(tickets as TicketData[] || []);
 
+        // Fetch 6-month volume data
+        const monthlyVolume = await fetch6MonthVolume(supabase, client.id, targetMonth, targetYear);
+
         // Generate HTML report
         const htmlContent = generateReportHTML(
           client.name,
           targetMonth,
           targetYear,
           metrics,
-          tickets as TicketData[] || []
+          tickets as TicketData[] || [],
+          monthlyVolume,
         );
 
         // Get recipients
