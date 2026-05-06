@@ -474,6 +474,7 @@ export default function Tickets() {
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
+      'rascunho': 0,
       'novo': 0,
       'em_atendimento': 1,
       'aguardando_cliente': 2,
