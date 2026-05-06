@@ -685,6 +685,58 @@ const Dashboard = () => {
             <DashboardSection title="Distribuição por Segmento" icon={LayoutGrid}>
               {distributionCards.map(renderStatCard)}
             </DashboardSection>
+
+            {/* Seção 4: Distribuição por Prioridade */}
+            <DashboardSection title="Distribuição por Prioridade" icon={Flag}>
+              {priorityCounts.map((p) =>
+                renderStatCard({
+                  title: `Tickets ${p.priority}`,
+                  value: p.count,
+                  icon: Flag,
+                  color: PRIORITY_STYLES[p.priority]?.color || "text-muted-foreground",
+                  bgColor: PRIORITY_STYLES[p.priority]?.bgColor || "bg-muted",
+                })
+              )}
+            </DashboardSection>
+
+            {/* Top 5 Categorias */}
+            {topCategories.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Tags className="w-5 h-5" />
+                    Top 5 Categorias
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead className="text-center">Qtd</TableHead>
+                        <TableHead className="text-center">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topCategories.map((cat, index) => (
+                        <TableRow key={cat.name}>
+                          <TableCell className="font-bold text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="font-medium">{cat.name}</TableCell>
+                          <TableCell className="text-center font-semibold">{cat.count}</TableCell>
+                          <TableCell className="text-center">
+                            {totalForDistribution > 0
+                              ? Math.round((cat.count / totalForDistribution) * 100)
+                              : 0}
+                            %
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
