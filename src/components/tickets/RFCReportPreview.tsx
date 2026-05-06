@@ -107,47 +107,9 @@ export default function RFCReportPreview({ ticket }: RFCReportPreviewProps) {
   const handleSendToClient = async () => {
     setSending(true);
     try {
-      const pdf = await generatePDF();
-      if (!pdf) throw new Error("Falha ao gerar PDF");
-
-      const pdfBlob = pdf.output("blob");
-      const fileName = `rfc-report-${ticket.ticket_number}.pdf`;
-      const filePath = `${ticket.client_id}/${ticket.id}/${fileName}`;
-
-      // Upload to Supabase Storage
-      const { error: uploadError } = await supabase.storage
-        .from("tickets")
-        .upload(filePath, pdfBlob, {
-          contentType: "application/pdf",
-          upsert: true,
-        });
-
-      if (uploadError) throw uploadError;
-
-      // Get public URL
-      const { data: urlData } = supabase.storage
-        .from("tickets")
-        .getPublicUrl(filePath);
-
-      // Get signed URL (bucket is private)
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from("tickets")
-        .createSignedUrl(filePath, 60 * 60 * 24 * 30); // 30 days
-
-      if (signedError) throw signedError;
-
-      // Send email via edge function
+      // Send inline HTML email via edge function (no PDF upload)
       const { error: sendError } = await supabase.functions.invoke("send-rfc-report", {
-        body: {
-          ticketId: ticket.id,
-          ticketNumber: ticket.ticket_number,
-          ticketTitle: ticket.title,
-          contactEmail: ticket.contact_email,
-          contactName: ticket.contact_name,
-          clientName: ticket.clients?.name || "Cliente",
-          reportUrl: signedData.signedUrl,
-          analystName: profile?.full_name || "Analista",
-        },
+        body: { ticketId: ticket.id },
       });
 
       if (sendError) throw sendError;
