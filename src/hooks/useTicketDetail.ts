@@ -1,5 +1,6 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { fetchTicketCreator } from "@/lib/ticketCreator";
 
 export function useTicketDetail(ticketId: string | undefined) {
   return useQuery({
@@ -31,7 +32,8 @@ export function useTicketDetail(ticketId: string | undefined) {
         const { data: emailData } = await supabase.rpc('get_user_email', { _user_id: data.analyst_id });
         analyst_email = (emailData as string) ?? null;
       }
-      return { ...data, analyst_email };
+      const creator = await fetchTicketCreator(ticketId);
+      return { ...data, analyst_email, ...creator };
     },
     enabled: !!ticketId
   });
