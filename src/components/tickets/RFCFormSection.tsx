@@ -91,7 +91,7 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
     title.trim().length > 0 &&
     steps.length > 0;
 
-  const handleSubmit = async (status: "novo" | "aguardando_aprovacao") => {
+  const handleSubmit = async (status: "rascunho" | "aguardando_aprovacao") => {
     if (!isValid) {
       toast({
         title: "Campos obrigatórios",
@@ -304,7 +304,7 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         <Button
           type="button"
           variant="outline"
-          onClick={() => handleSubmit("novo")}
+          onClick={() => handleSubmit("rascunho")}
           disabled={isSubmitting || !isValid}
         >
           {isSubmitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

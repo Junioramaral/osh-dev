@@ -49,7 +49,7 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
   const { isOtimizzoUser, isSuperAdmin, profile } = useAuth();
   const queryClient = useQueryClient();
 
-  const isDraft = ticket.status === "novo" && (isOtimizzoUser || isSuperAdmin);
+  const isDraft = ticket.status === "rascunho" && (isOtimizzoUser || isSuperAdmin);
 
   const [editSteps, setEditSteps] = useState<RFCStep[]>([]);
   const [isSaving, setIsSaving] = useState(false);

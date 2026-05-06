@@ -188,6 +188,8 @@ export const getPriorityColor = (priority: string) => {
 
 export const getStatusColor = (status: string) => {
   switch (status) {
+    case 'rascunho':
+      return 'bg-slate-100 text-slate-700 border-slate-300';
     case 'novo':
       return 'bg-blue-100 text-blue-800 border-blue-300';
     case 'em_atendimento':
@@ -205,6 +207,8 @@ export const getStatusColor = (status: string) => {
 
 export const getStatusLabel = (status: string) => {
   switch (status) {
+    case 'rascunho':
+      return 'Rascunho';
     case 'novo':
       return 'Novo';
     case 'em_atendimento':

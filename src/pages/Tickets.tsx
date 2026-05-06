@@ -474,6 +474,7 @@ export default function Tickets() {
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
+      'rascunho': 0,
       'novo': 0,
       'em_atendimento': 1,
       'aguardando_cliente': 2,
@@ -545,6 +546,7 @@ export default function Tickets() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="rascunho">Rascunho</SelectItem>
               <SelectItem value="novo">Novo</SelectItem>
               <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
               <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
