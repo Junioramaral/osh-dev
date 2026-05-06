@@ -894,6 +894,69 @@ const Dashboard = () => {
           </CardContent>
         </Card>
 
+        {/* Resumo Numérico - Volume Mensal */}
+        {monthlyVolumeData && monthlyVolumeData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Resumo Numérico
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mês</TableHead>
+                    <TableHead className="text-center">Abertos</TableHead>
+                    <TableHead className="text-center">Fechados</TableHead>
+                    <TableHead className="text-center">Saldo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyVolumeData.slice(-barChartPeriod).map((m) => {
+                    const saldo = m.fechados - m.abertos;
+                    return (
+                      <TableRow key={m.month}>
+                        <TableCell className="capitalize font-medium">{m.monthLabel}</TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-yellow-600 font-semibold">{m.abertos}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-green-600 font-semibold">{m.fechados}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={saldo >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+                            {saldo > 0 ? "+" : ""}{saldo}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {(() => {
+                    const slice = monthlyVolumeData.slice(-barChartPeriod);
+                    const totalAbertos = slice.reduce((sum, m) => sum + m.abertos, 0);
+                    const totalFechados = slice.reduce((sum, m) => sum + m.fechados, 0);
+                    const totalSaldo = totalFechados - totalAbertos;
+                    return (
+                      <TableRow className="font-bold border-t-2">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-center text-yellow-600">{totalAbertos}</TableCell>
+                        <TableCell className="text-center text-green-600">{totalFechados}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={totalSaldo >= 0 ? "text-green-600" : "text-red-600"}>
+                            {totalSaldo > 0 ? "+" : ""}{totalSaldo}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
+
       </div>
       
       <NewTicketDialog 
