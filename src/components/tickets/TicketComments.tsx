@@ -362,6 +362,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
+              {!isClientUser && (
               <div className="flex items-center gap-2">
                 <Switch checked={isInternal} onCheckedChange={setIsInternal} id="internal" />
                 <Label htmlFor="internal" className="text-sm cursor-pointer">Comentário interno</Label>
@@ -380,6 +381,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
                   </Tooltip>
                 </TooltipProvider>
               </div>
+              )}
             </div>
             
             <div className="flex items-center gap-2">
