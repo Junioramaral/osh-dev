@@ -1,5 +1,5 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Building2, User, Settings2 } from "lucide-react";
+import { Building2, User, Settings2, UserPlus } from "lucide-react";
 
 interface RFCContextCardsProps {
   ticket: any;
@@ -36,7 +36,7 @@ export default function RFCContextCards({ ticket }: RFCContextCardsProps) {
     : env || null;
 
   return (
-    <div className="grid gap-3 md:grid-cols-3">
+    <div className="grid gap-3 md:grid-cols-2 lg:grid-cols-4">
       {/* Cliente */}
       <Card>
         <CardHeader className="pb-2">
@@ -50,6 +50,22 @@ export default function RFCContextCards({ ticket }: RFCContextCardsProps) {
           <Row label="Domínio" value={ticket.clients?.domain} />
         </CardContent>
       </Card>
+
+      {/* Solicitante (quem abriu a RFC) */}
+      {(ticket.created_by_name || ticket.created_by_email) && (
+        <Card>
+          <CardHeader className="pb-2">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <UserPlus className="w-4 h-4 text-primary" />
+              Solicitante
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <Row label="Nome" value={ticket.created_by_name} />
+            <Row label="Email" value={ticket.created_by_email} />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Contato */}
       <Card>
