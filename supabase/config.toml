@@ -44,3 +44,6 @@ verify_jwt = false
 
 [functions.send-rfc-report]
 verify_jwt = false
+
+[functions.send-analyst-assignment-notification]
+verify_jwt = false
