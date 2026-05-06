@@ -45,7 +45,7 @@ export default function Tickets() {
     { value: "resolvido", label: "Resolvido" },
     { value: "fechado", label: "Fechado" },
   ];
-  const DEFAULT_STATUS_FILTERS = ["rascunho", "novo", "em_atendimento", "aguardando_cliente"];
+  const DEFAULT_STATUS_FILTERS = ["rascunho", "novo", "em_atendimento", "aguardando_cliente", "aguardando_aprovacao", "aprovado"];
   const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");

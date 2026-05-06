@@ -470,8 +470,9 @@ export default function MyTickets() {
               <SelectItem value="novo">Novo</SelectItem>
               <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
               <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
+              <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
+              <SelectItem value="aprovado">Aprovado</SelectItem>
               <SelectItem value="resolvido">Resolvido</SelectItem>
-              <SelectItem value="fechado">Fechado</SelectItem>
             </SelectContent>
           </Select>
           <Select value={segmentFilter} onValueChange={setSegmentFilter}>

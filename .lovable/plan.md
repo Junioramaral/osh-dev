@@ -1,26 +1,26 @@
 ## Objetivo
-
-Na aba **RFC** do ticket (visualização antes/depois da aprovação), permitir expandir cada passo da tabela "Passos" para visualizar o **procedimento detalhado** e os **scripts/comandos** já cadastrados na RFC — informações que hoje só aparecem no modo de execução.
+Incluir os status `aguardando_aprovacao` ("Aguardando Aprovação") e `aprovado` ("Aprovado") nos filtros padrão de status, tanto na tela **Tickets** quanto em **Meus Tickets**.
 
 ## Mudanças
 
-### `src/components/tickets/TicketRFCReport.tsx`
-- Adicionar estado local `expandedSteps: Set<string>` para controlar quais linhas estão abertas.
-- Em cada linha da tabela de passos, incluir uma coluna inicial com botão chevron (ChevronRight / ChevronDown) que alterna a expansão.
-- Quando expandida, renderizar uma `TableRow` adicional com `colSpan` total contendo dois blocos:
-  - **Procedimento detalhado** — texto formatado (`whitespace-pre-wrap`) a partir de `step.procedimento`. Sempre visível.
-  - **Scripts / Comandos** — bloco monoespaçado com fundo escuro (`bg-muted` / `font-mono`) a partir de `step.scripts`. Visível apenas para usuários internos (`isOtimizzoUser || isSuperAdmin`), respeitando a regra existente de ocultar scripts para clientes.
-- Se um passo não tiver procedimento nem scripts (ou cliente sem procedimento), exibir mensagem discreta "Sem detalhes adicionais".
-- Adicionar botão "Expandir todos / Recolher todos" acima da tabela para conveniência.
+### `src/pages/Tickets.tsx`
+- As opções já existem em `STATUS_OPTIONS` (adicionadas anteriormente).
+- Atualizar `DEFAULT_STATUS_FILTERS` para incluir os dois novos valores:
+  ```ts
+  const DEFAULT_STATUS_FILTERS = [
+    "rascunho", "novo", "em_atendimento",
+    "aguardando_cliente", "aguardando_aprovacao", "aprovado"
+  ];
+  ```
 
-### Sem alterações de backend
-Os campos `procedimento` e `scripts` já existem em `rfc_steps` e já são retornados pelo hook `useTicketRFCSteps`. Nada a mudar em SQL, RLS ou edge functions.
-
-## Aspectos visuais
-- Manter o layout atual da tabela; a linha expandida usa fundo `bg-muted/30` para destacar.
-- Ícones via `lucide-react` (`ChevronRight`, `ChevronDown`, `FileText`, `Terminal`).
-- Tokens semânticos do design system (sem cores hardcoded).
+### `src/pages/MyTickets.tsx`
+- O select de status hoje é estático e não inclui os status de RFC. Adicionar duas opções:
+  ```tsx
+  <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
+  <SelectItem value="aprovado">Aprovado</SelectItem>
+  ```
+- Posicioná-las após "Aguardando Cliente" para manter ordem coerente com Tickets.
+- Remover `"fechado"` do select (regra do projeto: não exibir "Fechado" em menus de UI).
 
 ## Fora do escopo
-- Não altera a tela de execução de passos (`RFCExecution`) nem o portal do cliente.
-- Não altera a política de visibilidade de scripts para clientes.
+- Não altera prioridades de ordenação por status, lógica de RFC, ou backend.
