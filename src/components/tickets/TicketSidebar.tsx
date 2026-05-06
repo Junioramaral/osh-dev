@@ -21,7 +21,7 @@ import {
 } from "@/components/ui/select";
 import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer, Pencil } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "./RequiredFieldsBeforeResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
@@ -31,7 +31,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
-import { useQueryClient } from "@tanstack/react-query";
+import { useQueryClient, useQuery } from "@tanstack/react-query";
+
+const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 interface TicketSidebarProps {
   ticket: any;
@@ -57,6 +59,50 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const queryClient = useQueryClient();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
   const { data: history } = useTicketHistory(ticket.id);
+  const canAssignAnalyst = (isOtimizzoUser || isSuperAdmin) && !isViewer;
+  const [editingAnalyst, setEditingAnalyst] = useState(false);
+  const [assigningAnalyst, setAssigningAnalyst] = useState(false);
+
+  const { data: assignableAnalysts } = useQuery({
+    queryKey: ["sidebar-otimizzo-analysts"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, team_id")
+        .eq("client_id", OTIMIZZO_TENANT_ID)
+        .eq("is_active", true)
+        .order("full_name");
+      if (error) throw error;
+      return data || [];
+    },
+    enabled: canAssignAnalyst,
+  });
+
+  const handleAssignAnalyst = async (analystId: string) => {
+    const analyst = assignableAnalysts?.find((a) => a.id === analystId);
+    if (!analyst) return;
+    setAssigningAnalyst(true);
+    try {
+      const updates: Record<string, any> = {
+        analyst_id: analystId,
+        lock_status: "locked",
+        lock_owner_id: analystId,
+        lock_at: new Date().toISOString(),
+        unlocked_at: null,
+      };
+      if (analyst.team_id) updates.team_id = analyst.team_id;
+      const { error } = await supabase.from("tickets").update(updates).eq("id", ticket.id);
+      if (error) throw error;
+      await queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      await queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      toast.success("Analista atribuído");
+      setEditingAnalyst(false);
+    } catch (e: any) {
+      toast.error("Erro ao atribuir analista: " + e.message);
+    } finally {
+      setAssigningAnalyst(false);
+    }
+  };
   
   // Fallback: get resolver name from history if resolved_by is empty
   const resolvedByName = useMemo(() => {
@@ -503,19 +549,65 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         <CardContent className="space-y-3">
           <div>
             <Label className="text-xs text-muted-foreground">Analista</Label>
-            <div className="flex items-center gap-2 mt-1">
-              <Avatar className="h-6 w-6">
-                <AvatarFallback className="text-xs">
-                  {ticket.profiles?.full_name?.[0] || 'N'}
-                </AvatarFallback>
-              </Avatar>
-              <div className="flex flex-col">
-                <span className="text-sm">{ticket.profiles?.full_name || 'Não atribuído'}</span>
-                {ticket.analyst_email && (
-                  <span className="text-xs text-muted-foreground">{ticket.analyst_email}</span>
+            {canAssignAnalyst && (editingAnalyst || !ticket.analyst_id) ? (
+              <div className="mt-1 space-y-2">
+                <Select
+                  value={ticket.analyst_id || ""}
+                  onValueChange={handleAssignAnalyst}
+                  disabled={assigningAnalyst}
+                >
+                  <SelectTrigger className="h-9">
+                    <SelectValue placeholder="Selecione um analista" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {assignableAnalysts?.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.full_name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {ticket.analyst_id && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-7 px-2 text-xs"
+                    onClick={() => setEditingAnalyst(false)}
+                    disabled={assigningAnalyst}
+                  >
+                    Cancelar
+                  </Button>
+                )}
+                <p className="text-xs text-muted-foreground">
+                  O time será preenchido automaticamente conforme o analista.
+                </p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 mt-1">
+                <Avatar className="h-6 w-6">
+                  <AvatarFallback className="text-xs">
+                    {ticket.profiles?.full_name?.[0] || 'N'}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex flex-col flex-1">
+                  <span className="text-sm">{ticket.profiles?.full_name || 'Não atribuído'}</span>
+                  {ticket.analyst_email && (
+                    <span className="text-xs text-muted-foreground">{ticket.analyst_email}</span>
+                  )}
+                </div>
+                {canAssignAnalyst && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => setEditingAnalyst(true)}
+                    title="Alterar analista"
+                  >
+                    <Pencil className="h-3.5 w-3.5" />
+                  </Button>
                 )}
               </div>
-            </div>
+            )}
           </div>
           
           <div>
