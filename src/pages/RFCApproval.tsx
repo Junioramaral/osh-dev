@@ -293,7 +293,7 @@ const RFCApproval = () => {
           </div>
 
           {/* Right: Details + Decision — inline JSX (not a sub-component) */}
-          <div className={`flex flex-col h-full ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
+          <div className={`flex flex-col h-full min-h-0 ${!showDetails && !selectedRfcId ? "hidden md:flex" : showDetails ? "flex" : "hidden md:flex"}`}>
             {!selectedRfc ? (
               <div className="flex flex-col items-center justify-center h-full text-center px-8">
                 <ShieldCheck className="w-12 h-12 text-muted-foreground mb-4" />
@@ -303,7 +303,7 @@ const RFCApproval = () => {
                 </p>
               </div>
             ) : (
-              <div className="flex flex-col h-full">
+              <div className="flex flex-col h-full min-h-0">
                 {/* Mobile back button */}
                 <div className="md:hidden p-3 border-b border-border">
                   <Button variant="ghost" size="sm" onClick={handleBack} className="gap-2">
@@ -312,7 +312,7 @@ const RFCApproval = () => {
                   </Button>
                 </div>
 
-                <ScrollArea className="flex-1">
+                <ScrollArea className="flex-1 min-h-0">
                   <div className="p-4 space-y-4">
                     {/* Header */}
                     <div className="space-y-2">
