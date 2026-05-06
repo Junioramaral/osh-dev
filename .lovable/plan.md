@@ -1,53 +1,50 @@
-## Objetivo
+## Proposta
 
-Permitir que usuários (Otimizzo / Super Admin / Viewer) filtrem os artigos da Base de Conhecimento primeiro por **Cliente**, depois por **Segmento** e, em seguida, por **Tipo do Segmento** (categoria DB ou módulo APP), para localizar facilmente as FAQs de um cliente específico.
+Trocar a geração de PDF + upload no Storage por um **email HTML inline** com o conteúdo completo do relatório RFC, no mesmo padrão do "Relatório Mensal de Suporte".
 
-## Mudanças em `src/pages/FAQ.tsx`
+Vantagens:
+- Elimina o erro de tamanho ("The object exceeded the maximum allowed size") — não há mais upload
+- Cliente lê direto na caixa de entrada, sem precisar baixar PDF / clicar em link assinado
+- Sem dependência de `html2canvas` + `jspdf` no fluxo de envio
+- Mais rápido e mais leve
 
-### 1. Filtro de Cliente sempre visível
-Hoje o `<Select>` de Cliente só aparece quando `visibilityFilter === "client_specific"`. Vamos torná-lo independente:
+## Mudanças
 
-- Mostrar o filtro **Cliente** sempre que `canSeeAllFilters` for `true` (Super Admin, Otimizzo, Viewer).
-- Opção `"all"` = "Todos Clientes".
-- Quando um cliente é selecionado, a query dos artigos passa a considerar:
-  - artigos `client_specific` ou `private` daquele cliente
-  - + artigos `global` (que valem para todos os clientes)
-- Carregar a lista de `clients` (já existe `clients-for-faq-filter`) — sem mudanças no hook, apenas remover o gate de visibilidade.
+### 1. Edge Function `supabase/functions/send-rfc-report/index.ts`
+Refatorar para receber dados do ticket + passos e montar o HTML do relatório no próprio servidor:
 
-### 2. Filtro de Segmento (já existe, será encadeado)
-Permanece com opções "DB" e "APP" lidas via `useActiveSegments()` (substituir o hardcode atual por dinâmico, alinhado ao restante do sistema).
+- Novo payload: `{ ticketId }` apenas
+- Buscar via service role:
+  - ticket (com `clients(name)`, `profiles!analyst_id(full_name)`, `contact_email`, `contact_name`, `title`, `description`, `ticket_number`)
+  - `ticket_rfc_steps` ordenados por `ordem` (com `started_by_name`, `concluded_by_name`)
+- Renderizar HTML estilizado seguindo o visual do relatório mensal (gradiente verde do header já existente, container 600px, tabelas com bordas, badges de status), contendo:
+  - Cabeçalho com #ticket_number e título
+  - Bloco de info: Cliente, Analista, Progresso (X/Y, %), Tempo total
+  - Tabela de passos: Ordem · Descrição · Status (badge) · Início · Fim · Duração · Responsável
+  - Linha de total ao final
+  - Rodapé Otimizzo
+- Mantém `from`, `replyTo` e cabeçalhos `In-Reply-To`/`References` com formato `ticket-{number}@resend.otimizzo.com` (memória do projeto)
+- Mantém verificação de auth e papel (Otimizzo/super_admin)
 
-### 3. Novo filtro: Tipo do Segmento
-Aparece **somente quando um Segmento é selecionado**:
+Helpers a portar para a edge function (cópias simples, sem dependências):
+- `formatDuration(start, end)` e `formatTotalDuration(min)` (mesma lógica do front)
+- `formatBR(date)` para datas em pt-BR
 
-- Se `segmentFilter === "DB"`: dropdown listando os engines distintos presentes em `faq_articles.db_engines` (ou via tabela `database_engines` ativos). Filtra artigos cujo array `db_engines` contém o valor.
-- Se `segmentFilter === "APP"`: dropdown listando os produtos APP via `application_products`. Filtra artigos cujo array `app_product_ids` contém o ID.
-- Opção `"all"` = "Todos os tipos".
+### 2. Componente `src/components/tickets/RFCReportPreview.tsx`
+- Manter o **preview visual e o botão "Baixar PDF"** (download local continua útil para arquivo offline)
+- Refatorar `handleSendToClient`:
+  - Remover geração de PDF, upload no bucket e signed URL
+  - Chamar `supabase.functions.invoke("send-rfc-report", { body: { ticketId: ticket.id } })` direto
+  - Manter o comentário interno de auditoria ("📄 Relatório RFC enviado por email para …")
+  - Manter toasts de sucesso/erro
 
-### 4. Lógica de filtragem combinada
-No `filteredArticles`:
-```ts
-matchesClient =
-  clientFilter === "all"
-  || article.client_id === clientFilter
-  || article.visibility === "global"; // globais sempre aparecem para o cliente filtrado
+Sem mudanças em schema, storage ou políticas. Sem novos secrets.
 
-matchesSegmentType =
-  segmentTypeFilter === "all"
-  || (segmentFilter === "DB"  && article.db_engines?.includes(segmentTypeFilter))
-  || (segmentFilter === "APP" && article.app_product_ids?.includes(segmentTypeFilter));
-```
+## Arquivos
+- editar `supabase/functions/send-rfc-report/index.ts`
+- editar `src/components/tickets/RFCReportPreview.tsx`
 
-### 5. UX
-- Reset automático do `segmentTypeFilter` para `"all"` ao trocar o `segmentFilter`.
-- Layout: manter o `flex flex-col md:flex-row gap-4`, ordem da esquerda para direita: Busca → Cliente → Visibilidade → Segmento → Tipo do Segmento → Status.
-- Sem alterações em `FAQSelector.tsx` (componente do ticket) — escopo é apenas a página `/faq`.
+Após editar a edge function, fazer deploy de `send-rfc-report`.
 
-## Permissões
-- Clients comuns continuam vendo apenas o que a RLS permite (próprio tenant + globais), filtros adicionais ficam ocultos como hoje.
-- Super Admin / Otimizzo / Viewer ganham o filtro de Cliente independente.
-
-## Arquivos afetados
-- `src/pages/FAQ.tsx` (única alteração de código)
-
-Sem mudanças em banco, hooks compartilhados ou RLS.
+## Memória a atualizar
+Atualizar `mem://features/rfc-pdf-report-workflow` para refletir que o envio ao cliente agora é HTML inline (PDF segue disponível só para download local).
