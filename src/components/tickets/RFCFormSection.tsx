@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -27,6 +27,7 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
   const { profile, tenantId, isOtimizzoUser } = useAuth();
 
   const [clientId, setClientId] = useState<string>("");
+  const [contactId, setContactId] = useState<string>("");
   const [segment, setSegment] = useState<"DB" | "APP">("DB");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -51,8 +52,42 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
   // For client users, use their own tenantId
   const effectiveClientId = isOtimizzoUser ? clientId : (tenantId || "");
 
+  // Reset contact when client changes
+  useEffect(() => {
+    setContactId("");
+  }, [clientId]);
+
+  // Fetch contacts (active profiles) for the selected client — Otimizzo only
+  const { data: contacts, isLoading: contactsLoading } = useQuery({
+    queryKey: ["rfc-client-contacts", effectiveClientId],
+    queryFn: async () => {
+      const { data: profiles, error } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .eq("client_id", effectiveClientId)
+        .eq("is_active", true)
+        .order("full_name");
+      if (error) throw error;
+
+      const ids = (profiles || []).map((p) => p.id);
+      if (ids.length === 0) return [];
+
+      const { data: authResp } = await supabase.functions.invoke("manage-user", {
+        body: { action: "list_users" },
+      });
+      const authUsers: any[] = authResp?.data?.users || [];
+
+      return (profiles || []).map((p: any) => {
+        const au = authUsers.find((u) => u.id === p.id);
+        return { id: p.id, full_name: p.full_name, email: au?.email || "" };
+      });
+    },
+    enabled: !!isOtimizzoUser && !!effectiveClientId,
+  });
+
   const isValid =
     !!effectiveClientId &&
+    (!isOtimizzoUser || !!contactId) &&
     title.trim().length > 0 &&
     steps.length > 0;
 
@@ -76,14 +111,22 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         .map((s, i) => `${i + 1}. ${s.descricao}`)
         .join("\n");
 
+      const selectedContact = contacts?.find((c) => c.id === contactId);
+      const contactName = isOtimizzoUser && selectedContact
+        ? selectedContact.full_name
+        : (profile?.full_name || user.email || "Usuário");
+      const contactEmail = isOtimizzoUser && selectedContact
+        ? selectedContact.email
+        : (user.email || "");
+
       const ticketData: any = {
         record_type: "rfc",
         status,
         segment,
         client_id: effectiveClientId,
         title: title.trim(),
-        contact_name: profile?.full_name || user.email || "Usuário",
-        contact_email: user.email || "",
+        contact_name: contactName,
+        contact_email: contactEmail,
         ticket_type: "service_request",
         priority: "P3",
         category: "RFC",
@@ -174,6 +217,31 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
                   {c.name}
                 </SelectItem>
               ))}
+            </SelectContent>
+          </Select>
+        </div>
+      )}
+
+      {/* 1b. Contato — apenas para usuários Otimizzo, após selecionar cliente */}
+      {isOtimizzoUser && clientId && (
+        <div className="space-y-2">
+          <Label htmlFor="rfc-contact">Contato *</Label>
+          <Select value={contactId} onValueChange={setContactId} disabled={contactsLoading}>
+            <SelectTrigger id="rfc-contact">
+              <SelectValue placeholder={contactsLoading ? "Carregando contatos..." : "Selecione o contato"} />
+            </SelectTrigger>
+            <SelectContent>
+              {(contacts || []).length === 0 && !contactsLoading ? (
+                <div className="px-3 py-2 text-sm text-muted-foreground">
+                  Nenhum contato cadastrado para este cliente
+                </div>
+              ) : (
+                contacts?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.full_name}{c.email ? ` — ${c.email}` : ""}
+                  </SelectItem>
+                ))
+              )}
             </SelectContent>
           </Select>
         </div>

@@ -1,50 +1,36 @@
-## Proposta
+## Objetivo
 
-Trocar a geração de PDF + upload no Storage por um **email HTML inline** com o conteúdo completo do relatório RFC, no mesmo padrão do "Relatório Mensal de Suporte".
+Adicionar um campo "Contato" no formulário de criação de RFC que aparece após a seleção do cliente, listando os usuários cadastrados desse cliente.
 
-Vantagens:
-- Elimina o erro de tamanho ("The object exceeded the maximum allowed size") — não há mais upload
-- Cliente lê direto na caixa de entrada, sem precisar baixar PDF / clicar em link assinado
-- Sem dependência de `html2canvas` + `jspdf` no fluxo de envio
-- Mais rápido e mais leve
+## Comportamento
 
-## Mudanças
+1. Usuário Otimizzo seleciona o **Cliente** (campo já existente).
+2. Após a seleção, aparece o campo **Contato \***, um dropdown com a lista de usuários ativos vinculados àquele cliente (consultados em `profiles` filtrando por `client_id` e `is_active = true`).
+3. Cada item mostra `full_name` e o e-mail do usuário (obtido via edge function `manage-user` action `list_users`, que já é o padrão do projeto — ver `useTenantUsers.ts`).
+4. Ao escolher um contato, os campos `contact_name` e `contact_email` do ticket passam a ser preenchidos com os dados do contato selecionado (em vez do usuário logado).
+5. Se nenhum cliente foi selecionado ainda, o dropdown fica oculto. Se o cliente não tiver usuários, mostra mensagem "Nenhum contato cadastrado para este cliente".
+6. Para usuários não-Otimizzo (cliente criando sua própria RFC), mantém o comportamento atual (usa o próprio usuário logado como contato) — não há mudança.
+7. Trocar o cliente limpa o contato selecionado.
 
-### 1. Edge Function `supabase/functions/send-rfc-report/index.ts`
-Refatorar para receber dados do ticket + passos e montar o HTML do relatório no próprio servidor:
+## Validação
 
-- Novo payload: `{ ticketId }` apenas
-- Buscar via service role:
-  - ticket (com `clients(name)`, `profiles!analyst_id(full_name)`, `contact_email`, `contact_name`, `title`, `description`, `ticket_number`)
-  - `ticket_rfc_steps` ordenados por `ordem` (com `started_by_name`, `concluded_by_name`)
-- Renderizar HTML estilizado seguindo o visual do relatório mensal (gradiente verde do header já existente, container 600px, tabelas com bordas, badges de status), contendo:
-  - Cabeçalho com #ticket_number e título
-  - Bloco de info: Cliente, Analista, Progresso (X/Y, %), Tempo total
-  - Tabela de passos: Ordem · Descrição · Status (badge) · Início · Fim · Duração · Responsável
-  - Linha de total ao final
-  - Rodapé Otimizzo
-- Mantém `from`, `replyTo` e cabeçalhos `In-Reply-To`/`References` com formato `ticket-{number}@resend.otimizzo.com` (memória do projeto)
-- Mantém verificação de auth e papel (Otimizzo/super_admin)
+- Campo Contato passa a ser obrigatório quando o usuário é Otimizzo.
+- `isValid` agora também checa `selectedContactId`.
 
-Helpers a portar para a edge function (cópias simples, sem dependências):
-- `formatDuration(start, end)` e `formatTotalDuration(min)` (mesma lógica do front)
-- `formatBR(date)` para datas em pt-BR
+## Mudanças técnicas
 
-### 2. Componente `src/components/tickets/RFCReportPreview.tsx`
-- Manter o **preview visual e o botão "Baixar PDF"** (download local continua útil para arquivo offline)
-- Refatorar `handleSendToClient`:
-  - Remover geração de PDF, upload no bucket e signed URL
-  - Chamar `supabase.functions.invoke("send-rfc-report", { body: { ticketId: ticket.id } })` direto
-  - Manter o comentário interno de auditoria ("📄 Relatório RFC enviado por email para …")
-  - Manter toasts de sucesso/erro
+**Arquivo único: `src/components/tickets/RFCFormSection.tsx`**
 
-Sem mudanças em schema, storage ou políticas. Sem novos secrets.
+- Novo estado: `const [contactId, setContactId] = useState<string>("")`.
+- Nova query `useQuery(["rfc-client-contacts", effectiveClientId])` habilitada quando `isOtimizzoUser && effectiveClientId`:
+  - Busca `profiles` por `client_id = effectiveClientId, is_active = true`.
+  - Em paralelo, invoca `supabase.functions.invoke("manage-user", { body: { action: "list_users" }})` para mapear `id -> email` (mesmo padrão de `useTenantUsers.ts`).
+  - Retorna array `{ id, full_name, email }`.
+- Adicionar novo `<Select>` "Contato *" entre o campo Cliente e o Segmento, renderizado apenas quando `isOtimizzoUser && clientId`.
+- `useEffect` que zera `contactId` quando `clientId` muda.
+- No `handleSubmit`, ao montar `ticketData`:
+  - Se `isOtimizzoUser` e contato selecionado → usar `contact_name = contact.full_name` e `contact_email = contact.email`.
+  - Caso contrário, manter fallback atual (`profile.full_name` / `user.email`).
+- Atualizar `isValid` para exigir `contactId` quando `isOtimizzoUser`.
 
-## Arquivos
-- editar `supabase/functions/send-rfc-report/index.ts`
-- editar `src/components/tickets/RFCReportPreview.tsx`
-
-Após editar a edge function, fazer deploy de `send-rfc-report`.
-
-## Memória a atualizar
-Atualizar `mem://features/rfc-pdf-report-workflow` para refletir que o envio ao cliente agora é HTML inline (PDF segue disponível só para download local).
+Nenhuma mudança em banco de dados, edge functions ou outros componentes.
