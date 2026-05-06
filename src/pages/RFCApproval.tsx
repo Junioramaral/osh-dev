@@ -34,7 +34,8 @@ type RFC = {
   segment: string;
   status: string;
   created_at: string;
-  clients: { name: string } | null;
+  clients: { name: string; domain?: string | null } | null;
+  [key: string]: any;
 };
 
 type RFCStep = {
