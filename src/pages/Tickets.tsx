@@ -545,6 +545,7 @@ export default function Tickets() {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="all">Todos Status</SelectItem>
+              <SelectItem value="rascunho">Rascunho</SelectItem>
               <SelectItem value="novo">Novo</SelectItem>
               <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
               <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
