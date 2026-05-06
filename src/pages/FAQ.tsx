@@ -53,6 +53,7 @@ export default function FAQ() {
   const [visibilityFilter, setVisibilityFilter] = useState<string>("all");
   const [statusFilter, setStatusFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
+  const [segmentTypeFilter, setSegmentTypeFilter] = useState<string>("all");
   
   const [dialogOpen, setDialogOpen] = useState(false);
   const [editingArticle, setEditingArticle] = useState<FAQArticle | null>(null);
@@ -118,6 +119,36 @@ export default function FAQ() {
     enabled: canSeeAllFilters,
   });
 
+  // Database engines for DB segment type filter
+  const { data: dbEngines } = useQuery({
+    queryKey: ["faq-db-engines"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("database_engines")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: segmentFilter === "DB",
+  });
+
+  // Application products for APP segment type filter
+  const { data: appProducts } = useQuery({
+    queryKey: ["faq-app-products"],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("application_products")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order");
+      if (error) throw error;
+      return data;
+    },
+    enabled: segmentFilter === "APP",
+  });
+
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
@@ -152,9 +183,21 @@ export default function FAQ() {
     const matchesSegment = segmentFilter === "all" || article.segment === segmentFilter;
     const matchesVisibility = visibilityFilter === "all" || article.visibility === visibilityFilter;
     const matchesStatus = statusFilter === "all" || article.status === statusFilter;
-    const matchesClient = clientFilter === "all" || article.client_id === clientFilter;
-    
-    return matchesSearch && matchesSegment && matchesVisibility && matchesStatus && matchesClient;
+    const matchesClient =
+      clientFilter === "all" ||
+      article.client_id === clientFilter ||
+      article.visibility === "global";
+
+    let matchesSegmentType = true;
+    if (segmentTypeFilter !== "all") {
+      if (segmentFilter === "DB") {
+        matchesSegmentType = !!(article.db_engines as string[] | null)?.includes(segmentTypeFilter);
+      } else if (segmentFilter === "APP") {
+        matchesSegmentType = !!article.app_product_ids?.includes(segmentTypeFilter);
+      }
+    }
+
+    return matchesSearch && matchesSegment && matchesVisibility && matchesStatus && matchesClient && matchesSegmentType;
   });
 
   const handleView = (article: FAQArticle) => {
@@ -218,6 +261,22 @@ export default function FAQ() {
           </div>
 
           {canSeeAllFilters && (
+            <Select value={clientFilter} onValueChange={setClientFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Cliente" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Clientes</SelectItem>
+                {clients?.map((client) => (
+                  <SelectItem key={client.id} value={client.id}>
+                    {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {canSeeAllFilters && (
             <Select value={visibilityFilter} onValueChange={setVisibilityFilter}>
               <SelectTrigger className="w-[180px]">
                 <SelectValue placeholder="Visibilidade" />
@@ -246,23 +305,13 @@ export default function FAQ() {
             </Select>
           )}
 
-          {canSeeAllFilters && visibilityFilter === "client_specific" && (
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos Clientes</SelectItem>
-                {clients?.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          <Select value={segmentFilter} onValueChange={setSegmentFilter}>
+          <Select
+            value={segmentFilter}
+            onValueChange={(v) => {
+              setSegmentFilter(v);
+              setSegmentTypeFilter("all");
+            }}
+          >
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Segmento" />
             </SelectTrigger>
@@ -272,6 +321,38 @@ export default function FAQ() {
               <SelectItem value="APP">Aplicação</SelectItem>
             </SelectContent>
           </Select>
+
+          {segmentFilter === "DB" && (
+            <Select value={segmentTypeFilter} onValueChange={setSegmentTypeFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Engine de BD" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Engines</SelectItem>
+                {dbEngines?.map((eng) => (
+                  <SelectItem key={eng.id} value={eng.name}>
+                    {eng.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
+
+          {segmentFilter === "APP" && (
+            <Select value={segmentTypeFilter} onValueChange={setSegmentTypeFilter}>
+              <SelectTrigger className="w-[200px]">
+                <SelectValue placeholder="Produto APP" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos Produtos</SelectItem>
+                {appProducts?.map((p) => (
+                  <SelectItem key={p.id} value={p.id}>
+                    {p.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
 
           {canSeeAllFilters && (
             <Select value={statusFilter} onValueChange={setStatusFilter}>
