@@ -34,6 +34,20 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
   const [steps, setSteps] = useState<RFCStep[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
+  // Informações Técnicas - DB
+  const [dbEngine, setDbEngine] = useState<string>("");
+  const [dbEnvironment, setDbEnvironment] = useState<string>("");
+  const [dbMachineId, setDbMachineId] = useState<string>("");
+  const [dbInstanceId, setDbInstanceId] = useState<string>("");
+
+  // Informações Técnicas - APP
+  const [appProductId, setAppProductId] = useState<string>("");
+  const [appEnvironment, setAppEnvironment] = useState<string>("");
+  const [appMachineId, setAppMachineId] = useState<string>("");
+  const [appInstanceId, setAppInstanceId] = useState<string>("");
+  const [appModule, setAppModule] = useState<string>("");
+  const [appVersion, setAppVersion] = useState<string>("");
+
   // Fetch clients (only for Otimizzo users)
   const { data: clients } = useQuery({
     queryKey: ["clients"],
@@ -55,7 +69,142 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
   // Reset contact when client changes
   useEffect(() => {
     setContactId("");
+    // Limpar campos técnicos ao trocar cliente
+    setDbEngine(""); setDbEnvironment(""); setDbMachineId(""); setDbInstanceId("");
+    setAppProductId(""); setAppEnvironment(""); setAppMachineId(""); setAppInstanceId("");
+    setAppModule(""); setAppVersion("");
   }, [clientId]);
+
+  // Reset technical fields when segment changes
+  useEffect(() => {
+    setDbEngine(""); setDbEnvironment(""); setDbMachineId(""); setDbInstanceId("");
+    setAppProductId(""); setAppEnvironment(""); setAppMachineId(""); setAppInstanceId("");
+    setAppModule(""); setAppVersion("");
+  }, [segment]);
+
+  // Limpar dependentes do engine
+  useEffect(() => { setDbInstanceId(""); setDbMachineId(""); }, [dbEngine, dbEnvironment]);
+  useEffect(() => { setAppInstanceId(""); setAppMachineId(""); setAppModule(""); }, [appProductId, appEnvironment]);
+
+  // Buscar engines disponíveis para o cliente
+  const { data: clientData } = useQuery({
+    queryKey: ["rfc-client-data", effectiveClientId],
+    queryFn: async () => {
+      if (!effectiveClientId) return null;
+      const { data, error } = await supabase
+        .from("clients")
+        .select("db_engines, app_product_ids")
+        .eq("id", effectiveClientId)
+        .single();
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!effectiveClientId,
+  });
+
+  // DB instances
+  const { data: dbInstances } = useQuery({
+    queryKey: ["rfc-db-instances", effectiveClientId, dbEngine, dbEnvironment, dbMachineId],
+    queryFn: async () => {
+      if (!effectiveClientId || !dbEngine || segment !== "DB") return [];
+      let q = supabase.from("database_instances")
+        .select("id, instance_name, version, environment, machine_id")
+        .eq("client_id", effectiveClientId)
+        .eq("engine", dbEngine as any);
+      if (dbEnvironment) q = q.eq("environment", dbEnvironment as any);
+      if (dbMachineId) q = q.eq("machine_id", dbMachineId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!effectiveClientId && !!dbEngine && segment === "DB",
+  });
+
+  // APP products
+  const { data: appProducts } = useQuery({
+    queryKey: ["rfc-app-products", effectiveClientId, clientData?.app_product_ids],
+    queryFn: async () => {
+      const ids = clientData?.app_product_ids || [];
+      if (!ids.length) return [];
+      const { data, error } = await supabase
+        .from("application_products")
+        .select("id, name")
+        .in("id", ids)
+        .order("name");
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!effectiveClientId && segment === "APP" && !!clientData,
+  });
+
+  // APP instances
+  const { data: appInstances } = useQuery({
+    queryKey: ["rfc-app-instances", effectiveClientId, appProductId, appEnvironment, appMachineId],
+    queryFn: async () => {
+      if (!effectiveClientId || !appProductId || segment !== "APP") return [];
+      let q = supabase.from("application_instances")
+        .select("id, version, environment, machine_id, active_modules")
+        .eq("client_id", effectiveClientId)
+        .eq("product_id", appProductId);
+      if (appEnvironment) q = q.eq("environment", appEnvironment as any);
+      if (appMachineId) q = q.eq("machine_id", appMachineId);
+      const { data, error } = await q;
+      if (error) throw error;
+      return data;
+    },
+    enabled: !!effectiveClientId && !!appProductId && segment === "APP",
+  });
+
+  // Machines
+  const { data: machines } = useQuery({
+    queryKey: ["rfc-machines", effectiveClientId, segment, dbEngine, dbEnvironment, appProductId, appEnvironment],
+    queryFn: async () => {
+      if (!effectiveClientId) return [];
+      if (segment === "DB" && dbEngine) {
+        let iq = supabase.from("database_instances")
+          .select("machine_id")
+          .eq("client_id", effectiveClientId)
+          .eq("engine", dbEngine as any)
+          .not("machine_id", "is", null);
+        if (dbEnvironment) iq = iq.eq("environment", dbEnvironment as any);
+        const { data: ins } = await iq;
+        const ids = Array.from(new Set((ins || []).map((i: any) => i.machine_id).filter(Boolean)));
+        if (!ids.length) return [];
+        const { data } = await supabase.from("machines")
+          .select("id, hostname")
+          .eq("client_id", effectiveClientId)
+          .in("id", ids);
+        return data || [];
+      }
+      if (segment === "APP" && appProductId) {
+        let iq = supabase.from("application_instances")
+          .select("machine_id")
+          .eq("client_id", effectiveClientId)
+          .eq("product_id", appProductId)
+          .not("machine_id", "is", null);
+        if (appEnvironment) iq = iq.eq("environment", appEnvironment as any);
+        const { data: ins } = await iq;
+        const ids = Array.from(new Set((ins || []).map((i: any) => i.machine_id).filter(Boolean)));
+        if (!ids.length) return [];
+        const { data } = await supabase.from("machines")
+          .select("id, hostname")
+          .eq("client_id", effectiveClientId)
+          .in("id", ids);
+        return data || [];
+      }
+      return [];
+    },
+    enabled: !!effectiveClientId,
+  });
+
+  const availableEngines: string[] = clientData?.db_engines || [];
+  // Auto-fill app version from selected instance
+  useEffect(() => {
+    if (segment === "APP" && appInstanceId) {
+      const inst = appInstances?.find((i: any) => i.id === appInstanceId);
+      if (inst?.version) setAppVersion(inst.version);
+    }
+  }, [appInstanceId, appInstances, segment]);
 
   // Fetch contacts (active profiles) for the selected client — Otimizzo only
   const { data: contacts, isLoading: contactsLoading } = useQuery({
@@ -137,6 +286,20 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         business_impact: "medio",
         reproduction_steps: stepsText,
       };
+
+      if (segment === "DB") {
+        if (dbEngine) ticketData.db_engine = dbEngine;
+        if (dbEnvironment) ticketData.db_environment = dbEnvironment;
+        if (dbMachineId) ticketData.db_machine_id = dbMachineId;
+        if (dbInstanceId) ticketData.db_instance_id = dbInstanceId;
+      } else if (segment === "APP") {
+        if (appProductId) ticketData.app_product_id = appProductId;
+        if (appEnvironment) ticketData.app_environment = appEnvironment;
+        if (appMachineId) ticketData.app_machine_id = appMachineId;
+        if (appInstanceId) ticketData.app_instance_id = appInstanceId;
+        if (appModule) ticketData.app_module = appModule;
+        if (appVersion) ticketData.app_version = appVersion;
+      }
 
       // Insert ticket
       const { data: ticket, error: ticketError } = await supabase
@@ -269,6 +432,120 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
           </div>
         </RadioGroup>
       </div>
+
+      {/* 2b. Informações Técnicas */}
+      {effectiveClientId && (
+        <div className="rounded-lg border border-border p-4 space-y-4">
+          <div>
+            <p className="text-sm font-semibold">Informações Técnicas</p>
+            <p className="text-xs text-muted-foreground">
+              Detalhes do ambiente onde a mudança será aplicada
+            </p>
+          </div>
+
+          {segment === "DB" ? (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Engine</Label>
+                <Select value={dbEngine} onValueChange={setDbEngine}>
+                  <SelectTrigger><SelectValue placeholder="Selecione a engine" /></SelectTrigger>
+                  <SelectContent>
+                    {availableEngines.map((e) => (
+                      <SelectItem key={e} value={e}>{e}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Ambiente</Label>
+                <Select value={dbEnvironment} onValueChange={setDbEnvironment} disabled={!dbEngine}>
+                  <SelectTrigger><SelectValue placeholder={dbEngine ? "Selecione" : "Selecione a engine primeiro"} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="prod">Produção</SelectItem>
+                    <SelectItem value="hom">Homologação</SelectItem>
+                    <SelectItem value="qa">QA</SelectItem>
+                    <SelectItem value="dev">Desenvolvimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Máquina</Label>
+                <Select value={dbMachineId} onValueChange={setDbMachineId} disabled={!dbEngine}>
+                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                  <SelectContent>
+                    {machines?.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>{m.hostname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Instância</Label>
+                <Select value={dbInstanceId} onValueChange={setDbInstanceId} disabled={!dbEngine}>
+                  <SelectTrigger><SelectValue placeholder={dbEngine ? "Selecione" : "Selecione a engine primeiro"} /></SelectTrigger>
+                  <SelectContent>
+                    {dbInstances?.map((i: any) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {i.instance_name}{i.version ? ` (${i.version})` : ""}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          ) : (
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Produto</Label>
+                <Select value={appProductId} onValueChange={setAppProductId}>
+                  <SelectTrigger><SelectValue placeholder="Selecione o produto" /></SelectTrigger>
+                  <SelectContent>
+                    {appProducts?.map((p: any) => (
+                      <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Ambiente</Label>
+                <Select value={appEnvironment} onValueChange={setAppEnvironment} disabled={!appProductId}>
+                  <SelectTrigger><SelectValue placeholder={appProductId ? "Selecione" : "Selecione o produto primeiro"} /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="prod">Produção</SelectItem>
+                    <SelectItem value="hom">Homologação</SelectItem>
+                    <SelectItem value="qa">QA</SelectItem>
+                    <SelectItem value="dev">Desenvolvimento</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Máquina</Label>
+                <Select value={appMachineId} onValueChange={setAppMachineId} disabled={!appProductId}>
+                  <SelectTrigger><SelectValue placeholder="Opcional" /></SelectTrigger>
+                  <SelectContent>
+                    {machines?.map((m: any) => (
+                      <SelectItem key={m.id} value={m.id}>{m.hostname}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>Instância</Label>
+                <Select value={appInstanceId} onValueChange={setAppInstanceId} disabled={!appProductId}>
+                  <SelectTrigger><SelectValue placeholder={appProductId ? "Selecione" : "Selecione o produto primeiro"} /></SelectTrigger>
+                  <SelectContent>
+                    {appInstances?.map((i: any) => (
+                      <SelectItem key={i.id} value={i.id}>
+                        {i.version} - {i.environment}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* 3. Título */}
       <div className="space-y-2">
