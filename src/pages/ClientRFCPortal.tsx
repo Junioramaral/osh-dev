@@ -16,6 +16,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import RFCContextCards from "@/components/tickets/RFCContextCards";
+import { attachTicketCreators } from "@/lib/ticketCreator";
 
 function formatDuration(startedAt: string | null, concludedAt: string | null): string {
   if (!startedAt || !concludedAt) return "—";
@@ -114,7 +115,8 @@ const ClientRFCPortal = () => {
         .eq("record_type", "rfc")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as RFC[];
+      const withCreators = await attachTicketCreators((data ?? []) as any[]);
+      return withCreators as RFC[];
     },
   });
 

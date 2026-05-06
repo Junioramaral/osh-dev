@@ -1,52 +1,67 @@
 ## Objetivo
 
-Adicionar campos técnicos na criação da RFC e mostrar um resumo (Cliente, Contato, Informações Técnicas) acima do título da RFC nas telas de RFC aberta / Aprovação.
+Mostrar nas telas de RFC quem abriu a RFC (nome + email do usuário que criou o ticket), além das informações já existentes (Cliente, Contato, Informações Técnicas).
 
-## 1. Criação de RFC — `src/components/tickets/RFCFormSection.tsx`
+## Fonte do dado
 
-Após o segmento, incluir um card "Informações Técnicas" com campos em cascata, espelhando a lógica já usada em `NewTicketDialog`:
+A tabela `tickets` não tem coluna `created_by`. A informação de quem abriu já é registrada em `ticket_history` pelo trigger `log_ticket_creation` (`action_type = 'created'`, `user_id = auth.uid()`).
 
-- **Segmento DB**: `db_engine`, `db_environment`, `db_machine_id`, `db_instance_id`
-- **Segmento APP**: `app_product_id`, `app_environment`, `app_machine_id`, `app_instance_id`, `app_module`, `app_version`
+Para evitar uma migration e manter retrocompatibilidade com tickets antigos, vamos buscar o autor via `ticket_history`:
 
-Os queries serão idênticas às do `NewTicketDialog` (database_instances, application_instances, application_products, machines do cliente selecionado, com filtros encadeados). Os valores serão persistidos diretamente nas colunas correspondentes da tabela `tickets` no `handleSubmit`.
-
-Validação leve: pelo menos engine+instância (DB) ou produto+instância (APP). Não bloquearemos rascunhos sem esses campos preenchidos para manter flexibilidade — apenas avisaremos no "Solicitar Aprovação".
-
-## 2. Cards de contexto — Aprovação de RFC e Detalhe da RFC
-
-Criar um componente reutilizável `src/components/tickets/RFCContextCards.tsx` que recebe o `ticket` e renderiza 3 cards lado a lado (grid responsivo):
-
-```text
-[ Cliente ]      [ Contato ]      [ Informações Técnicas ]
- Nome cliente     Nome contato      Segmento + Engine/Produto
- Domínio          Email contato     Ambiente / Máquina / Instância / Versão
+```sql
+SELECT user_id FROM ticket_history
+WHERE ticket_id = :id AND action_type = 'created'
+ORDER BY created_at ASC LIMIT 1
 ```
 
-Onde usar:
+E então resolver `full_name` em `profiles` e `email` via RPC `get_user_email`.
 
-- **`src/pages/RFCApproval.tsx`**: inserir `<RFCContextCards ticket={selectedRfc}/>` logo após o header `#NNNN + segment + Aguardando Aprovação + título` e antes do `<Separator />` que precede a lista de passos. Ajustar a query `rfc-pending-approval-list` para já trazer os campos necessários (`db_engine, db_environment, db_instance_id, db_machine_id, app_product_id, app_environment, app_instance_id, app_machine_id, app_module, app_version, contact_name, contact_email, clients(name, domain)`), com joins para nomes (`database_instances(instance_name, version)`, `application_instances(version, environment)`, `application_products(name)`, `db_machine:machines!tickets_db_machine_id_fkey(hostname)`, `app_machine:machines!tickets_app_machine_id_fkey(hostname)`).
+## 1. Hook — `src/hooks/useTicketDetail.ts`
 
-- **`src/pages/TicketDetail.tsx`** (quando `ticket.record_type === 'rfc'`): inserir `<RFCContextCards ticket={ticket}/>` no topo da aba "RFC", acima do `TicketRFCReport`. Os dados já vêm de `useTicketDetail`.
+Após carregar o ticket, fazer um lookup adicional:
 
-- **`src/pages/ClientRFCPortal.tsx`** (visão do cliente, mesma necessidade de contexto): incluir os mesmos cards acima da lista de passos.
+- Buscar o primeiro registro `ticket_history` com `action_type='created'` para o ticket.
+- Se houver `user_id`: buscar `profiles.full_name` e chamar `get_user_email`.
+- Anexar ao retorno: `created_by_name`, `created_by_email`.
 
-## 3. Detalhes técnicos
+Mantém o padrão já usado para `analyst_email`.
 
-**Schema**: nenhuma migração necessária — todas as colunas já existem em `tickets`.
+## 2. Query da aprovação — `src/pages/RFCApproval.tsx`
 
-**Componente RFCContextCards**:
-- Tipa `ticket` como `any` para reuso entre Approval (query enxuta) e TicketDetail (query completa).
-- Cada card é um `<Card>` com header (ícone + título) e linhas `Label: valor`.
-- Oculta linhas vazias (ex.: cliente sem domínio, ticket APP sem módulo).
-- Card de Informações Técnicas alterna entre layout DB e APP via `ticket.segment`.
+Na query `rfc-pending-approval-list`, após receber a lista, fazer um segundo fetch agregado em `ticket_history` filtrando `action_type='created'` e `ticket_id IN (...)`, juntando com `profiles` para obter o nome. Fazer um único `rpc('get_user_email')` por ticket (ou usar uma função batch nova se necessário — começar simples, um por ticket, já que a lista é pequena).
 
-**Cascade no formulário**: limpar campos dependentes ao trocar pai (engine → instance/machine; product → instance/machine), seguindo o padrão de `NewTicketDialog`.
+Anexar `created_by_name` e `created_by_email` em cada RFC retornada.
+
+## 3. Componente `RFCContextCards.tsx`
+
+Adicionar um quarto card "Solicitante" (ou incluir como bloco no card "Contato"). Para não quebrar o grid de 3 colunas, vamos mudar para `md:grid-cols-2 lg:grid-cols-4` e adicionar:
+
+```text
+[ Cliente ] [ Solicitante ] [ Contato ] [ Informações Técnicas ]
+              Nome
+              Email
+```
+
+Ícone: `UserPlus` do lucide-react. Oculta o card se `created_by_name` e `created_by_email` estiverem ausentes (tickets antigos sem histórico).
+
+## 4. Onde usar
+
+Já está plugado em:
+- `src/pages/RFCApproval.tsx`
+- `src/pages/TicketDetail.tsx` (aba RFC)
+- `src/pages/ClientRFCPortal.tsx`
+
+Para o portal do cliente, a query também precisa incluir `created_by_name`/`created_by_email` (mesma lógica do hook: lookup em `ticket_history` + `profiles` + `get_user_email`).
+
+## 5. Detalhes técnicos
+
+- Sem migration de schema.
+- RLS: `ticket_history` já permite SELECT para usuários com acesso ao ticket; `profiles` tem policy "Client can view ticket analysts" — pode não cobrir o caso de o solicitante ser do próprio cliente. Verificaremos: a policy "Viewers can view tenant profiles" e "Otimizzo view work-related profiles" já cobrem cenários relevantes; se o nome ficar vazio, faremos fallback para o email.
+- `get_user_email` é SECURITY DEFINER, então funciona para qualquer usuário autenticado.
 
 ## Arquivos editados
 
-- `src/components/tickets/RFCFormSection.tsx` — novo bloco "Informações Técnicas".
-- `src/components/tickets/RFCContextCards.tsx` — **novo**.
-- `src/pages/RFCApproval.tsx` — query expandida + render do componente.
-- `src/pages/TicketDetail.tsx` — render do componente acima do conteúdo da aba RFC.
-- `src/pages/ClientRFCPortal.tsx` — render do componente.
+- `src/hooks/useTicketDetail.ts` — adicionar lookup do criador.
+- `src/pages/RFCApproval.tsx` — anexar criador na lista.
+- `src/pages/ClientRFCPortal.tsx` — anexar criador.
+- `src/components/tickets/RFCContextCards.tsx` — novo card "Solicitante".
