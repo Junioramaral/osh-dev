@@ -1,11 +1,11 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTicketRFCSteps } from "@/hooks/useTicketDetail";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, CheckCircle2, Play, Loader2, Save, Send } from "lucide-react";
+import { Clock, CheckCircle2, Play, Loader2, Save, Send, ChevronRight, ChevronDown, FileText, Terminal } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
@@ -50,10 +50,24 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
   const queryClient = useQueryClient();
 
   const isDraft = ticket.status === "rascunho" && (isOtimizzoUser || isSuperAdmin);
+  const canSeeScripts = isOtimizzoUser || isSuperAdmin;
 
   const [editSteps, setEditSteps] = useState<RFCStep[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const [submittingApproval, setSubmittingApproval] = useState(false);
+  const [expandedSteps, setExpandedSteps] = useState<Set<string>>(new Set());
+
+  const toggleStep = (id: string) => {
+    setExpandedSteps((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id); else next.add(id);
+      return next;
+    });
+  };
+  const allExpanded = steps.length > 0 && expandedSteps.size === steps.length;
+  const toggleAll = () => {
+    setExpandedSteps(allExpanded ? new Set() : new Set(steps.map((s: any) => s.id)));
+  };
 
   useEffect(() => {
     if (isDraft && steps.length > 0) {
@@ -227,9 +241,15 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
 
       {/* Time report table */}
       <Card>
+        <div className="flex justify-end p-2 border-b">
+          <Button variant="ghost" size="sm" onClick={toggleAll}>
+            {allExpanded ? "Recolher todos" : "Expandir todos"}
+          </Button>
+        </div>
         <Table>
           <TableHeader>
             <TableRow>
+              <TableHead className="w-8" />
               <TableHead className="w-16">Passo</TableHead>
               <TableHead>Descrição</TableHead>
               <TableHead className="w-24">Status</TableHead>
@@ -243,8 +263,15 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
             {steps.map((step) => {
               const isDone = step.status_concluido;
               const isInProgress = !!step.started_at && !isDone;
+              const isExpanded = expandedSteps.has(step.id);
+              const hasProcedimento = !!(step as any).procedimento?.trim();
+              const hasScripts = !!(step as any).scripts?.trim();
               return (
-                <TableRow key={step.id}>
+                <Fragment key={step.id}>
+                <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleStep(step.id)}>
+                  <TableCell>
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+                  </TableCell>
                   <TableCell className="font-mono text-xs">
                     {String(step.ordem + 1).padStart(2, "0")}
                   </TableCell>
@@ -284,11 +311,48 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
                     {step.concluded_by_name || step.started_by_name || "—"}
                   </TableCell>
                 </TableRow>
+                {isExpanded && (
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
+                    <TableCell colSpan={8} className="p-4">
+                      <div className="space-y-4">
+                        <div>
+                          <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                            <FileText className="w-4 h-4 text-primary" />
+                            Procedimento detalhado
+                          </div>
+                          {hasProcedimento ? (
+                            <p className="text-sm text-foreground whitespace-pre-wrap leading-relaxed">
+                              {(step as any).procedimento}
+                            </p>
+                          ) : (
+                            <p className="text-sm text-muted-foreground italic">Sem procedimento detalhado.</p>
+                          )}
+                        </div>
+                        {canSeeScripts && (
+                          <div>
+                            <div className="flex items-center gap-2 text-sm font-medium mb-2">
+                              <Terminal className="w-4 h-4 text-primary" />
+                              Scripts / Comandos
+                            </div>
+                            {hasScripts ? (
+                              <pre className="text-xs font-mono bg-zinc-900 text-zinc-100 dark:bg-zinc-950 p-3 rounded border whitespace-pre-wrap overflow-x-auto">
+                                {(step as any).scripts}
+                              </pre>
+                            ) : (
+                              <p className="text-sm text-muted-foreground italic">Sem scripts cadastrados.</p>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                )}
+                </Fragment>
               );
             })}
             {/* Total row */}
             <TableRow className="bg-muted/50 font-semibold">
-              <TableCell colSpan={5} className="text-right text-sm">
+              <TableCell colSpan={6} className="text-right text-sm">
                 Tempo Total
               </TableCell>
               <TableCell className="text-sm">{formatTotalDuration(totalMinutes)}</TableCell>
