@@ -5,6 +5,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useTicketDetail, useTicketComments } from "@/hooks/useTicketDetail";
 import TicketRFCReport from "@/components/tickets/TicketRFCReport";
 import RFCReportPreview from "@/components/tickets/RFCReportPreview";
+import RFCContextCards from "@/components/tickets/RFCContextCards";
 import TicketHeader from "@/components/tickets/TicketHeader";
 import TicketDetails from "@/components/tickets/TicketDetails";
 import TicketTimeline from "@/components/tickets/TicketTimeline";
@@ -108,7 +109,10 @@ export default function TicketDetail() {
               )}
               {isRFC && (
                 <TabsContent value="rfc" className="mt-6">
-                  <TicketRFCReport ticket={ticket} />
+                  <div className="space-y-4">
+                    <RFCContextCards ticket={ticket} />
+                    <TicketRFCReport ticket={ticket} />
+                  </div>
                 </TabsContent>
               )}
               {showReportTab && (
