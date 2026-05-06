@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { Fragment, useEffect, useState } from "react";
 import { useTicketRFCSteps } from "@/hooks/useTicketDetail";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -267,8 +267,8 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
               const hasProcedimento = !!(step as any).procedimento?.trim();
               const hasScripts = !!(step as any).scripts?.trim();
               return (
-                <>
-                <TableRow key={step.id} className="cursor-pointer hover:bg-muted/30" onClick={() => toggleStep(step.id)}>
+                <Fragment key={step.id}>
+                <TableRow className="cursor-pointer hover:bg-muted/30" onClick={() => toggleStep(step.id)}>
                   <TableCell>
                     {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
                   </TableCell>
@@ -312,7 +312,7 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
                   </TableCell>
                 </TableRow>
                 {isExpanded && (
-                  <TableRow key={`${step.id}-details`} className="bg-muted/30 hover:bg-muted/30">
+                  <TableRow className="bg-muted/30 hover:bg-muted/30">
                     <TableCell colSpan={8} className="p-4">
                       <div className="space-y-4">
                         <div>
@@ -347,7 +347,7 @@ export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
                     </TableCell>
                   </TableRow>
                 )}
-                </>
+                </Fragment>
               );
             })}
             {/* Total row */}
