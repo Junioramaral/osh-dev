@@ -40,6 +40,8 @@ export default function Tickets() {
     { value: "novo", label: "Novo" },
     { value: "em_atendimento", label: "Em Atendimento" },
     { value: "aguardando_cliente", label: "Aguardando Cliente" },
+    { value: "aguardando_aprovacao", label: "Aguardando Aprovação" },
+    { value: "aprovado", label: "Aprovado" },
     { value: "resolvido", label: "Resolvido" },
     { value: "fechado", label: "Fechado" },
   ];
