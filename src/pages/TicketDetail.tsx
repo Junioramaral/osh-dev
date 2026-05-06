@@ -108,7 +108,7 @@ export default function TicketDetail() {
               )}
               {isRFC && (
                 <TabsContent value="rfc" className="mt-6">
-                  <TicketRFCReport ticketId={ticket.id} />
+                  <TicketRFCReport ticket={ticket} />
                 </TabsContent>
               )}
               {showReportTab && (
