@@ -1,11 +1,18 @@
+import { useEffect, useState } from "react";
 import { useTicketRFCSteps } from "@/hooks/useTicketDetail";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Progress } from "@/components/ui/progress";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Clock, CheckCircle2, Play, Loader2 } from "lucide-react";
+import { Clock, CheckCircle2, Play, Loader2, Save, Send } from "lucide-react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { supabase } from "@/integrations/supabase/client";
+import { toast } from "@/hooks/use-toast";
+import RFCStepBuilder, { RFCStep } from "./RFCStepBuilder";
 
 function formatDuration(startedAt: string | null, concludedAt: string | null): string {
   if (!startedAt || !concludedAt) return "—";
@@ -33,16 +40,160 @@ function formatTotalDuration(totalMinutes: number): string {
 }
 
 interface TicketRFCReportProps {
-  ticketId: string;
+  ticket: any;
 }
 
-export default function TicketRFCReport({ ticketId }: TicketRFCReportProps) {
+export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
+  const ticketId = ticket.id;
   const { data: steps = [], isLoading } = useTicketRFCSteps(ticketId);
+  const { isOtimizzoUser, isSuperAdmin, profile } = useAuth();
+  const queryClient = useQueryClient();
+
+  const isDraft = ticket.status === "novo" && (isOtimizzoUser || isSuperAdmin);
+
+  const [editSteps, setEditSteps] = useState<RFCStep[]>([]);
+  const [isSaving, setIsSaving] = useState(false);
+  const [submittingApproval, setSubmittingApproval] = useState(false);
+
+  useEffect(() => {
+    if (isDraft && steps.length > 0) {
+      setEditSteps(
+        steps.map((s: any) => ({
+          id: s.id,
+          descricao: s.descricao || "",
+          procedimento: s.procedimento || "",
+          scripts: s.scripts || "",
+          ordem: s.ordem ?? 0,
+        }))
+      );
+    } else if (isDraft) {
+      setEditSteps([]);
+    }
+  }, [isDraft, steps]);
+
+  const persistSteps = async () => {
+    // Delete old steps then insert new ones
+    const { error: delErr } = await supabase
+      .from("rfc_steps" as any)
+      .delete()
+      .eq("ticket_id", ticketId);
+    if (delErr) throw delErr;
+
+    if (editSteps.length > 0) {
+      const rows = editSteps.map((s, i) => ({
+        ticket_id: ticketId,
+        descricao: s.descricao,
+        ordem: i,
+        procedimento: s.procedimento || null,
+        scripts: s.scripts || null,
+      }));
+      const { error: insErr } = await supabase.from("rfc_steps" as any).insert(rows);
+      if (insErr) throw insErr;
+    }
+  };
+
+  const invalidate = () => {
+    queryClient.invalidateQueries({ queryKey: ["ticket-rfc-steps", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["ticket", ticketId] });
+    queryClient.invalidateQueries({ queryKey: ["tickets"] });
+  };
+
+  const handleSave = async () => {
+    if (editSteps.length === 0) {
+      toast({ title: "Adicione ao menos um passo", variant: "destructive" });
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await persistSteps();
+      toast({ title: "Passos atualizados com sucesso!" });
+      invalidate();
+    } catch (e: any) {
+      toast({ title: "Erro ao salvar", description: e.message, variant: "destructive" });
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
+  const handleRequestApproval = async () => {
+    if (editSteps.length === 0) {
+      toast({ title: "Adicione ao menos um passo", variant: "destructive" });
+      return;
+    }
+    setSubmittingApproval(true);
+    try {
+      await persistSteps();
+
+      const { data: { user } } = await supabase.auth.getUser();
+      const { error: updErr } = await supabase
+        .from("tickets")
+        .update({ status: "aguardando_aprovacao" })
+        .eq("id", ticketId);
+      if (updErr) throw updErr;
+
+      if (user) {
+        await supabase.from("ticket_comments").insert({
+          ticket_id: ticketId,
+          author_id: user.id,
+          content: `RFC enviada para aprovação por ${profile?.full_name || user.email}.`,
+          is_internal: true,
+        });
+      }
+
+      toast({ title: "RFC enviada para aprovação!" });
+      invalidate();
+    } catch (e: any) {
+      toast({ title: "Erro ao solicitar aprovação", description: e.message, variant: "destructive" });
+    } finally {
+      setSubmittingApproval(false);
+    }
+  };
 
   if (isLoading) {
     return (
       <div className="flex items-center justify-center py-12">
         <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+      </div>
+    );
+  }
+
+  // Draft editable mode for Otimizzo / Super admin
+  if (isDraft) {
+    return (
+      <div className="space-y-4">
+        <Card className="p-4 space-y-2">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-sm font-medium">Rascunho de RFC</p>
+              <p className="text-xs text-muted-foreground">
+                Edite os passos do plano de implementação. Quando estiver pronto, solicite aprovação.
+              </p>
+            </div>
+            <Badge variant="outline">Rascunho</Badge>
+          </div>
+        </Card>
+
+        <Card className="p-4">
+          <RFCStepBuilder steps={editSteps} onStepsChange={setEditSteps} />
+        </Card>
+
+        <div className="flex justify-end gap-2">
+          <Button
+            variant="outline"
+            onClick={handleSave}
+            disabled={isSaving || submittingApproval || editSteps.length === 0}
+          >
+            {isSaving ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+            Salvar Alterações
+          </Button>
+          <Button
+            onClick={handleRequestApproval}
+            disabled={isSaving || submittingApproval || editSteps.length === 0}
+          >
+            {submittingApproval ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Send className="mr-2 h-4 w-4" />}
+            Solicitar Aprovação
+          </Button>
+        </div>
       </div>
     );
   }
