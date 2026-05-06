@@ -25,6 +25,7 @@ import {
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
+import RFCContextCards from "@/components/tickets/RFCContextCards";
 
 type RFC = {
   id: string;
@@ -66,7 +67,17 @@ const RFCApproval = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("tickets")
-        .select("id, ticket_number, title, segment, status, created_at, clients(name)")
+        .select(`
+          id, ticket_number, title, segment, status, created_at,
+          contact_name, contact_email,
+          db_engine, db_environment, app_environment, app_module, app_version,
+          clients(name, domain),
+          database_instances(instance_name, version),
+          application_instances(version, environment),
+          application_products(name),
+          db_machine:machines!tickets_db_machine_id_fkey(hostname),
+          app_machine:machines!tickets_app_machine_id_fkey(hostname)
+        `)
         .eq("record_type", "rfc")
         .eq("status", "aguardando_aprovacao")
         .order("created_at", { ascending: false });
@@ -321,6 +332,11 @@ const RFCApproval = () => {
                         </span>
                       </div>
                     </div>
+
+                    <Separator />
+
+                    {/* Context cards: Cliente / Contato / Informações Técnicas */}
+                    <RFCContextCards ticket={selectedRfc} />
 
                     <Separator />
 
