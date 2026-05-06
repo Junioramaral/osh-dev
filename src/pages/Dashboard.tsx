@@ -14,6 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Ticket,
   Clock,
   AlertTriangle,
@@ -30,6 +38,9 @@ import {
   Undo2,
   LucideIcon,
   LayoutGrid,
+  Flag,
+  Tags,
+  BarChart3,
 } from "lucide-react";
 
 // Componente de Seção do Dashboard
@@ -97,6 +108,23 @@ interface MonthlyTrendData {
 
 type TrendPeriod = 3 | 6 | 12;
 
+interface PriorityCount {
+  priority: string;
+  count: number;
+}
+
+interface CategoryCount {
+  name: string;
+  count: number;
+}
+
+const PRIORITY_STYLES: Record<string, { color: string; bgColor: string }> = {
+  P1: { color: "text-red-600", bgColor: "bg-red-100" },
+  P2: { color: "text-orange-600", bgColor: "bg-orange-100" },
+  P3: { color: "text-yellow-600", bgColor: "bg-yellow-100" },
+  P4: { color: "text-green-600", bgColor: "bg-green-100" },
+};
+
 const Dashboard = () => {
   const { user, profile, roles, isSuperAdmin, hasRole } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -121,6 +149,9 @@ const Dashboard = () => {
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>(6);
   const [barChartPeriod, setBarChartPeriod] = useState<TrendPeriod>(6);
   const [newTicketOpen, setNewTicketOpen] = useState(false);
+  const [priorityCounts, setPriorityCounts] = useState<PriorityCount[]>([]);
+  const [topCategories, setTopCategories] = useState<CategoryCount[]>([]);
+  const [totalForDistribution, setTotalForDistribution] = useState(0);
   const navigate = useNavigate();
 
   // Determine if current user is a client user
@@ -132,8 +163,9 @@ const Dashboard = () => {
     !hasRole('tenant_admin');
 
   // Fetch monthly volume data for bar chart (12 months stored, display configurable)
+  // Clients see only their tenant; staff/admins see global volume (RLS handles scope).
   const { data: monthlyVolumeData } = useMonthlyTicketVolume(
-    isClientUser ? profile?.client_id : null,
+    isClientUser ? (profile?.client_id ?? null) : null,
     12
   );
 
@@ -265,6 +297,33 @@ const Dashboard = () => {
           .not('unlocked_at', 'is', null);
         retornadosCount = unlockedCount || 0;
       }
+
+      // Distribuição por prioridade e Top 5 categorias (excluindo RFCs)
+      const { data: distributionTickets } = await supabase
+        .from('tickets')
+        .select('priority, category')
+        .neq('record_type', 'rfc');
+
+      const priorityMap = new Map<string, number>();
+      const categoryMap = new Map<string, number>();
+      (distributionTickets || []).forEach((t) => {
+        if (t.priority) priorityMap.set(t.priority, (priorityMap.get(t.priority) || 0) + 1);
+        if (t.category) categoryMap.set(t.category, (categoryMap.get(t.category) || 0) + 1);
+      });
+
+      const priorityList: PriorityCount[] = ['P1', 'P2', 'P3', 'P4'].map((p) => ({
+        priority: p,
+        count: priorityMap.get(p) || 0,
+      }));
+
+      const topCats: CategoryCount[] = Array.from(categoryMap.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      setPriorityCounts(priorityList);
+      setTopCategories(topCats);
+      setTotalForDistribution(distributionTickets?.length || 0);
 
       setStats({
         totalTickets: totalCount || 0,
