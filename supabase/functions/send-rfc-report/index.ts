@@ -13,13 +13,65 @@ const corsHeaders = {
 
 interface RFCReportRequest {
   ticketId: string;
-  ticketNumber: string;
-  ticketTitle: string;
-  contactEmail: string;
-  contactName: string;
-  clientName: string;
-  reportUrl: string;
-  analystName: string;
+}
+
+function escapeHtml(s: string | null | undefined): string {
+  if (!s) return "";
+  return String(s)
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+
+function formatBR(date: string | null | undefined): string {
+  if (!date) return "—";
+  try {
+    return new Date(date).toLocaleString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  } catch {
+    return "—";
+  }
+}
+
+function getDurationMinutes(startedAt: string | null, concludedAt: string | null): number {
+  if (!startedAt || !concludedAt) return 0;
+  const diffMs = new Date(concludedAt).getTime() - new Date(startedAt).getTime();
+  return diffMs > 0 ? Math.round(diffMs / 60000) : 0;
+}
+
+function formatDuration(startedAt: string | null, concludedAt: string | null): string {
+  const totalMinutes = getDurationMinutes(startedAt, concludedAt);
+  if (totalMinutes === 0 && (!startedAt || !concludedAt)) return "—";
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+}
+
+function formatTotalDuration(totalMinutes: number): string {
+  if (totalMinutes === 0) return "—";
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const hours = Math.floor(totalMinutes / 60);
+  const mins = totalMinutes % 60;
+  return mins > 0 ? `${hours}h ${mins}min` : `${hours}h`;
+}
+
+function statusBadge(step: any): string {
+  if (step.status_concluido) {
+    return `<span style="display:inline-block;background:#d1fae5;color:#065f46;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Concluído</span>`;
+  }
+  if (step.started_at) {
+    return `<span style="display:inline-block;background:#fef3c7;color:#92400e;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Em andamento</span>`;
+  }
+  return `<span style="display:inline-block;background:#dbeafe;color:#1e40af;padding:3px 10px;border-radius:12px;font-size:11px;font-weight:600;">Pendente</span>`;
 }
 
 const handler = async (req: Request): Promise<Response> => {
@@ -47,20 +99,11 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    const {
-      ticketId,
-      ticketNumber,
-      ticketTitle,
-      contactEmail,
-      contactName,
-      clientName,
-      reportUrl,
-      analystName,
-    }: RFCReportRequest = await req.json();
+    const { ticketId }: RFCReportRequest = await req.json();
 
-    if (!ticketId || !ticketNumber || !contactEmail || !reportUrl) {
+    if (!ticketId) {
       return new Response(
-        JSON.stringify({ error: "Missing required fields" }),
+        JSON.stringify({ error: "Missing ticketId" }),
         { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
@@ -82,6 +125,91 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
+    // Fetch ticket
+    const { data: ticket, error: ticketError } = await supabase
+      .from("tickets")
+      .select(`id, ticket_number, title, contact_email, contact_name, analyst_id, client_id, clients(name)`)
+      .eq("id", ticketId)
+      .single();
+
+    if (ticketError || !ticket) {
+      return new Response(
+        JSON.stringify({ error: "Ticket not found" }),
+        { status: 404, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (!ticket.contact_email) {
+      return new Response(
+        JSON.stringify({ error: "Ticket has no contact_email" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    // Fetch analyst profile
+    let analystName = "Analista";
+    if (ticket.analyst_id) {
+      const { data: analyst } = await supabase
+        .from("profiles")
+        .select("full_name")
+        .eq("id", ticket.analyst_id)
+        .maybeSingle();
+      if (analyst?.full_name) analystName = analyst.full_name;
+    }
+
+    // Fetch RFC steps
+    const { data: stepsData } = await supabase
+      .from("rfc_steps")
+      .select("*")
+      .eq("ticket_id", ticketId)
+      .order("ordem", { ascending: true });
+
+    const steps = stepsData ?? [];
+
+    // Resolve user names for started_by/concluded_by
+    const userIds = Array.from(new Set([
+      ...steps.map((s: any) => s.started_by).filter(Boolean),
+      ...steps.map((s: any) => s.concluded_by).filter(Boolean),
+    ]));
+    const profileMap: Record<string, string> = {};
+    if (userIds.length > 0) {
+      const { data: profiles } = await supabase
+        .from("profiles")
+        .select("id, full_name")
+        .in("id", userIds);
+      (profiles ?? []).forEach((p: any) => { profileMap[p.id] = p.full_name; });
+    }
+
+    const completedCount = steps.filter((s: any) => s.status_concluido).length;
+    const totalSteps = steps.length;
+    const progressPercent = totalSteps > 0 ? Math.round((completedCount / totalSteps) * 100) : 0;
+    const totalMinutes = steps.reduce(
+      (acc: number, s: any) => acc + getDurationMinutes(s.started_at, s.concluded_at),
+      0,
+    );
+
+    const ticketNumber = ticket.ticket_number;
+    const ticketTitle = ticket.title || "";
+    const clientName = (ticket as any).clients?.name || "Cliente";
+    const contactEmail = ticket.contact_email;
+    const contactName = ticket.contact_name || "Cliente";
+
+    const stepsRowsHtml = steps.map((s: any, idx: number) => {
+      const responsibleId = s.concluded_by || s.started_by;
+      const responsible = responsibleId ? profileMap[responsibleId] || "—" : "—";
+      return `
+        <tr>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-family:monospace;font-size:12px;color:#6b7280;">${String((s.ordem ?? idx) + 1).padStart(2, "0")}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:13px;color:#111827;">${escapeHtml(s.descricao)}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;">${statusBadge(s)}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;">${formatBR(s.started_at)}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;">${formatBR(s.concluded_at)}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:13px;font-weight:600;color:#111827;">${formatDuration(s.started_at, s.concluded_at)}</td>
+          <td style="padding:10px 8px;border-bottom:1px solid #e5e7eb;font-size:12px;color:#6b7280;">${escapeHtml(responsible)}</td>
+        </tr>
+      `;
+    }).join("");
+
     console.log("Sending RFC report to:", contactEmail);
 
     const emailResponse = await resend.emails.send({
@@ -100,7 +228,7 @@ const handler = async (req: Request): Promise<Response> => {
         <head>
           <style>
             body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
+            .container { max-width: 760px; margin: 0 auto; padding: 20px; }
             .header { background: linear-gradient(135deg, #1a7f37 0%, #2da44e 100%); padding: 30px 20px; border-radius: 8px 8px 0 0; text-align: center; }
             .header h2 { margin: 0; color: #ffffff; font-size: 24px; }
             .header .icon { font-size: 48px; margin-bottom: 10px; }
@@ -109,8 +237,13 @@ const handler = async (req: Request): Promise<Response> => {
             .ticket-info { background-color: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #1a7f37; }
             .ticket-info p { margin: 5px 0; font-size: 14px; }
             .ticket-info strong { color: #155724; }
-            .download-section { text-align: center; margin: 30px 0; padding: 25px; background: #f8f9fa; border-radius: 12px; }
-            .download-btn { display: inline-block; background: linear-gradient(135deg, #1a7f37 0%, #2da44e 100%); color: white; padding: 14px 32px; border-radius: 25px; text-decoration: none; font-weight: bold; font-size: 16px; box-shadow: 0 4px 15px rgba(26, 127, 55, 0.3); }
+            .summary-grid { display: table; width: 100%; margin: 20px 0; border-collapse: collapse; }
+            .summary-cell { display: table-cell; padding: 12px; background: #f8f9fa; border: 1px solid #e9ecef; text-align: center; width: 33%; }
+            .summary-cell .label { font-size: 11px; text-transform: uppercase; color: #6b7280; letter-spacing: 0.5px; }
+            .summary-cell .value { font-size: 18px; font-weight: 700; color: #111827; margin-top: 4px; }
+            table.steps { width: 100%; border-collapse: collapse; margin-top: 12px; font-size: 13px; }
+            table.steps thead th { background: #f3f4f6; padding: 10px 8px; text-align: left; font-size: 12px; color: #374151; border-bottom: 2px solid #e5e7eb; }
+            table.steps tfoot td { background: #f9fafb; padding: 10px 8px; font-weight: 700; border-top: 2px solid #e5e7eb; }
             .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 8px 8px; border: 1px solid #e9ecef; border-top: none; }
           </style>
         </head>
@@ -123,31 +256,58 @@ const handler = async (req: Request): Promise<Response> => {
             </div>
             
             <div class="content">
-              <p>Olá <strong>${contactName}</strong>,</p>
-              
-              <p>O relatório de execução da RFC foi gerado e está disponível para download.</p>
-              
+              <p>Olá <strong>${escapeHtml(contactName)}</strong>,</p>
+
+              <p>Segue abaixo o relatório completo de execução da RFC <strong>#${escapeHtml(ticketNumber)}</strong>.</p>
+
               <div class="ticket-info">
-                <p><strong>RFC:</strong> #${ticketNumber}</p>
-                <p><strong>Título:</strong> ${ticketTitle}</p>
-                <p><strong>Cliente:</strong> ${clientName}</p>
-                <p><strong>Analista Responsável:</strong> ${analystName}</p>
+                <p><strong>RFC:</strong> #${escapeHtml(ticketNumber)}</p>
+                <p><strong>Título:</strong> ${escapeHtml(ticketTitle)}</p>
+                <p><strong>Cliente:</strong> ${escapeHtml(clientName)}</p>
+                <p><strong>Analista Responsável:</strong> ${escapeHtml(analystName)}</p>
               </div>
-              
-              <div class="download-section">
-                <h3 style="margin: 0 0 10px 0; color: #333;">📥 Download do Relatório</h3>
-                <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">
-                  Clique no botão abaixo para baixar o relatório completo em PDF
-                </p>
-                <a href="${reportUrl}" class="download-btn">
-                  Baixar Relatório PDF
-                </a>
-                <p style="margin: 15px 0 0 0; font-size: 12px; color: #999;">
-                  O link expira em 30 dias
-                </p>
+
+              <div class="summary-grid">
+                <div class="summary-cell">
+                  <div class="label">Progresso</div>
+                  <div class="value">${completedCount}/${totalSteps} (${progressPercent}%)</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="label">Passos concluídos</div>
+                  <div class="value">${completedCount}</div>
+                </div>
+                <div class="summary-cell">
+                  <div class="label">Tempo total</div>
+                  <div class="value">${formatTotalDuration(totalMinutes)}</div>
+                </div>
               </div>
-              
-              <p style="font-size: 14px; color: #666;">
+
+              <h3 style="margin: 24px 0 8px 0; color: #111827; font-size: 16px;">Passos da Execução</h3>
+              ${steps.length === 0
+                ? `<p style="color:#6b7280;font-size:13px;">Nenhum passo registrado para esta RFC.</p>`
+                : `<table class="steps">
+                    <thead>
+                      <tr>
+                        <th>#</th>
+                        <th>Descrição</th>
+                        <th>Status</th>
+                        <th>Início</th>
+                        <th>Fim</th>
+                        <th>Duração</th>
+                        <th>Responsável</th>
+                      </tr>
+                    </thead>
+                    <tbody>${stepsRowsHtml}</tbody>
+                    <tfoot>
+                      <tr>
+                        <td colspan="5" style="text-align:right;">Tempo Total</td>
+                        <td>${formatTotalDuration(totalMinutes)}</td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
+                  </table>`}
+
+              <p style="font-size: 14px; color: #666; margin-top: 24px;">
                 Em caso de dúvidas, basta responder este email.
               </p>
             </div>
