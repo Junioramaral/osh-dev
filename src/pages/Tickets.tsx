@@ -8,11 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Search, AlertCircle, ListOrdered, AlertTriangle } from "lucide-react";
+import { Plus, Search, AlertCircle, ListOrdered, AlertTriangle, ChevronDown } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import { TicketRow } from "@/components/tickets/TicketRow";
 
@@ -33,7 +35,16 @@ export default function Tickets() {
   const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst, isTenantAdmin } = useAuth();
   const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: "rascunho", label: "Rascunho" },
+    { value: "novo", label: "Novo" },
+    { value: "em_atendimento", label: "Em Atendimento" },
+    { value: "aguardando_cliente", label: "Aguardando Cliente" },
+    { value: "resolvido", label: "Resolvido" },
+    { value: "fechado", label: "Fechado" },
+  ];
+  const DEFAULT_STATUS_FILTERS = ["rascunho", "novo", "em_atendimento", "aguardando_cliente"];
+  const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
@@ -458,7 +469,7 @@ export default function Tickets() {
     const matchesSearch = 
       ticket.ticket_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
       ticket.title.toLowerCase().includes(searchTerm.toLowerCase());
-    const matchesStatus = statusFilter === "all" || ticket.status === statusFilter;
+    const matchesStatus = statusFilters.length === 0 ? false : statusFilters.includes(ticket.status);
     const matchesSegment = segmentFilter === "all" || ticket.segment === segmentFilter;
     const matchesClient = clientFilter === "all" || ticket.client_id === clientFilter;
     const matchesTeam = 
@@ -540,20 +551,63 @@ export default function Tickets() {
               className="pl-10"
             />
           </div>
-          <Select value={statusFilter} onValueChange={setStatusFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Status" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Status</SelectItem>
-              <SelectItem value="rascunho">Rascunho</SelectItem>
-              <SelectItem value="novo">Novo</SelectItem>
-              <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
-              <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
-              <SelectItem value="resolvido">Resolvido</SelectItem>
-              <SelectItem value="fechado">Fechado</SelectItem>
-            </SelectContent>
-          </Select>
+          <Popover>
+            <PopoverTrigger asChild>
+              <Button variant="outline" className="w-[200px] justify-between font-normal">
+                <span className="truncate">
+                  {statusFilters.length === 0
+                    ? "Nenhum status"
+                    : statusFilters.length === STATUS_OPTIONS.length
+                    ? "Todos Status"
+                    : statusFilters.length === 1
+                    ? STATUS_OPTIONS.find((s) => s.value === statusFilters[0])?.label
+                    : `${statusFilters.length} status selecionados`}
+                </span>
+                <ChevronDown className="h-4 w-4 opacity-50 ml-2 shrink-0" />
+              </Button>
+            </PopoverTrigger>
+            <PopoverContent className="w-[220px] p-2" align="start">
+              <div className="flex items-center justify-between px-2 py-1 mb-1 border-b">
+                <button
+                  type="button"
+                  className="text-xs text-primary hover:underline"
+                  onClick={() => setStatusFilters(STATUS_OPTIONS.map((s) => s.value))}
+                >
+                  Selecionar todos
+                </button>
+                <button
+                  type="button"
+                  className="text-xs text-muted-foreground hover:underline"
+                  onClick={() => setStatusFilters([])}
+                >
+                  Limpar
+                </button>
+              </div>
+              <div className="space-y-1">
+                {STATUS_OPTIONS.map((opt) => {
+                  const checked = statusFilters.includes(opt.value);
+                  return (
+                    <label
+                      key={opt.value}
+                      className="flex items-center gap-2 px-2 py-1.5 rounded-sm hover:bg-accent cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={checked}
+                        onCheckedChange={(v) => {
+                          setStatusFilters((prev) =>
+                            v
+                              ? [...prev, opt.value]
+                              : prev.filter((s) => s !== opt.value),
+                          );
+                        }}
+                      />
+                      <span className="text-sm">{opt.label}</span>
+                    </label>
+                  );
+                })}
+              </div>
+            </PopoverContent>
+          </Popover>
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[160px]">
               <SelectValue placeholder="Tipo" />
@@ -712,7 +766,9 @@ export default function Tickets() {
               <AlertCircle className="h-12 w-12 text-muted-foreground mb-4" />
               <h3 className="text-lg font-semibold mb-2">Nenhum ticket encontrado</h3>
               <p className="text-muted-foreground text-center max-w-md">
-                {searchTerm || statusFilter !== "all" || segmentFilter !== "all"
+                {searchTerm ||
+                JSON.stringify([...statusFilters].sort()) !== JSON.stringify([...DEFAULT_STATUS_FILTERS].sort()) ||
+                segmentFilter !== "all"
                   ? "Tente ajustar os filtros de busca"
                   : "Crie seu primeiro ticket para começar"}
               </p>
