@@ -26,6 +26,7 @@ import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { toast } from "@/hooks/use-toast";
 import RFCContextCards from "@/components/tickets/RFCContextCards";
+import { attachTicketCreators } from "@/lib/ticketCreator";
 
 type RFC = {
   id: string;
@@ -83,7 +84,8 @@ const RFCApproval = () => {
         .eq("status", "aguardando_aprovacao")
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as RFC[];
+      const withCreators = await attachTicketCreators((data ?? []) as any[]);
+      return withCreators as RFC[];
     },
   });
 
