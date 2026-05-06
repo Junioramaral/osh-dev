@@ -191,7 +191,7 @@ export default function FAQ() {
     let matchesSegmentType = true;
     if (segmentTypeFilter !== "all") {
       if (segmentFilter === "DB") {
-        matchesSegmentType = !!article.db_engines?.includes(segmentTypeFilter);
+        matchesSegmentType = !!(article.db_engines as string[] | null)?.includes(segmentTypeFilter);
       } else if (segmentFilter === "APP") {
         matchesSegmentType = !!article.app_product_ids?.includes(segmentTypeFilter);
       }
