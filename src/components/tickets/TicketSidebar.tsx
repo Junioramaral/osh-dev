@@ -1,4 +1,4 @@
-import { useState, useMemo } from "react";
+import { useState, useMemo, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -62,6 +62,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const canAssignAnalyst = (isOtimizzoUser || isSuperAdmin) && !isViewer;
   const [editingAnalyst, setEditingAnalyst] = useState(false);
   const [assigningAnalyst, setAssigningAnalyst] = useState(false);
+  const [pendingAnalystId, setPendingAnalystId] = useState<string>("");
+  const [pendingTeamId, setPendingTeamId] = useState<string>("");
 
   const { data: assignableAnalysts } = useQuery({
     queryKey: ["sidebar-otimizzo-analysts"],
@@ -78,25 +80,85 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
     enabled: canAssignAnalyst,
   });
 
-  const handleAssignAnalyst = async (analystId: string) => {
-    const analyst = assignableAnalysts?.find((a) => a.id === analystId);
-    if (!analyst) return;
+  const { data: analystTeams, isLoading: loadingAnalystTeams } = useQuery({
+    queryKey: ["analyst-teams", pendingAnalystId],
+    enabled: canAssignAnalyst && !!pendingAnalystId,
+    queryFn: async () => {
+      const teamMap = new Map<string, { id: string; name: string; segment: string | null }>();
+
+      // 1) profiles.team_id
+      const profile = assignableAnalysts?.find((a) => a.id === pendingAnalystId);
+      if (profile?.team_id) {
+        const { data: t } = await supabase
+          .from("teams")
+          .select("id, name, segment")
+          .eq("id", profile.team_id)
+          .maybeSingle();
+        if (t) teamMap.set(t.id, t);
+      }
+
+      // 2) via user_queues -> teams_queues -> teams
+      const { data: uq } = await supabase
+        .from("user_queues")
+        .select("queue_id")
+        .eq("user_id", pendingAnalystId);
+      const queueIds = (uq || []).map((q) => q.queue_id);
+      if (queueIds.length > 0) {
+        const { data: tq } = await supabase
+          .from("teams_queues")
+          .select("team_id, teams(id, name, segment)")
+          .in("queue_id", queueIds);
+        (tq || []).forEach((row: any) => {
+          if (row.teams) teamMap.set(row.teams.id, row.teams);
+        });
+      }
+
+      return Array.from(teamMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+    },
+  });
+
+  // Auto-select team when only one option
+  useEffect(() => {
+    if (analystTeams && analystTeams.length === 1) {
+      setPendingTeamId(analystTeams[0].id);
+    } else if (analystTeams && analystTeams.length === 0) {
+      setPendingTeamId("");
+    }
+  }, [analystTeams]);
+
+  const handleAnalystChange = (analystId: string) => {
+    setPendingAnalystId(analystId);
+    setPendingTeamId("");
+  };
+
+  const handleConfirmAssignment = async () => {
+    if (!pendingAnalystId) return;
     setAssigningAnalyst(true);
     try {
       const updates: Record<string, any> = {
-        analyst_id: analystId,
+        analyst_id: pendingAnalystId,
         lock_status: "locked",
-        lock_owner_id: analystId,
+        lock_owner_id: pendingAnalystId,
         lock_at: new Date().toISOString(),
         unlocked_at: null,
       };
-      if (analyst.team_id) updates.team_id = analyst.team_id;
+      if (pendingTeamId) updates.team_id = pendingTeamId;
       const { error } = await supabase.from("tickets").update(updates).eq("id", ticket.id);
       if (error) throw error;
       await queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
       await queryClient.invalidateQueries({ queryKey: ["tickets"] });
       toast.success("Analista atribuído");
+
+      // Best-effort notification (don't block UI on failure)
+      supabase.functions
+        .invoke("send-analyst-assignment-notification", { body: { ticketId: ticket.id } })
+        .then(({ error: notifErr }) => {
+          if (notifErr) console.warn("Notification error:", notifErr);
+        });
+
       setEditingAnalyst(false);
+      setPendingAnalystId("");
+      setPendingTeamId("");
     } catch (e: any) {
       toast.error("Erro ao atribuir analista: " + e.message);
     } finally {
@@ -552,8 +614,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             {canAssignAnalyst && (editingAnalyst || !ticket.analyst_id) ? (
               <div className="mt-1 space-y-2">
                 <Select
-                  value={ticket.analyst_id || ""}
-                  onValueChange={handleAssignAnalyst}
+                  value={pendingAnalystId || ticket.analyst_id || ""}
+                  onValueChange={handleAnalystChange}
                   disabled={assigningAnalyst}
                 >
                   <SelectTrigger className="h-9">
@@ -567,20 +629,60 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                {ticket.analyst_id && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => setEditingAnalyst(false)}
-                    disabled={assigningAnalyst}
-                  >
-                    Cancelar
-                  </Button>
+                {pendingAnalystId && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Time</Label>
+                    <Select
+                      value={pendingTeamId}
+                      onValueChange={setPendingTeamId}
+                      disabled={assigningAnalyst || loadingAnalystTeams || (analystTeams?.length ?? 0) === 0}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue
+                          placeholder={
+                            loadingAnalystTeams
+                              ? "Carregando times..."
+                              : (analystTeams?.length ?? 0) === 0
+                                ? "Sem times associados"
+                                : "Selecione um time"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {analystTeams?.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}{t.segment ? ` · ${t.segment}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  O time será preenchido automaticamente conforme o analista.
-                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    onClick={handleConfirmAssignment}
+                    disabled={assigningAnalyst || !pendingAnalystId}
+                  >
+                    {assigningAnalyst ? "Salvando..." : "Confirmar"}
+                  </Button>
+                  {ticket.analyst_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => {
+                        setEditingAnalyst(false);
+                        setPendingAnalystId("");
+                        setPendingTeamId("");
+                      }}
+                      disabled={assigningAnalyst}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 mt-1">
