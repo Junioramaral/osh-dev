@@ -25,7 +25,13 @@ export function useTicketDetail(ticketId: string | undefined) {
         .single();
       
       if (error) throw error;
-      return data;
+      // Fetch analyst email via RPC (auth.users not directly accessible)
+      let analyst_email: string | null = null;
+      if (data?.analyst_id) {
+        const { data: emailData } = await supabase.rpc('get_user_email', { _user_id: data.analyst_id });
+        analyst_email = (emailData as string) ?? null;
+      }
+      return { ...data, analyst_email };
     },
     enabled: !!ticketId
   });
