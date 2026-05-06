@@ -614,8 +614,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             {canAssignAnalyst && (editingAnalyst || !ticket.analyst_id) ? (
               <div className="mt-1 space-y-2">
                 <Select
-                  value={ticket.analyst_id || ""}
-                  onValueChange={handleAssignAnalyst}
+                  value={pendingAnalystId || ticket.analyst_id || ""}
+                  onValueChange={handleAnalystChange}
                   disabled={assigningAnalyst}
                 >
                   <SelectTrigger className="h-9">
@@ -629,20 +629,60 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                     ))}
                   </SelectContent>
                 </Select>
-                {ticket.analyst_id && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-7 px-2 text-xs"
-                    onClick={() => setEditingAnalyst(false)}
-                    disabled={assigningAnalyst}
-                  >
-                    Cancelar
-                  </Button>
+                {pendingAnalystId && (
+                  <div className="space-y-1">
+                    <Label className="text-xs text-muted-foreground">Time</Label>
+                    <Select
+                      value={pendingTeamId}
+                      onValueChange={setPendingTeamId}
+                      disabled={assigningAnalyst || loadingAnalystTeams || (analystTeams?.length ?? 0) === 0}
+                    >
+                      <SelectTrigger className="h-9">
+                        <SelectValue
+                          placeholder={
+                            loadingAnalystTeams
+                              ? "Carregando times..."
+                              : (analystTeams?.length ?? 0) === 0
+                                ? "Sem times associados"
+                                : "Selecione um time"
+                          }
+                        />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {analystTeams?.map((t) => (
+                          <SelectItem key={t.id} value={t.id}>
+                            {t.name}{t.segment ? ` · ${t.segment}` : ""}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
-                <p className="text-xs text-muted-foreground">
-                  O time será preenchido automaticamente conforme o analista.
-                </p>
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    onClick={handleConfirmAssignment}
+                    disabled={assigningAnalyst || !pendingAnalystId}
+                  >
+                    {assigningAnalyst ? "Salvando..." : "Confirmar"}
+                  </Button>
+                  {ticket.analyst_id && (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="h-8"
+                      onClick={() => {
+                        setEditingAnalyst(false);
+                        setPendingAnalystId("");
+                        setPendingTeamId("");
+                      }}
+                      disabled={assigningAnalyst}
+                    >
+                      Cancelar
+                    </Button>
+                  )}
+                </div>
               </div>
             ) : (
               <div className="flex items-center gap-2 mt-1">
