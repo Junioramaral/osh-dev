@@ -1,38 +1,46 @@
 ## Objetivo
 
-Trocar o filtro de Status (atualmente um Select de seleção única) por um **multi-select com checkboxes**, permitindo escolher múltiplos status simultaneamente. O default deve marcar todos EXCETO "Resolvido" e "Fechado".
+Enriquecer o Dashboard com mais blocos analíticos baseados no padrão do Relatório Mensal:
+1. **Distribuição por Prioridade** — ao lado da Distribuição por Segmento
+2. **Top 5 Categorias** — bloco novo
+3. **Resumo Numérico** — tabela de volume mensal (Abertos / Fechados / Saldo), disponível para **todos os perfis** (não só cliente)
 
-## Comportamento
+Tudo em `src/pages/Dashboard.tsx`. Nenhuma alteração de banco ou regra de negócio.
 
-- Botão/trigger no lugar do Select atual mostrando "Status (N)" ou os labels selecionados resumidos.
-- Ao abrir, exibe checkboxes para: Rascunho, Novo, Em Atendimento, Aguardando Cliente, Resolvido, Fechado.
-- Inclui um item "Selecionar todos / Limpar" no topo para conveniência.
-- Default ao carregar a página: `["rascunho", "novo", "em_atendimento", "aguardando_cliente"]` (todos menos Resolvido e Fechado).
-- Se nenhum status estiver marcado → mostra "Nenhum status selecionado" e a lista fica vazia (ou tratamos como "todos"; vou usar lista vazia = nenhum, comportamento previsível).
-- Se todos estiverem marcados → exibe "Todos status".
+---
 
-## Arquivos a alterar
+## 1. Distribuição por Prioridade (P1–P4)
 
-### `src/pages/Tickets.tsx`
+- Buscar contagem de tickets agrupados por `priority` em `loadDashboardStats()` (escopo coerente com o segmento atual: todos os tickets que o usuário enxerga via RLS, excluindo `record_type='rfc'` para manter a regra de exclusão de RFCs).
+- Renderizar uma nova `DashboardSection title="Distribuição por Prioridade"` logo abaixo (ou ao lado) da seção "Distribuição por Segmento", com 4 cards (P1, P2, P3, P4) usando cores já padronizadas:
+  - P1 vermelho, P2 laranja, P3 amarelo, P4 verde (mesmas do `useReportData`).
+- Ícone da seção: `Flag` ou `AlertTriangle`.
 
-1. Trocar `statusFilter: string` por `statusFilters: string[]` com default `["rascunho","novo","em_atendimento","aguardando_cliente"]`.
-2. Filtro de tickets: `const matchesStatus = statusFilters.includes(ticket.status);`
-3. Substituir o `<Select>` de status por um `<Popover>` + `<Button>` trigger + lista de `<Checkbox>` (ambos componentes já existem em `components/ui`).
-4. Atualizar o empty-state condicional na linha ~715 para refletir o novo estado (ex.: comparar com o default).
-5. Manter ordenação atual.
+## 2. Top 5 Categorias
 
-### Detalhes técnicos
+- Buscar `category` dos tickets visíveis (mesma query que segmento) e agregar no client-side para top 5 (`category, count`).
+- Novo `Card` "Top 5 Categorias" abaixo das seções de distribuição, com tabela: `# | Categoria | Qtd | %` (mesmo layout do relatório mensal).
 
-- Usar `Popover` + `PopoverTrigger`/`PopoverContent` já disponíveis.
-- Trigger: `<Button variant="outline" className="w-[200px] justify-between">` mostrando label dinâmico:
-  - 0 selecionados → "Nenhum status"
-  - 6 selecionados → "Todos status"
-  - 1 selecionado → label do status
-  - 2+ → "N status selecionados"
-- Conteúdo: lista vertical com `<Checkbox>` + `<Label>` por status, mais um botão "Limpar" / "Selecionar todos".
-- Sem mudanças de banco, hooks, ou outras páginas.
+## 3. Resumo Numérico para todos os perfis
+
+- Hoje `useMonthlyTicketVolume` só é chamado quando `isClientUser`. Vamos chamá-lo para todos:
+  - Cliente: `clientId = profile.client_id` (continua igual).
+  - Otimizzo / Super Admin / Analista / Tenant Admin: `clientId = null` para retornar volume global (verificar no hook).
+- Se o hook não suporta `null`, ajustar o hook para aceitar `null` e agregar todos os tickets visíveis (escopo atual já é definido por RLS).
+- Renderizar `Card` "Resumo Numérico" com a mesma tabela do relatório mensal (Mês / Abertos / Fechados / Saldo + linha de total), reutilizando exatamente o markup das linhas 710–767 de `MonthlyClientReport.tsx`.
+- Posicionar abaixo do gráfico "Tendência Mensal" já existente (que usa dados parecidos), formando dupla gráfico + tabela.
+
+---
+
+## Detalhes técnicos
+
+- Arquivo único alterado: `src/pages/Dashboard.tsx`.
+- Possível pequeno ajuste em `src/hooks/useMonthlyTicketVolume.ts` para aceitar `clientId === null` (todos os tenants visíveis ao usuário). Confirmo lendo o hook antes de implementar.
+- Excluir `record_type = 'rfc'` em todas as novas queries para manter a regra global do projeto.
+- Cores e badges reaproveitados: `PRIORITY_COLORS` em `useReportData.ts`; `getPriorityBadgeVariant` em `ticketUtils.tsx`.
+- Layout: usar `grid md:grid-cols-2` quando combinar Distribuição por Segmento + Prioridade lado a lado, mantendo `DashboardSection` como wrapper (cada uma vira sua seção, mas posicionadas em uma row de 2 colunas em telas largas).
 
 ## Fora de escopo
 
-- Persistência da seleção (localStorage) — não solicitado.
-- Aplicar o mesmo padrão em `MyTickets.tsx` ou outras páginas — só o pedido foi a "fila de tickets" (`/tickets`).
+- Sem mudanças em RLS, migrations ou edge functions.
+- Sem alterações no relatório mensal.

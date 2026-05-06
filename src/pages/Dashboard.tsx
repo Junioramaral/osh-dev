@@ -14,6 +14,14 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
+import {
   Ticket,
   Clock,
   AlertTriangle,
@@ -30,6 +38,9 @@ import {
   Undo2,
   LucideIcon,
   LayoutGrid,
+  Flag,
+  Tags,
+  BarChart3,
 } from "lucide-react";
 
 // Componente de Seção do Dashboard
@@ -97,6 +108,23 @@ interface MonthlyTrendData {
 
 type TrendPeriod = 3 | 6 | 12;
 
+interface PriorityCount {
+  priority: string;
+  count: number;
+}
+
+interface CategoryCount {
+  name: string;
+  count: number;
+}
+
+const PRIORITY_STYLES: Record<string, { color: string; bgColor: string }> = {
+  P1: { color: "text-red-600", bgColor: "bg-red-100" },
+  P2: { color: "text-orange-600", bgColor: "bg-orange-100" },
+  P3: { color: "text-yellow-600", bgColor: "bg-yellow-100" },
+  P4: { color: "text-green-600", bgColor: "bg-green-100" },
+};
+
 const Dashboard = () => {
   const { user, profile, roles, isSuperAdmin, hasRole } = useAuth();
   const [stats, setStats] = useState<DashboardStats>({
@@ -121,6 +149,9 @@ const Dashboard = () => {
   const [trendPeriod, setTrendPeriod] = useState<TrendPeriod>(6);
   const [barChartPeriod, setBarChartPeriod] = useState<TrendPeriod>(6);
   const [newTicketOpen, setNewTicketOpen] = useState(false);
+  const [priorityCounts, setPriorityCounts] = useState<PriorityCount[]>([]);
+  const [topCategories, setTopCategories] = useState<CategoryCount[]>([]);
+  const [totalForDistribution, setTotalForDistribution] = useState(0);
   const navigate = useNavigate();
 
   // Determine if current user is a client user
@@ -132,8 +163,9 @@ const Dashboard = () => {
     !hasRole('tenant_admin');
 
   // Fetch monthly volume data for bar chart (12 months stored, display configurable)
+  // Clients see only their tenant; staff/admins see global volume (RLS handles scope).
   const { data: monthlyVolumeData } = useMonthlyTicketVolume(
-    isClientUser ? profile?.client_id : null,
+    isClientUser ? (profile?.client_id ?? null) : null,
     12
   );
 
@@ -265,6 +297,33 @@ const Dashboard = () => {
           .not('unlocked_at', 'is', null);
         retornadosCount = unlockedCount || 0;
       }
+
+      // Distribuição por prioridade e Top 5 categorias (excluindo RFCs)
+      const { data: distributionTickets } = await supabase
+        .from('tickets')
+        .select('priority, category')
+        .neq('record_type', 'rfc');
+
+      const priorityMap = new Map<string, number>();
+      const categoryMap = new Map<string, number>();
+      (distributionTickets || []).forEach((t) => {
+        if (t.priority) priorityMap.set(t.priority, (priorityMap.get(t.priority) || 0) + 1);
+        if (t.category) categoryMap.set(t.category, (categoryMap.get(t.category) || 0) + 1);
+      });
+
+      const priorityList: PriorityCount[] = ['P1', 'P2', 'P3', 'P4'].map((p) => ({
+        priority: p,
+        count: priorityMap.get(p) || 0,
+      }));
+
+      const topCats: CategoryCount[] = Array.from(categoryMap.entries())
+        .map(([name, count]) => ({ name, count }))
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 5);
+
+      setPriorityCounts(priorityList);
+      setTopCategories(topCats);
+      setTotalForDistribution(distributionTickets?.length || 0);
 
       setStats({
         totalTickets: totalCount || 0,
@@ -626,6 +685,58 @@ const Dashboard = () => {
             <DashboardSection title="Distribuição por Segmento" icon={LayoutGrid}>
               {distributionCards.map(renderStatCard)}
             </DashboardSection>
+
+            {/* Seção 4: Distribuição por Prioridade */}
+            <DashboardSection title="Distribuição por Prioridade" icon={Flag}>
+              {priorityCounts.map((p) =>
+                renderStatCard({
+                  title: `Tickets ${p.priority}`,
+                  value: p.count,
+                  icon: Flag,
+                  color: PRIORITY_STYLES[p.priority]?.color || "text-muted-foreground",
+                  bgColor: PRIORITY_STYLES[p.priority]?.bgColor || "bg-muted",
+                })
+              )}
+            </DashboardSection>
+
+            {/* Top 5 Categorias */}
+            {topCategories.length > 0 && (
+              <Card>
+                <CardHeader className="pb-2">
+                  <CardTitle className="flex items-center gap-2">
+                    <Tags className="w-5 h-5" />
+                    Top 5 Categorias
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>#</TableHead>
+                        <TableHead>Categoria</TableHead>
+                        <TableHead className="text-center">Qtd</TableHead>
+                        <TableHead className="text-center">%</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {topCategories.map((cat, index) => (
+                        <TableRow key={cat.name}>
+                          <TableCell className="font-bold text-muted-foreground">{index + 1}</TableCell>
+                          <TableCell className="font-medium">{cat.name}</TableCell>
+                          <TableCell className="text-center font-semibold">{cat.count}</TableCell>
+                          <TableCell className="text-center">
+                            {totalForDistribution > 0
+                              ? Math.round((cat.count / totalForDistribution) * 100)
+                              : 0}
+                            %
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            )}
           </div>
         )}
 
@@ -782,6 +893,69 @@ const Dashboard = () => {
             )}
           </CardContent>
         </Card>
+
+        {/* Resumo Numérico - Volume Mensal */}
+        {monthlyVolumeData && monthlyVolumeData.length > 0 && (
+          <Card>
+            <CardHeader className="pb-2">
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="w-5 h-5" />
+                Resumo Numérico
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>Mês</TableHead>
+                    <TableHead className="text-center">Abertos</TableHead>
+                    <TableHead className="text-center">Fechados</TableHead>
+                    <TableHead className="text-center">Saldo</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {monthlyVolumeData.slice(-barChartPeriod).map((m) => {
+                    const saldo = m.fechados - m.abertos;
+                    return (
+                      <TableRow key={m.month}>
+                        <TableCell className="capitalize font-medium">{m.monthLabel}</TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-yellow-600 font-semibold">{m.abertos}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className="text-green-600 font-semibold">{m.fechados}</span>
+                        </TableCell>
+                        <TableCell className="text-center">
+                          <span className={saldo >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+                            {saldo > 0 ? "+" : ""}{saldo}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })}
+                  {(() => {
+                    const slice = monthlyVolumeData.slice(-barChartPeriod);
+                    const totalAbertos = slice.reduce((sum, m) => sum + m.abertos, 0);
+                    const totalFechados = slice.reduce((sum, m) => sum + m.fechados, 0);
+                    const totalSaldo = totalFechados - totalAbertos;
+                    return (
+                      <TableRow className="font-bold border-t-2">
+                        <TableCell>Total</TableCell>
+                        <TableCell className="text-center text-yellow-600">{totalAbertos}</TableCell>
+                        <TableCell className="text-center text-green-600">{totalFechados}</TableCell>
+                        <TableCell className="text-center">
+                          <span className={totalSaldo >= 0 ? "text-green-600" : "text-red-600"}>
+                            {totalSaldo > 0 ? "+" : ""}{totalSaldo}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    );
+                  })()}
+                </TableBody>
+              </Table>
+            </CardContent>
+          </Card>
+        )}
 
       </div>
       
