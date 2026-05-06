@@ -8,11 +8,13 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Plus, Search, AlertCircle, ListOrdered, AlertTriangle } from "lucide-react";
+import { Plus, Search, AlertCircle, ListOrdered, AlertTriangle, ChevronDown } from "lucide-react";
 import NewTicketDialog from "@/components/tickets/NewTicketDialog";
 import { TicketRow } from "@/components/tickets/TicketRow";
 
@@ -33,7 +35,16 @@ export default function Tickets() {
   const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst, isTenantAdmin } = useAuth();
   const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<string>("all");
+  const STATUS_OPTIONS: { value: string; label: string }[] = [
+    { value: "rascunho", label: "Rascunho" },
+    { value: "novo", label: "Novo" },
+    { value: "em_atendimento", label: "Em Atendimento" },
+    { value: "aguardando_cliente", label: "Aguardando Cliente" },
+    { value: "resolvido", label: "Resolvido" },
+    { value: "fechado", label: "Fechado" },
+  ];
+  const DEFAULT_STATUS_FILTERS = ["rascunho", "novo", "em_atendimento", "aguardando_cliente"];
+  const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
   const [teamFilter, setTeamFilter] = useState<string>("all");
