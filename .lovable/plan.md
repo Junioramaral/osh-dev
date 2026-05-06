@@ -1,37 +1,26 @@
-## Problemas a corrigir
+## Objetivo
 
-### 1. Não consegue rolar até o comentário / botões na tela de Aprovação de RFC
+Na aba **RFC** do ticket (visualização antes/depois da aprovação), permitir expandir cada passo da tabela "Passos" para visualizar o **procedimento detalhado** e os **scripts/comandos** já cadastrados na RFC — informações que hoje só aparecem no modo de execução.
 
-Em `src/pages/RFCApproval.tsx` o painel direito é um `flex flex-col h-full` com `<ScrollArea className="flex-1">`. O Radix `ScrollArea` precisa de **altura explícita** no viewport interno — `flex-1` em alguns layouts não propaga a altura para o `ScrollAreaViewport`, então o conteúdo overflowa sem ativar a barra.
+## Mudanças
 
-Correção: trocar `flex-1` por `flex-1 h-0` (ou `min-h-0`) na `ScrollArea`, e garantir que o container pai (`flex flex-col h-full`) tenha `min-h-0`. Esse é o fix idiomático para ScrollArea dentro de flexbox.
+### `src/components/tickets/TicketRFCReport.tsx`
+- Adicionar estado local `expandedSteps: Set<string>` para controlar quais linhas estão abertas.
+- Em cada linha da tabela de passos, incluir uma coluna inicial com botão chevron (ChevronRight / ChevronDown) que alterna a expansão.
+- Quando expandida, renderizar uma `TableRow` adicional com `colSpan` total contendo dois blocos:
+  - **Procedimento detalhado** — texto formatado (`whitespace-pre-wrap`) a partir de `step.procedimento`. Sempre visível.
+  - **Scripts / Comandos** — bloco monoespaçado com fundo escuro (`bg-muted` / `font-mono`) a partir de `step.scripts`. Visível apenas para usuários internos (`isOtimizzoUser || isSuperAdmin`), respeitando a regra existente de ocultar scripts para clientes.
+- Se um passo não tiver procedimento nem scripts (ou cliente sem procedimento), exibir mensagem discreta "Sem detalhes adicionais".
+- Adicionar botão "Expandir todos / Recolher todos" acima da tabela para conveniência.
 
-Alternativa equivalente: aplicar `h-full` na `ScrollArea` e `overflow-hidden min-h-0` no parent. Vou usar `flex-1 min-h-0` na ScrollArea (mais simples).
+### Sem alterações de backend
+Os campos `procedimento` e `scripts` já existem em `rfc_steps` e já são retornados pelo hook `useTicketRFCSteps`. Nada a mudar em SQL, RLS ou edge functions.
 
-### 2. RFC com status "Aguardando Aprovação" não aparece em /tickets
+## Aspectos visuais
+- Manter o layout atual da tabela; a linha expandida usa fundo `bg-muted/30` para destacar.
+- Ícones via `lucide-react` (`ChevronRight`, `ChevronDown`, `FileText`, `Terminal`).
+- Tokens semânticos do design system (sem cores hardcoded).
 
-Em `src/pages/Tickets.tsx` (linhas 38–46) a lista `STATUS_OPTIONS` não inclui os status específicos de RFC:
-
-```ts
-const STATUS_OPTIONS = [
-  { value: "rascunho", ... },
-  { value: "novo", ... },
-  { value: "em_atendimento", ... },
-  { value: "aguardando_cliente", ... },
-  { value: "resolvido", ... },
-  { value: "fechado", ... },
-];
-```
-
-Faltam:
-- `aguardando_aprovacao` → "Aguardando Aprovação"
-- `aprovado` → "Aprovado"
-
-Sem eles, o filtro de status nunca casa com a RFC e o registro fica oculto.
-
-Correção: adicionar as duas opções a `STATUS_OPTIONS`. Eles não entram em `DEFAULT_STATUS_FILTERS` (mantém o default atual) — o usuário precisa marcá-los manualmente, igual a "Resolvido"/"Fechado".
-
-## Arquivos a editar
-
-- `src/pages/RFCApproval.tsx` — adicionar `min-h-0` na `ScrollArea` do painel direito.
-- `src/pages/Tickets.tsx` — incluir `aguardando_aprovacao` e `aprovado` em `STATUS_OPTIONS`.
+## Fora do escopo
+- Não altera a tela de execução de passos (`RFCExecution`) nem o portal do cliente.
+- Não altera a política de visibilidade de scripts para clientes.
