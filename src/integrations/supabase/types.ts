@@ -1557,6 +1557,7 @@ export type Database = {
       }
       get_analyst_queue_ids: { Args: { _user_id: string }; Returns: string[] }
       get_tenant_by_domain: { Args: { _email: string }; Returns: string }
+      get_user_email: { Args: { _user_id: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
       has_role: {
         Args: {

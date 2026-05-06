@@ -509,7 +509,12 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                   {ticket.profiles?.full_name?.[0] || 'N'}
                 </AvatarFallback>
               </Avatar>
-              <span className="text-sm">{ticket.profiles?.full_name || 'Não atribuído'}</span>
+              <div className="flex flex-col">
+                <span className="text-sm">{ticket.profiles?.full_name || 'Não atribuído'}</span>
+                {ticket.analyst_email && (
+                  <span className="text-xs text-muted-foreground">{ticket.analyst_email}</span>
+                )}
+              </div>
             </div>
           </div>
           
