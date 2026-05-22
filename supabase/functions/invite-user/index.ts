@@ -172,12 +172,34 @@ serve(async (req) => {
 
     console.log("✅ Validation passed, creating user...");
 
-    // Generate random temporary password for each invitation
+    // Generate random temporary password without visually ambiguous characters
+    // Excludes: l, I, 1, O, 0, o (avoid digitação errada na primeira tentativa)
     const generateTempPassword = (): string => {
-      const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*';
-      const passwordArray = new Uint8Array(12);
-      crypto.getRandomValues(passwordArray);
-      return Array.from(passwordArray).map(x => chars[x % chars.length]).join('');
+      const lowercase = 'abcdefghijkmnpqrstuvwxyz'; // sem l, o
+      const uppercase = 'ABCDEFGHJKLMNPQRSTUVWXYZ'; // sem I, O
+      const digits = '23456789';                    // sem 0, 1
+      const symbols = '!@#$%^&*';
+      const all = lowercase + uppercase + digits + symbols;
+
+      const pick = (set: string) => {
+        const arr = new Uint8Array(1);
+        crypto.getRandomValues(arr);
+        return set[arr[0] % set.length];
+      };
+
+      // Garantir 1 de cada categoria para passar na validação do ForcePasswordChange
+      const required = [pick(lowercase), pick(uppercase), pick(digits), pick(symbols)];
+      const remaining = Array.from({ length: 8 }, () => pick(all));
+      const combined = [...required, ...remaining];
+
+      // Shuffle (Fisher-Yates) usando crypto
+      for (let i = combined.length - 1; i > 0; i--) {
+        const rand = new Uint8Array(1);
+        crypto.getRandomValues(rand);
+        const j = rand[0] % (i + 1);
+        [combined[i], combined[j]] = [combined[j], combined[i]];
+      }
+      return combined.join('');
     };
     const temporaryPassword = generateTempPassword();
 
