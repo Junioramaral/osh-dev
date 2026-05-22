@@ -1,29 +1,55 @@
-## Diagnóstico
+# Troca de Senha do Usuário Logado
 
-O print está correto: no banco, a Juliane está com telefone vazio em duas tabelas:
+## Recomendação UX/UI
 
-- `profiles.phone = NULL`
-- `client_contacts.phone = NULL`
+A melhor prática é **manter a troca de senha dentro do "Meu Perfil"**, mas em uma **aba separada chamada "Segurança"**. Isso porque:
 
-Ou seja, a listagem não está escondendo o telefone; o telefone não foi persistido para esse usuário.
+- O usuário já associa "perfil" como o lugar de gerenciar a própria conta (padrão Google, GitHub, Notion, Linear).
+- Dados pessoais (nome, foto, telefone) e dados sensíveis (senha) devem ficar **visualmente separados** para evitar erros e reforçar a percepção de segurança.
+- Evita criar uma nova rota/menu só para senha, mantendo a navegação enxuta.
 
-Também encontrei que o fluxo de criação do tenant chama a Edge Function `invite-user` passando `phone`, mas o usuário da Juliane foi criado antes/ao redor da correção anterior, e o registro atual ficou sem telefone. Como não há log recente da Edge Function para esse email, a causa mais provável é que o telefone não chegou gravado na função ou foi perdido no fluxo antigo antes da correção.
+## Estrutura proposta
 
-## Plano de correção
+Reorganizar o `ProfileEditDialog` com duas abas (`Tabs` do shadcn):
 
-1. Corrigir o fluxo de convite para ficar mais robusto
-   - Garantir que `invite-user` grave o telefone no `profiles` via `upsert`.
-   - Se o contato já existir em `client_contacts`, atualizar também `name`, `phone`, `role` e `updated_at`, em vez de apenas ignorar o contato existente.
-   - Incluir o telefone em `user_metadata` na criação do auth user para o trigger `handle_new_user` também ter essa informação disponível.
+```text
+┌─ Meu Perfil ────────────────────────┐
+│  [ Dados Pessoais ] [ Segurança ]   │
+├─────────────────────────────────────┤
+│  (conteúdo da aba ativa)            │
+└─────────────────────────────────────┘
+```
 
-2. Corrigir o trigger de novo usuário
-   - Atualizar `handle_new_user()` para gravar `phone` a partir de `raw_user_meta_data->>'phone'` quando existir.
-   - Isso evita perda do telefone quando o perfil é criado automaticamente pelo trigger antes da Edge Function completar.
+### Aba "Dados Pessoais" (atual)
+- Avatar, Nome, Telefone, E-mail (já existe — sem mudanças).
 
-3. Corrigir a Juliane no dado atual
-   - Atualizar `profiles.phone` e `client_contacts.phone` para `juliane@atppoa.com.br`, usando o telefone correto que você me passar.
-   - Após isso, a coluna “Telefone” deve aparecer na tela do tenant ATPPOA.
+### Aba "Segurança" (nova)
+Campos:
+- **Senha atual** (obrigatório — reautenticação)
+- **Nova senha** (com indicador visual de força: fraca/média/forte)
+- **Confirmar nova senha**
+- Requisitos visíveis em tempo real:
+  - mínimo 8 caracteres
+  - 1 letra maiúscula
+  - 1 número
+  - 1 caractere especial
+- Botão "Alterar senha" desabilitado até que tudo esteja válido.
+- Após sucesso: toast de confirmação + manter usuário logado (sem reload).
 
-## Preciso de uma informação
+## Implementação técnica
 
-Me informe o telefone correto da Juliane para eu aplicar a correção no registro atual.
+1. **`ProfileEditDialog.tsx`**: envolver conteúdo em `<Tabs>` com `TabsList` (Dados Pessoais / Segurança) e dois `TabsContent`.
+2. **Novo componente `PasswordChangeForm.tsx`** dentro de `src/components/profile/`:
+   - Reautentica chamando `supabase.auth.signInWithPassword({ email: user.email, password: currentPassword })` para validar a senha atual.
+   - Se ok, chama `supabase.auth.updateUser({ password: newPassword })`.
+   - Trata erros: senha atual incorreta, nova senha fraca, falha de rede.
+3. **Componente auxiliar de força de senha** (barra colorida + checklist) reaproveitando tokens semânticos do design system (sem cores hardcoded).
+4. Dialog cresce levemente em altura (`sm:max-w-md` mantido); tabs evitam scroll excessivo.
+
+## Fora de escopo
+- Autenticação em dois fatores (2FA) — pode ser proposta futura na mesma aba "Segurança".
+- Histórico de sessões / dispositivos conectados — idem.
+- Logout de outras sessões após troca — opcional, posso incluir se desejar (`supabase.auth.signOut({ scope: 'others' })`).
+
+## Pergunta opcional
+Quer que eu inclua o **logout automático das outras sessões** após a troca de senha? É uma boa prática de segurança (padrão GitHub/Google), mas adiciona uma linha extra de UX a comunicar ao usuário.
