@@ -16,7 +16,9 @@ import { Label } from "@/components/ui/label";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { GradientSeparator } from "@/components/ui/gradient-separator";
-import { Camera, Loader2, User } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { PasswordChangeForm } from "@/components/profile/PasswordChangeForm";
+import { Camera, Loader2, Lock, User, UserCog } from "lucide-react";
 
 interface ProfileEditDialogProps {
   open: boolean;
@@ -149,7 +151,17 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
           <DialogTitle>Meu Perfil</DialogTitle>
         </DialogHeader>
 
-        <div className="space-y-6 py-4">
+        <Tabs defaultValue="personal" className="pt-2">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="personal" className="gap-2">
+              <UserCog className="h-4 w-4" /> Dados Pessoais
+            </TabsTrigger>
+            <TabsTrigger value="security" className="gap-2">
+              <Lock className="h-4 w-4" /> Segurança
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="personal" className="space-y-6 py-4">
           {/* Avatar Section */}
           <div className="flex flex-col items-center gap-4">
             <div className="relative">
@@ -216,17 +228,22 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
               </p>
             </div>
           </div>
-        </div>
 
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
-            Cancelar
-          </Button>
-          <Button onClick={handleSave} disabled={saving || !fullName.trim()}>
-            {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-            Salvar
-          </Button>
-        </DialogFooter>
+            <DialogFooter className="pt-4">
+              <Button variant="outline" onClick={() => onOpenChange(false)} disabled={saving}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSave} disabled={saving || !fullName.trim()}>
+                {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Salvar
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+
+          <TabsContent value="security" className="py-4">
+            <PasswordChangeForm />
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
   );
