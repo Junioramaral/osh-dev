@@ -1,38 +1,38 @@
-## Objetivo
-1. No card **Pessoas** do ticket/RFC, após escolher o analista, exibir um **dropdown de Times** mostrando os times aos quais aquele analista pertence (em vez de definir o time automaticamente).
-2. Quando o analista for atribuído pelo card Pessoas, **enviar notificação por e-mail** ao analista informando a atribuição.
+## Problema
 
-## Como descobrir os times do analista
-Hoje a relação analista ↔ time é feita por:
-- `profiles.team_id` — time principal do analista (single).
-- Indireto: `user_queues` (filas do analista) ↔ `teams_queues` (filas dos times) → times com sobreposição de filas.
+A usuária `juliane@atppoa.com.br` recebeu uma senha temporária contendo caracteres visualmente ambíguos (`l`, `1`, `I`, `O`, `0`, `o`). Ela digitou `1` no lugar de `l` minúsculo e recebeu "Invalid login credentials". Os logs confirmam que **nenhuma tentativa de login dela** chegou ao Supabase com sucesso — todas falharam por digitação incorreta.
 
-Combinar as duas fontes para listar os times disponíveis (deduplicado, ordenado por nome). Se houver apenas 1 time, pré-seleciona; se vazio, exibe "Sem times associados" e mantém o time atual do ticket.
+## Solução
 
-## Mudanças
+### 1. Senha temporária sem ambiguidade
+Em `supabase/functions/invite-user/index.ts`, na função `generateTempPassword`, trocar o charset para remover caracteres confusos:
 
-### `src/components/tickets/TicketSidebar.tsx`
-- Remover a lógica que escreve `team_id` automaticamente ao selecionar o analista.
-- Após selecionar analista (e quando `editingAnalyst`), **mostrar um segundo Select "Time"** carregando os times do analista escolhido:
-  - Query nova `useQuery(["analyst-teams", analystId])`:
-    - Buscar `profiles.team_id` do analista (1 time).
-    - Buscar `user_queues` do analista → `teams_queues` com mesmas `queue_id` → `teams`.
-    - Unir os resultados (deduplicar por id).
-  - Pré-seleciona se houver apenas 1; caso contrário, requer escolha manual.
-- Botão **"Confirmar"** que efetiva o update do ticket com `analyst_id`, `team_id` (escolhido), lock fields, e dispara a notificação.
-- Após sucesso: invalida queries e fecha edição.
+**Antes:**
+```
+abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*
+```
 
-### Notificação ao analista
-Reutilizar/estender a Edge Function `send-analyst-notification` existente:
-- Atualmente ela é usada para notificações de comentário. Adicionar suporte a um novo tipo `assignment` (ou criar nova função `send-analyst-assignment-notification`).
-- **Decisão recomendada:** criar função nova `send-analyst-assignment-notification` (separação clara de templates) — recebe `{ ticketId }`, busca analista (e-mail via `auth.users`), ticket, cliente, e envia e-mail "Você foi atribuído ao ticket #XXXXX – Título" com link para `${APP_URL}/tickets/{id}`.
-- Frontend chama `supabase.functions.invoke("send-analyst-assignment-notification", { body: { ticketId } })` após o update bem-sucedido (best-effort, erros não bloqueiam a UI).
+**Depois (sem `l`, `I`, `O`, `o`, `0`, `1`):**
+```
+abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*
+```
 
-## Fora do escopo
-- Não altera o fluxo do `RequiredFieldsBeforeResolveDialog`.
-- Não altera RLS.
-- Não altera o `BulkAssignAnalystDialog` (escopo apenas do sidebar).
+Garantir também que a senha gerada **sempre contenha** pelo menos 1 maiúscula, 1 minúscula, 1 dígito e 1 caractere especial (para passar na validação de `ForcePasswordChange`).
 
-## Pontos a confirmar
-- Se o analista tiver apenas 1 time associado, devo pré-selecionar automaticamente ou ainda exigir confirmação?
-- A notificação por e-mail deve ser enviada também quando o analista é trocado (reatribuição), ou apenas na primeira atribuição?
+### 2. Botão "Copiar senha" no e-mail
+Como não dá para ter botão de copiar real em e-mail, a melhor garantia é:
+- Manter a senha em fonte monoespaçada grande (já está)
+- Adicionar uma orientação explícita logo abaixo: **"💡 Dica: copie e cole a senha para evitar erros de digitação"**
+
+### 3. (Opcional) Mostrar a senha em "caixa selecionável"
+Adicionar `user-select: all` no `<p>` da senha — em clientes de e-mail web (Gmail, Outlook Web) basta 1 clique para selecionar tudo.
+
+## Arquivos alterados
+
+- `supabase/functions/invite-user/index.ts` — charset da senha + dica de copiar/colar no template
+
+## Como verificar
+
+1. Cadastrar um novo usuário de teste
+2. Conferir no e-mail que a senha não contém `l`, `1`, `I`, `O`, `o`, `0`
+3. Confirmar que a dica de copiar/colar aparece abaixo da senha
