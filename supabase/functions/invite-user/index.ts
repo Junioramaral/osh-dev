@@ -303,69 +303,103 @@ serve(async (req) => {
     try {
       console.log("📧 Sending welcome email...");
 
-      const emailHtml = `
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta charset="utf-8">
-            <style>
-              body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-              .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-              .header { background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0; }
-              .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-              .credentials-box { background: white; border: 2px solid #e5e7eb; padding: 20px; margin: 20px 0; border-radius: 8px; }
-              .credential-row { margin: 10px 0; }
-              .credential-label { font-weight: bold; color: #6b7280; }
-              .credential-value { color: #111827; font-family: monospace; font-size: 16px; }
-              .button { display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 14px 28px; text-decoration: none; border-radius: 6px; margin: 20px 0; font-weight: bold; }
-              .warning { background: #fef3c7; border-left: 4px solid #f59e0b; padding: 15px; margin: 20px 0; }
-              .footer { text-align: center; color: #6b7280; font-size: 14px; margin-top: 30px; }
-              .roles-badge { display: inline-block; background: #e0e7ff; color: #3730a3; padding: 4px 12px; border-radius: 4px; font-size: 14px; margin-top: 10px; }
-            </style>
-          </head>
-          <body>
-            <div class="container">
-              <div class="header">
-                <h1>🎉 Bem-vindo à Plataforma de Atendimento</h1>
-              </div>
-              <div class="content">
-                <p>Olá, <strong>${full_name}</strong>!</p>
-                <p>Sua conta foi criada com sucesso no tenant <strong>${tenant.name}</strong>.</p>
-                <p>Suas funções: <span class="roles-badge">${rolesDisplay}</span></p>
-                
-                <div class="credentials-box">
-                  <h3 style="margin-top: 0;">🔐 Suas Credenciais de Acesso</h3>
-                  <div class="credential-row">
-                    <span class="credential-label">Email:</span><br>
-                    <span class="credential-value">${email}</span>
-                  </div>
-                  <div class="credential-row">
-                    <span class="credential-label">Senha Temporária:</span><br>
-                    <span class="credential-value">${temporaryPassword}</span>
-                  </div>
-                </div>
-                
-                <div class="warning">
-                  <strong>⚠️ Importante:</strong> Por motivos de segurança, você será obrigado a trocar sua senha no primeiro acesso. Esta senha temporária não poderá ser utilizada após a primeira troca.
-                </div>
-                
-                <div style="text-align: center;">
-                  <a href="${appUrl}/auth" class="button">
-                    Acessar Plataforma
-                  </a>
-                </div>
-                
-                <p style="margin-top: 30px; color: #6b7280; font-size: 14px;">
-                  Se você não solicitou esta conta, por favor ignore este email.
-                </p>
-              </div>
-              <div class="footer">
-                <p>Otimizzo Service Hub - Service Desk Multi-tenant</p>
-              </div>
-            </div>
-          </body>
-        </html>
-      `;
+      // Bulletproof email HTML - table-based, inline styles, no gradients
+      // Compatible with Outlook desktop, Gmail, Apple Mail, mobile clients
+      const emailHtml = `<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+  <meta http-equiv="Content-Type" content="text/html; charset=UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Bem-vindo à Plataforma</title>
+</head>
+<body style="margin:0; padding:0; background-color:#f3f4f6; font-family:Arial, Helvetica, sans-serif;">
+  <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f3f4f6;">
+    <tr>
+      <td align="center" style="padding:20px 10px;">
+        <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="max-width:600px; background-color:#ffffff; border:1px solid #e5e7eb;">
+          <!-- Header -->
+          <tr>
+            <td align="center" bgcolor="#667eea" style="background-color:#667eea; padding:30px 20px; color:#ffffff;">
+              <h1 style="margin:0; font-family:Arial, Helvetica, sans-serif; font-size:24px; font-weight:bold; color:#ffffff; line-height:1.3;">
+                Bem-vindo à Plataforma de Atendimento
+              </h1>
+            </td>
+          </tr>
+          <!-- Content -->
+          <tr>
+            <td style="padding:30px 30px 10px 30px; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#333333; line-height:1.6;">
+              <p style="margin:0 0 15px 0;">Olá, <strong>${full_name}</strong>!</p>
+              <p style="margin:0 0 15px 0;">Sua conta foi criada com sucesso no tenant <strong>${tenant.name}</strong>.</p>
+              <p style="margin:0 0 20px 0;">Suas funções: <strong style="color:#3730a3;">${rolesDisplay}</strong></p>
+            </td>
+          </tr>
+          <!-- Credentials box -->
+          <tr>
+            <td style="padding:0 30px 20px 30px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#f9fafb; border:2px solid #e5e7eb;">
+                <tr>
+                  <td style="padding:20px; font-family:Arial, Helvetica, sans-serif; font-size:14px; color:#333333;">
+                    <h3 style="margin:0 0 15px 0; font-size:16px; color:#111827;">Suas Credenciais de Acesso</h3>
+                    <p style="margin:0 0 5px 0; font-weight:bold; color:#6b7280; font-size:13px;">Email:</p>
+                    <p style="margin:0 0 15px 0; font-family:'Courier New', monospace; font-size:15px; color:#111827; word-break:break-all;">${email}</p>
+                    <p style="margin:0 0 5px 0; font-weight:bold; color:#6b7280; font-size:13px;">Senha Temporária:</p>
+                    <p style="margin:0; font-family:'Courier New', monospace; font-size:15px; color:#111827; word-break:break-all;">${temporaryPassword}</p>
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Warning -->
+          <tr>
+            <td style="padding:0 30px 20px 30px;">
+              <table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="background-color:#fef3c7; border-left:4px solid #f59e0b;">
+                <tr>
+                  <td style="padding:15px; font-family:Arial, Helvetica, sans-serif; font-size:13px; color:#78350f; line-height:1.5;">
+                    <strong>Importante:</strong> Por motivos de segurança, você será obrigado a trocar sua senha no primeiro acesso. Esta senha temporária não poderá ser utilizada após a primeira troca.
+                  </td>
+                </tr>
+              </table>
+            </td>
+          </tr>
+          <!-- Bulletproof Button -->
+          <tr>
+            <td align="center" style="padding:10px 30px 30px 30px;">
+              <!--[if mso]>
+              <v:roundrect xmlns:v="urn:schemas-microsoft-com:vml" xmlns:w="urn:schemas-microsoft-com:office:word" href="${appUrl}/auth" style="height:48px;v-text-anchor:middle;width:240px;" arcsize="10%" stroke="f" fillcolor="#667eea">
+                <w:anchorlock/>
+                <center style="color:#ffffff;font-family:Arial,sans-serif;font-size:15px;font-weight:bold;">Acessar Plataforma</center>
+              </v:roundrect>
+              <![endif]-->
+              <!--[if !mso]><!-- -->
+              <a href="${appUrl}/auth" target="_blank" style="background-color:#667eea; border:1px solid #667eea; color:#ffffff; display:inline-block; font-family:Arial, Helvetica, sans-serif; font-size:15px; font-weight:bold; line-height:48px; text-align:center; text-decoration:none; width:240px; -webkit-text-size-adjust:none; mso-hide:all;">Acessar Plataforma</a>
+              <!--<![endif]-->
+            </td>
+          </tr>
+          <!-- Fallback link -->
+          <tr>
+            <td align="center" style="padding:0 30px 20px 30px; font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#6b7280;">
+              Ou copie e cole este link no navegador:<br/>
+              <a href="${appUrl}/auth" style="color:#667eea; word-break:break-all;">${appUrl}/auth</a>
+            </td>
+          </tr>
+          <!-- Footer note -->
+          <tr>
+            <td style="padding:0 30px 20px 30px; font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#9ca3af; line-height:1.5;">
+              Se você não solicitou esta conta, por favor ignore este email.
+            </td>
+          </tr>
+          <!-- Footer -->
+          <tr>
+            <td align="center" bgcolor="#f9fafb" style="background-color:#f9fafb; padding:20px; font-family:Arial, Helvetica, sans-serif; font-size:12px; color:#6b7280; border-top:1px solid #e5e7eb;">
+              Otimizzo Service Hub &mdash; Service Desk Multi-tenant
+            </td>
+          </tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>`;
 
       const { error: emailError } = await resend.emails.send({
         from: "Otimizzo Service Hub <noreply@resend.otimizzo.com>",
