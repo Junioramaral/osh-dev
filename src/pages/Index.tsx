@@ -370,6 +370,73 @@ const Index = () => {
         </div>
       </section>
 
+      {/* RFC + Time Tracking Highlight */}
+      <section className="py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-8">
+            <Card className="relative overflow-hidden border-accent/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent" />
+              <CardContent className="p-8 relative">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <GitPullRequest className="w-6 h-6 text-accent" />
+                  </div>
+                  <span className="text-xs font-semibold text-accent uppercase tracking-wider">Novidade</span>
+                </div>
+                <h3 className="text-2xl font-bold mb-3">Gestão de Mudanças (RFC) ponta a ponta</h3>
+                <p className="text-muted-foreground mb-6">
+                  Solicite, aprove, execute e documente cada mudança com rastreabilidade total.
+                </p>
+                <ul className="space-y-3">
+                  {[
+                    "Etapas dinâmicas com progresso automático",
+                    "Aprovação obrigatória do gestor com justificativa",
+                    "Portal de execução para acompanhamento do cliente",
+                    "Geração e envio de PDF da mudança concluída",
+                    "Excluído do SLA de tickets — métricas justas",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-success/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent" />
+              <CardContent className="p-8 relative">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
+                    <Timer className="w-6 h-6 text-success" />
+                  </div>
+                  <span className="text-xs font-semibold text-success uppercase tracking-wider">Novidade</span>
+                </div>
+                <h3 className="text-2xl font-bold mb-3">Apontamento de horas profissional</h3>
+                <p className="text-muted-foreground mb-6">
+                  Controle preciso de horas trabalhadas, com projetos, hora extra e relatórios.
+                </p>
+                <ul className="space-y-3">
+                  {[
+                    "Horário comercial 08:00–18:30 validado automaticamente",
+                    "Projetos de cliente com flag de hora extra",
+                    "Edição permitida em até 48 horas após o registro",
+                    "Relatório de horas por cliente com fallback lifetime",
+                    "Cobertura de carga por analista calculada",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      </section>
+
       {/* Secondary Features Grid */}
       <section id="benefits" className="py-16 md:py-24">
         <div className="container mx-auto px-4">
