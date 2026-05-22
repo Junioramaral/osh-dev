@@ -51,6 +51,7 @@ const machineSchema = z.object({
   root_password: z.string().optional(),
   machine_type: z.enum(["servidor", "vm", "desktop", "cloud"]),
   criticality: z.enum(["baixa", "media", "alta", "critica"]).default("media"),
+  location: z.string().optional(),
   description: z.string().optional(),
 });
 
@@ -107,6 +108,7 @@ export default function MachineDialog({
       root_password: "",
       machine_type: "servidor",
       criticality: "media",
+      location: "",
       description: "",
     },
   });
@@ -127,6 +129,7 @@ export default function MachineDialog({
       form.setValue("root_username", machine.root_username || "");
       form.setValue("machine_type", machine.machine_type as any);
       form.setValue("criticality", (machine.criticality || "media") as any);
+      form.setValue("location", machine.location || "");
       form.setValue("description", machine.description || "");
       
       // Descriptografar senha root se existir
@@ -245,6 +248,7 @@ export default function MachineDialog({
       root_password: data.root_password,
       machine_type: data.machine_type,
       criticality: data.criticality,
+      location: data.location,
       description: data.description,
       additional_users: validUsers.map(({ id, showPassword, ...user }) => user),
     };
@@ -446,6 +450,26 @@ export default function MachineDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="location"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Local</FormLabel>
+                  <FormControl>
+                    <Input
+                      placeholder="Ex: Datacenter SP, AWS us-east-1, Sala 3 - Rack B"
+                      {...field}
+                    />
+                  </FormControl>
+                  <p className="text-xs text-muted-foreground">
+                    Onde a máquina está hospedada (datacenter, cloud, sala física, etc.)
+                  </p>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="border-t pt-4 space-y-4">
               <h3 className="font-semibold text-sm">🔐 Credenciais Root (Opcional)</h3>

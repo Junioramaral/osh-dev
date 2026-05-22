@@ -20,6 +20,7 @@ interface CreateMachineData {
   description?: string;
   machine_type: string;
   criticality?: string;
+  location?: string;
 }
 
 export const useCreateMachine = () => {
@@ -85,6 +86,7 @@ export const useCreateMachine = () => {
         root_password_secret_id: rootPasswordSecretId,
         additional_users: encryptedAdditionalUsers,
         description: data.description || null,
+        location: data.location || null,
       };
 
       const { data: machine, error } = await supabase
@@ -199,6 +201,7 @@ export const useUpdateMachine = () => {
         root_password_secret_id: rootPasswordSecretId,
         additional_users: encryptedAdditionalUsers,
         description: data.description || null,
+        location: data.location || null,
       };
 
       const { data: machine, error } = await supabase
