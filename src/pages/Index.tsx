@@ -624,7 +624,7 @@ const Index = () => {
                       <div>
                         <h4 className="font-semibold">Visão 360° do Suporte</h4>
                         <p className="text-sm text-muted-foreground">
-                          Dashboard executivo com métricas de SLA, CSAT, volume de tickets e performance da equipe
+                          Dashboard executivo com SLA, CSAT, volume, tendência mensal e ranking de encerramento
                         </p>
                       </div>
                     </div>
@@ -635,18 +635,18 @@ const Index = () => {
                       <div>
                         <h4 className="font-semibold">Relatórios Executivos Automáticos</h4>
                         <p className="text-sm text-muted-foreground">
-                          Relatórios mensais enviados automaticamente para gestores e clientes
+                          Relatórios mensais agendados (pg_cron) e enviados a gestores e clientes
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-4 items-start">
                       <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-                        <Settings className="w-5 h-5 text-accent" />
+                        <GitPullRequest className="w-5 h-5 text-accent" />
                       </div>
                       <div>
-                        <h4 className="font-semibold">Configuração de SLAs por Cliente</h4>
+                        <h4 className="font-semibold">Aprovação de RFCs</h4>
                         <p className="text-sm text-muted-foreground">
-                          SLAs customizados por segmento e prioridade para cada contrato
+                          Aprove ou reprove mudanças com justificativa obrigatória e notificação automática
                         </p>
                       </div>
                     </div>
@@ -681,12 +681,12 @@ const Index = () => {
                     </div>
                     <div className="flex gap-4 items-start">
                       <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center flex-shrink-0">
-                        <Bell className="w-5 h-5 text-warning" />
+                        <Timer className="w-5 h-5 text-warning" />
                       </div>
                       <div>
-                        <h4 className="font-semibold">Alertas de SLA em Tempo Real</h4>
+                        <h4 className="font-semibold">Apontamento de Horas</h4>
                         <p className="text-sm text-muted-foreground">
-                          Notificações visuais e por email quando SLA está próximo de vencer
+                          Registre horas em projetos do cliente direto pelo ticket, com hora extra opcional
                         </p>
                       </div>
                     </div>
@@ -726,7 +726,18 @@ const Index = () => {
                       <div>
                         <h4 className="font-semibold">Pesquisa de Satisfação</h4>
                         <p className="text-sm text-muted-foreground">
-                          Avalie o atendimento após a resolução e contribua para a melhoria contínua
+                          Avalie o atendimento de 1–5 estrelas direto pelo email de resolução
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 items-start">
+                      <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                        <GitPullRequest className="w-5 h-5 text-accent" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Portal de RFCs</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Acompanhe etapas de cada mudança e receba o PDF ao final da execução
                         </p>
                       </div>
                     </div>
