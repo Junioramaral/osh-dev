@@ -301,6 +301,7 @@ export default function Applications() {
       baixa: "bg-success text-success-foreground",
       media: "bg-warning text-warning-foreground",
       alta: "bg-destructive text-destructive-foreground",
+      critica: "bg-red-900 text-white hover:bg-red-900",
     };
     return colors[criticality as keyof typeof colors] || "bg-muted";
   };
