@@ -297,7 +297,7 @@ export default function MachineDialog({
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!isSuperAdmin}
+                    disabled={!isSuperAdmin || !!machine}
                   >
                     <FormControl>
                       <SelectTrigger>
@@ -312,6 +312,11 @@ export default function MachineDialog({
                       ))}
                     </SelectContent>
                   </Select>
+                  {machine && (
+                    <p className="text-xs text-muted-foreground mt-1">
+                      O cliente não pode ser alterado após o cadastro da máquina.
+                    </p>
+                  )}
                   <FormMessage />
                 </FormItem>
               )}
