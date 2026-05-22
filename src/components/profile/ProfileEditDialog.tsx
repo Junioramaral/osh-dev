@@ -1,4 +1,4 @@
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
@@ -29,19 +29,35 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
   const { user, profile } = useAuth();
   const fileInputRef = useRef<HTMLInputElement>(null);
   
-  const [fullName, setFullName] = useState(profile?.full_name || "");
-  const [phone, setPhone] = useState(profile?.phone || "");
+  const metaFullName = (user?.user_metadata as any)?.full_name || "";
+  const metaPhone = (user?.user_metadata as any)?.phone || "";
+
+  const [fullName, setFullName] = useState(profile?.full_name || metaFullName);
+  const [phone, setPhone] = useState(profile?.phone || metaPhone);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
+  const [userEdited, setUserEdited] = useState(false);
+
+  // Sync fields when profile loads after dialog mount (avoid clobbering user input)
+  useEffect(() => {
+    if (!open || userEdited) return;
+    if (profile?.full_name !== undefined) {
+      setFullName(profile.full_name || metaFullName || "");
+    }
+    if (profile?.phone !== undefined) {
+      setPhone(profile.phone || metaPhone || "");
+    }
+  }, [open, profile?.full_name, profile?.phone, userEdited, metaFullName, metaPhone]);
 
   // Reset form when dialog opens
   const handleOpenChange = (newOpen: boolean) => {
     if (newOpen) {
-      setFullName(profile?.full_name || "");
-      setPhone(profile?.phone || "");
+      setFullName(profile?.full_name || metaFullName || "");
+      setPhone(profile?.phone || metaPhone || "");
       setAvatarPreview(null);
       setAvatarFile(null);
+      setUserEdited(false);
     }
     onOpenChange(newOpen);
   };
@@ -200,7 +216,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
               <Input
                 id="fullName"
                 value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
+                onChange={(e) => { setFullName(e.target.value); setUserEdited(true); }}
                 placeholder="Seu nome completo"
               />
             </div>
@@ -210,7 +226,7 @@ export function ProfileEditDialog({ open, onOpenChange }: ProfileEditDialogProps
               <PhoneInput
                 id="phone"
                 value={phone}
-                onChange={(e) => setPhone(e.target.value)}
+                onChange={(e) => { setPhone(e.target.value); setUserEdited(true); }}
                 placeholder="(00) 00000-0000"
               />
             </div>
