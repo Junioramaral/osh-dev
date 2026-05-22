@@ -32,13 +32,13 @@ import {
 import { Loader2 } from "lucide-react";
 import { useCreateDatabase, useUpdateDatabase, type CreateDatabaseData, type UpdateDatabaseData } from "@/hooks/useDatabaseMutations";
 import type { Tables } from "@/integrations/supabase/types";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 const databaseSchema = z.object({
   client_id: z.string().uuid("Selecione um cliente"),
   machine_id: z.string().optional(),
-  engine: z.enum(["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"], {
-    required_error: "Selecione um engine",
-  }),
+  engine: z.string().min(1, "Selecione um engine"),
   version: z.string().min(1, "Versão é obrigatória"),
   instance_name: z.string().min(3, "Nome deve ter no mínimo 3 caracteres"),
   endpoint: z.string().optional(),
@@ -73,7 +73,7 @@ export default function DatabaseDialog({
     queryFn: async () => {
       const { data, error } = await supabase
         .from("clients")
-        .select("id, name")
+        .select("id, name, db_engines, segments")
         .eq("is_active", true)
         .order("name");
       if (error) throw error;
@@ -98,6 +98,10 @@ export default function DatabaseDialog({
   });
 
   const selectedClientId = form.watch("client_id");
+  const currentEngine = form.watch("engine");
+  const selectedClient = clients?.find((c) => c.id === selectedClientId);
+  const availableEngines = (selectedClient?.db_engines as string[] | null) || [];
+  const clientHasDbSegment = !selectedClient || (selectedClient.segments || []).includes("DB");
 
   const { data: machines } = useQuery({
     queryKey: ["machines", selectedClientId],
@@ -120,6 +124,20 @@ export default function DatabaseDialog({
       form.setValue("client_id", profile.client_id);
     }
   }, [isSuperAdmin, profile, form]);
+
+  // Reset engine when selected client no longer supports it
+  useEffect(() => {
+    if (!selectedClientId || !clients) return;
+    if (database) return; // don't override in edit mode
+    if (!currentEngine) return;
+    if (availableEngines.length === 0) {
+      form.setValue("engine", "");
+      return;
+    }
+    if (!availableEngines.includes(currentEngine)) {
+      form.setValue("engine", "");
+    }
+  }, [selectedClientId, clients, currentEngine, availableEngines, database, form]);
 
   useEffect(() => {
     if (database && open) {
@@ -222,6 +240,24 @@ export default function DatabaseDialog({
               )}
             />
 
+            {selectedClient && !clientHasDbSegment && (
+              <Alert variant="destructive">
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Este cliente não possui o segmento <strong>DB</strong> ativo. Ative o segmento no cadastro do cliente antes de adicionar instâncias de banco.
+                </AlertDescription>
+              </Alert>
+            )}
+
+            {selectedClient && clientHasDbSegment && availableEngines.length === 0 && (
+              <Alert>
+                <AlertCircle className="h-4 w-4" />
+                <AlertDescription>
+                  Nenhum engine cadastrado para este cliente. Edite o cliente e selecione os engines contratados.
+                </AlertDescription>
+              </Alert>
+            )}
+
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -229,18 +265,30 @@ export default function DatabaseDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Engine *</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value}>
+                    <Select
+                      onValueChange={field.onChange}
+                      value={field.value}
+                      disabled={!selectedClientId || availableEngines.length === 0}
+                    >
                       <FormControl>
                         <SelectTrigger>
-                          <SelectValue />
+                          <SelectValue
+                            placeholder={
+                              !selectedClientId
+                                ? "Selecione o cliente primeiro"
+                                : availableEngines.length === 0
+                                ? "Nenhum engine disponível"
+                                : "Selecione o engine"
+                            }
+                          />
                         </SelectTrigger>
                       </FormControl>
                     <SelectContent>
-                      <SelectItem value="PostgreSQL">PostgreSQL</SelectItem>
-                      <SelectItem value="MySQL">MySQL</SelectItem>
-                      <SelectItem value="Oracle">Oracle</SelectItem>
-                      <SelectItem value="MongoDB">MongoDB</SelectItem>
-                      <SelectItem value="SQL Server">SQL Server</SelectItem>
+                      {availableEngines.map((eng) => (
+                        <SelectItem key={eng} value={eng}>
+                          {eng}
+                        </SelectItem>
+                      ))}
                     </SelectContent>
                     </Select>
                     <FormMessage />
@@ -398,7 +446,7 @@ export default function DatabaseDialog({
               >
                 Cancelar
               </Button>
-              <Button type="submit" disabled={isPending}>
+              <Button type="submit" disabled={isPending || !clientHasDbSegment || availableEngines.length === 0}>
                 {isPending && (
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 )}
