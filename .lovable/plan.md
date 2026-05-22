@@ -1,38 +1,38 @@
-## Problema
+## Diagnóstico
 
-A usuária `juliane@atppoa.com.br` recebeu uma senha temporária contendo caracteres visualmente ambíguos (`l`, `1`, `I`, `O`, `0`, `o`). Ela digitou `1` no lugar de `l` minúsculo e recebeu "Invalid login credentials". Os logs confirmam que **nenhuma tentativa de login dela** chegou ao Supabase com sucesso — todas falharam por digitação incorreta.
+Confirmei no banco: a Juliane existe (`profiles.id = d775aac4...`), mas `profiles.phone = NULL` **e** `client_contacts.phone = NULL`. Ou seja, o telefone nunca foi gravado em lugar nenhum — não é um problema de exibição.
 
-## Solução
+### Causa raiz (Bug nº 1 — convite)
 
-### 1. Senha temporária sem ambiguidade
-Em `supabase/functions/invite-user/index.ts`, na função `generateTempPassword`, trocar o charset para remover caracteres confusos:
+Na função `supabase/functions/invite-user/index.ts`:
 
-**Antes:**
-```
-abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*
-```
+1. `adminClient.auth.admin.createUser(...)` cria o registro em `auth.users`.
+2. Isso dispara o trigger `handle_new_user`, que **já cria a linha em `profiles`** (com phone = NULL, pois o trigger não recebe telefone).
+3. Logo em seguida, a edge function executa `adminClient.from("profiles").insert({ id, full_name, phone, client_id })`.
+4. Esse `INSERT` falha com violação de PK (a linha já existe), o erro é **apenas logado** (`console.error`) e o fluxo continua. O telefone é descartado silenciosamente.
 
-**Depois (sem `l`, `I`, `O`, `o`, `0`, `1`):**
-```
-abcdefghijkmnpqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%^&*
-```
+A inserção em `client_contacts` no fim da função até funcionaria, mas no caso da Juliane o contato também ficou sem telefone — provavelmente porque o convite foi feito sem o campo preenchido e o telefone foi adicionado depois na tela de edição. O que nos leva ao segundo bug.
 
-Garantir também que a senha gerada **sempre contenha** pelo menos 1 maiúscula, 1 minúscula, 1 dígito e 1 caractere especial (para passar na validação de `ForcePasswordChange`).
+### Causa raiz (Bug nº 2 — edição)
 
-### 2. Botão "Copiar senha" no e-mail
-Como não dá para ter botão de copiar real em e-mail, a melhor garantia é:
-- Manter a senha em fonte monoespaçada grande (já está)
-- Adicionar uma orientação explícita logo abaixo: **"💡 Dica: copie e cole a senha para evitar erros de digitação"**
+Em `src/hooks/useTenantUsers.ts` (`updateUserMutation`) o frontend faz `supabase.from("profiles").update({ phone })` direto, e **nada é replicado para `client_contacts`**. Mesmo quando o update do profile funciona (super_admin), o telefone do contato fica desatualizado. Além disso, para `tenant_admin` o RLS de `profiles` não permite `UPDATE` em outro usuário, então o update retorna 0 linhas sem erro — silencioso.
 
-### 3. (Opcional) Mostrar a senha em "caixa selecionável"
-Adicionar `user-select: all` no `<p>` da senha — em clientes de e-mail web (Gmail, Outlook Web) basta 1 clique para selecionar tudo.
+## Plano de correção
 
-## Arquivos alterados
+### 1. `supabase/functions/invite-user/index.ts`
+- Trocar o `insert` em `profiles` por **`upsert` com `onConflict: 'id'`** (ou `update().eq('id', newUser.user.id)`), garantindo que `phone`, `full_name` e `client_id` sobrescrevam o que o trigger criou.
+- Tratar erro como fatal (retornar 500) em vez de apenas logar, para não termos mais falhas silenciosas.
 
-- `supabase/functions/invite-user/index.ts` — charset da senha + dica de copiar/colar no template
+### 2. `src/hooks/useTenantUsers.ts` (`updateUserMutation`)
+- Após o `update` em `profiles`, quando `phone` ou `full_name` mudarem, propagar o valor para `client_contacts` do mesmo `client_id`+`email` (mesmo padrão já existente no trigger `sync_profile_to_contacts`, que sincroniza `name`/`phone` mas só dispara quando o profile muda — confirmar se ele está ativo; se sim, basta garantir que o update do profile aconteça de fato).
+- Verificar a contagem retornada pelo update; se `count === 0`, lançar erro "Sem permissão para atualizar este usuário" — assim paramos de mascarar falha de RLS para tenant_admin.
 
-## Como verificar
+### 3. Correção pontual de dados da Juliane
+- Após o deploy das correções, atualizar manualmente `profiles.phone` e `client_contacts.phone` da Juliane via UI de edição (que então funcionará), ou rodar um insert/update direto se você me passar o número.
 
-1. Cadastrar um novo usuário de teste
-2. Conferir no e-mail que a senha não contém `l`, `1`, `I`, `O`, `o`, `0`
-3. Confirmar que a dica de copiar/colar aparece abaixo da senha
+## Verificação após implementação
+1. Criar um usuário de teste pelo convite com telefone preenchido → conferir `profiles.phone` e `client_contacts.phone` populados.
+2. Editar telefone de um usuário existente → conferir as duas tabelas atualizadas.
+3. Tentar editar como tenant_admin um usuário fora do tenant → deve dar erro explícito.
+
+Posso seguir com a implementação?
