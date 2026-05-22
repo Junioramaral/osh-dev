@@ -210,7 +210,7 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">Tempo de Resposta</p>
             </div>
             <div className="text-center space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-primary">7</div>
+              <div className="text-3xl md:text-4xl font-bold text-primary">10+</div>
               <p className="text-sm text-muted-foreground">Tipos de Relatórios</p>
             </div>
           </div>
