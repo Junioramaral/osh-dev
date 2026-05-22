@@ -31,6 +31,7 @@ import {
   Briefcase,
   HeadphonesIcon
 } from "lucide-react";
+import { GitPullRequest, Timer, Building2, Inbox, UserCheck, FileText, Zap, Award } from "lucide-react";
 
 const Index = () => {
   const { user, loading } = useAuth();
