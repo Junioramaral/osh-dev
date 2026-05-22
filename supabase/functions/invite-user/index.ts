@@ -365,7 +365,8 @@ serve(async (req) => {
                     <p style="margin:0 0 5px 0; font-weight:bold; color:#6b7280; font-size:13px;">Email:</p>
                     <p style="margin:0 0 15px 0; font-family:'Courier New', monospace; font-size:15px; color:#111827; word-break:break-all;">${email}</p>
                     <p style="margin:0 0 5px 0; font-weight:bold; color:#6b7280; font-size:13px;">Senha Temporária:</p>
-                    <p style="margin:0; font-family:'Courier New', monospace; font-size:15px; color:#111827; word-break:break-all;">${temporaryPassword}</p>
+                    <p style="margin:0 0 10px 0; font-family:'Courier New', monospace; font-size:18px; font-weight:bold; color:#111827; word-break:break-all; -webkit-user-select:all; user-select:all; background-color:#ffffff; padding:8px 12px; border:1px dashed #c7d2fe; letter-spacing:0.5px;">${temporaryPassword}</p>
+                    <p style="margin:0; font-size:12px; color:#6b7280; font-style:italic;">💡 Dica: selecione e copie a senha acima (Ctrl+C / Cmd+C) para evitar erros de digitação.</p>
                   </td>
                 </tr>
               </table>
