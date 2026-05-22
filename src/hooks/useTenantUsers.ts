@@ -235,12 +235,47 @@ export const useTenantUsers = (tenantId: string | undefined) => {
       if (params.team_id !== undefined) profileUpdates.team_id = params.team_id || null;
 
       if (Object.keys(profileUpdates).length > 0) {
-        const { error: profileError } = await supabase
+        const { data: updatedRows, error: profileError } = await supabase
           .from("profiles")
           .update(profileUpdates)
-          .eq("id", params.userId);
+          .eq("id", params.userId)
+          .select("id");
 
         if (profileError) throw profileError;
+        if (!updatedRows || updatedRows.length === 0) {
+          throw new Error("Sem permissão para atualizar este usuário ou usuário não encontrado");
+        }
+
+        // Mirror name/phone into client_contacts so contact list stays in sync.
+        // The trigger sync_profile_to_contacts already does this on the DB, but we
+        // re-apply via the user's email to make sure rows created before the trigger
+        // are also updated.
+        if (
+          profileUpdates.full_name !== undefined ||
+          profileUpdates.phone !== undefined
+        ) {
+          const contactUpdates: Record<string, any> = {};
+          if (profileUpdates.full_name !== undefined) contactUpdates.name = profileUpdates.full_name;
+          if (profileUpdates.phone !== undefined) contactUpdates.phone = profileUpdates.phone;
+
+          // Look up the user's email to match against client_contacts.email
+          const targetEmail = params.email
+            ?? (await supabase.functions
+                  .invoke("manage-user", { body: { action: "get_user", userId: params.userId } })
+                  .then((r: any) => r?.data?.data?.user?.email ?? null)
+                  .catch(() => null));
+
+          if (targetEmail && tenantId) {
+            const { error: contactError } = await supabase
+              .from("client_contacts")
+              .update(contactUpdates)
+              .eq("client_id", tenantId)
+              .eq("email", targetEmail);
+            if (contactError) {
+              console.warn("[useTenantUsers] Falha ao sincronizar client_contacts:", contactError);
+            }
+          }
+        }
       }
 
       // Update email via edge function

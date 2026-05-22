@@ -241,17 +241,26 @@ serve(async (req) => {
 
     console.log("✅ User created:", newUser.user?.id);
 
-    // Create profile entry
-    const { error: profileError } = await adminClient.from("profiles").insert({
-      id: newUser.user!.id,
-      full_name,
-      phone: phone || null,
-      client_id: tenant_id,
-      is_active: true,
-    });
+    // Upsert profile entry (the handle_new_user trigger may have already created a base row)
+    const { error: profileError } = await adminClient
+      .from("profiles")
+      .upsert(
+        {
+          id: newUser.user!.id,
+          full_name,
+          phone: phone || null,
+          client_id: tenant_id,
+          is_active: true,
+        },
+        { onConflict: "id" }
+      );
 
     if (profileError) {
-      console.error("❌ Error creating profile:", profileError);
+      console.error("❌ Error upserting profile:", profileError);
+      return new Response(
+        JSON.stringify({ error: "Failed to persist user profile" }),
+        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
     }
 
     // Create user_roles entries for each role
