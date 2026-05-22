@@ -152,6 +152,7 @@ const Dashboard = () => {
   const [priorityCounts, setPriorityCounts] = useState<PriorityCount[]>([]);
   const [topCategories, setTopCategories] = useState<CategoryCount[]>([]);
   const [totalForDistribution, setTotalForDistribution] = useState(0);
+  const [clientSegments, setClientSegments] = useState<string[] | null>(null);
   const navigate = useNavigate();
 
   // Determine if current user is a client user
@@ -172,6 +173,22 @@ const Dashboard = () => {
   useEffect(() => {
     loadDashboardStats();
   }, [profile]);
+
+  useEffect(() => {
+    const loadClientSegments = async () => {
+      if (!isClientUser || !profile?.client_id) {
+        setClientSegments(null);
+        return;
+      }
+      const { data } = await supabase
+        .from("clients")
+        .select("segments")
+        .eq("id", profile.client_id)
+        .maybeSingle();
+      setClientSegments(((data as any)?.segments as string[] | null) ?? []);
+    };
+    loadClientSegments();
+  }, [profile, isClientUser]);
 
   useEffect(() => {
     loadMonthlyTrend(trendPeriod);
@@ -453,8 +470,9 @@ const Dashboard = () => {
   ];
 
   // Grupo 3: Distribuição por Segmento
-  const distributionCards = [
+  const allDistributionCards = [
     {
+      segment: "DB",
       title: "Tickets DB",
       value: stats.ticketsDB,
       icon: Database,
@@ -462,6 +480,7 @@ const Dashboard = () => {
       bgColor: "bg-blue-100",
     },
     {
+      segment: "APP",
       title: "Tickets APP",
       value: stats.ticketsApp,
       icon: AppWindow,
@@ -469,6 +488,10 @@ const Dashboard = () => {
       bgColor: "bg-green-100",
     },
   ];
+  const distributionCards: { title: string; value: number; icon: LucideIcon; color: string; bgColor: string }[] =
+    allDistributionCards
+      .filter((c) => clientSegments === null || clientSegments.includes(c.segment))
+      .map(({ segment, ...rest }) => rest);
 
   // Card de clientes (condicional)
   const showClientsCard = isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app');
