@@ -225,6 +225,7 @@ serve(async (req) => {
         role: primaryRole, // Store primary role in metadata
         roles: validatedRoles, // Store all roles
         must_change_password: true, // Flag to force password change on first login
+        phone: phone || null,
       },
     });
 
@@ -314,7 +315,18 @@ serve(async (req) => {
         console.log("✅ Contact entry created successfully");
       }
     } else {
-      console.log("ℹ️ Contact already exists, skipping creation");
+      console.log("ℹ️ Contact already exists, updating name/phone/role");
+      const { error: contactUpdateError } = await adminClient
+        .from("client_contacts")
+        .update({
+          name: full_name,
+          phone: phone || null,
+          role: validatedRoles.join(", "),
+        })
+        .eq("id", existingContact.id);
+      if (contactUpdateError) {
+        console.error("⚠️ Error updating existing contact (non-critical):", contactUpdateError);
+      }
     }
 
     // Format roles for email display
