@@ -123,8 +123,8 @@ const Index = () => {
                 <span className="text-primary">Vantagem Competitiva</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-xl">
-                Plataforma completa de Service Desk para equipes de suporte a Bancos de Dados e Aplicativos. 
-                Controle SLA, CSAT, relatórios automáticos e muito mais.
+                Plataforma completa de Service Desk multi-tenant para equipes de Bancos de Dados e Aplicativos.
+                Tickets, RFCs, SLA, CSAT, apontamento de horas, relatórios automáticos e muito mais.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button onClick={() => navigate("/auth")} size="lg" className="gap-2">
@@ -238,8 +238,36 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Gestão de Tickets</h4>
                 <p className="text-muted-foreground text-sm">
-                  Sistema completo com timeline, comentários, anexos e ações em lote. 
-                  Lock de tickets com TTL para evitar conflitos.
+                  Timeline, comentários, anexos, categorias e ações em lote.
+                  Lock com TTL, auto-alocação ao analista e liberação automática após inatividade.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Feature: RFC */}
+            <Card className="group hover:shadow-lg transition-all hover:border-primary/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 bg-accent/10 rounded-lg mb-4 group-hover:bg-accent/20 transition-colors">
+                  <GitPullRequest className="w-6 h-6 text-accent" />
+                </div>
+                <h4 className="text-lg font-semibold mb-2">Gestão de Mudanças (RFC)</h4>
+                <p className="text-muted-foreground text-sm">
+                  Workflow completo de RFCs com etapas, aprovação obrigatória do gestor,
+                  portal de execução para o cliente e geração de PDF da mudança.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Feature: Time Tracking */}
+            <Card className="group hover:shadow-lg transition-all hover:border-primary/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 bg-success/10 rounded-lg mb-4 group-hover:bg-success/20 transition-colors">
+                  <Timer className="w-6 h-6 text-success" />
+                </div>
+                <h4 className="text-lg font-semibold mb-2">Apontamento de Horas</h4>
+                <p className="text-muted-foreground text-sm">
+                  Registro manual em horário comercial (08:00–18:30), com projetos de
+                  hora extra, controle por cliente e janela de edição de 48h.
                 </p>
               </CardContent>
             </Card>
@@ -252,8 +280,8 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Monitoramento SLA</h4>
                 <p className="text-muted-foreground text-sm">
-                  Dashboards em tempo real com métricas de compliance. 
-                  Alertas automáticos por email quando SLA próximo de vencer.
+                  SLAs por segmento e prioridade com horário comercial e feriados.
+                  Alertas automáticos por email quando próximo de vencer.
                 </p>
               </CardContent>
             </Card>
@@ -264,10 +292,10 @@ const Index = () => {
                 <div className="flex items-center justify-center w-12 h-12 bg-warning/10 rounded-lg mb-4 group-hover:bg-warning/20 transition-colors">
                   <Star className="w-6 h-6 text-warning" />
                 </div>
-                <h4 className="text-lg font-semibold mb-2">Satisfação (CSAT)</h4>
+                <h4 className="text-lg font-semibold mb-2">CSAT & Analytics</h4>
                 <p className="text-muted-foreground text-sm">
-                  Pesquisa de satisfação com rating 1-5 estrelas. 
-                  Ranking de analistas baseado em avaliações dos clientes.
+                  Pesquisa de 1–5 estrelas enviada na resolução, dashboard de satisfação
+                  com alertas, ranking de analistas e score combinado SLA+CSAT.
                 </p>
               </CardContent>
             </Card>
@@ -280,8 +308,8 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Base de Conhecimento</h4>
                 <p className="text-muted-foreground text-sm">
-                  Artigos FAQ com 3 níveis de visibilidade: privado, por cliente ou global. 
-                  Histórico de alterações e busca avançada.
+                  Artigos FAQ com visibilidade privada, por cliente ou global.
+                  Busca, contagem de visualizações, histórico e destaque de termos.
                 </p>
               </CardContent>
             </Card>
@@ -294,22 +322,22 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Relatórios Avançados</h4>
                 <p className="text-muted-foreground text-sm">
-                  7 tipos de relatórios: mensal, performance, categorias, comparativo, tempo, ranking e filas. 
-                  Envio automático por email.
+                  Mensal, performance, tempo de resolução, ranking de encerramento,
+                  distribuição de filas, horas por cliente e mais — com envio automático.
                 </p>
               </CardContent>
             </Card>
 
-            {/* Feature 6: Email */}
+            {/* Feature 6: Email Inbound */}
             <Card className="group hover:shadow-lg transition-all hover:border-primary/50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded-lg mb-4 group-hover:bg-primary/20 transition-colors">
-                  <Mail className="w-6 h-6 text-primary" />
+                  <Inbox className="w-6 h-6 text-primary" />
                 </div>
-                <h4 className="text-lg font-semibold mb-2">Comunicação por Email</h4>
+                <h4 className="text-lg font-semibold mb-2">Email Bidirecional</h4>
                 <p className="text-muted-foreground text-sm">
-                  Notificações automáticas via Resend. Clientes respondem direto pelo email 
-                  e comentários são adicionados automaticamente ao ticket.
+                  Notificações via Resend e webhook inbound: o cliente responde pelo email
+                  e o comentário é adicionado automaticamente ao ticket correspondente.
                 </p>
               </CardContent>
             </Card>
