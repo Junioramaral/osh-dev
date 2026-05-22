@@ -31,6 +31,7 @@ import {
   Briefcase,
   HeadphonesIcon
 } from "lucide-react";
+import { GitPullRequest, Timer, Building2, Inbox, UserCheck, FileText, Zap, Award } from "lucide-react";
 
 const Index = () => {
   const { user, loading } = useAuth();
@@ -122,8 +123,8 @@ const Index = () => {
                 <span className="text-primary">Vantagem Competitiva</span>
               </h2>
               <p className="text-lg text-muted-foreground max-w-xl">
-                Plataforma completa de Service Desk para equipes de suporte a Bancos de Dados e Aplicativos. 
-                Controle SLA, CSAT, relatórios automáticos e muito mais.
+                Plataforma completa de Service Desk multi-tenant para equipes de Bancos de Dados e Aplicativos.
+                Tickets, RFCs, SLA, CSAT, apontamento de horas, relatórios automáticos e muito mais.
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Button onClick={() => navigate("/auth")} size="lg" className="gap-2">
@@ -209,7 +210,7 @@ const Index = () => {
               <p className="text-sm text-muted-foreground">Tempo de Resposta</p>
             </div>
             <div className="text-center space-y-2">
-              <div className="text-3xl md:text-4xl font-bold text-primary">7</div>
+              <div className="text-3xl md:text-4xl font-bold text-primary">10+</div>
               <p className="text-sm text-muted-foreground">Tipos de Relatórios</p>
             </div>
           </div>
@@ -237,8 +238,36 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Gestão de Tickets</h4>
                 <p className="text-muted-foreground text-sm">
-                  Sistema completo com timeline, comentários, anexos e ações em lote. 
-                  Lock de tickets com TTL para evitar conflitos.
+                  Timeline, comentários, anexos, categorias e ações em lote.
+                  Lock com TTL, auto-alocação ao analista e liberação automática após inatividade.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Feature: RFC */}
+            <Card className="group hover:shadow-lg transition-all hover:border-primary/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 bg-accent/10 rounded-lg mb-4 group-hover:bg-accent/20 transition-colors">
+                  <GitPullRequest className="w-6 h-6 text-accent" />
+                </div>
+                <h4 className="text-lg font-semibold mb-2">Gestão de Mudanças (RFC)</h4>
+                <p className="text-muted-foreground text-sm">
+                  Workflow completo de RFCs com etapas, aprovação obrigatória do gestor,
+                  portal de execução para o cliente e geração de PDF da mudança.
+                </p>
+              </CardContent>
+            </Card>
+
+            {/* Feature: Time Tracking */}
+            <Card className="group hover:shadow-lg transition-all hover:border-primary/50">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-center w-12 h-12 bg-success/10 rounded-lg mb-4 group-hover:bg-success/20 transition-colors">
+                  <Timer className="w-6 h-6 text-success" />
+                </div>
+                <h4 className="text-lg font-semibold mb-2">Apontamento de Horas</h4>
+                <p className="text-muted-foreground text-sm">
+                  Registro manual em horário comercial (08:00–18:30), com projetos de
+                  hora extra, controle por cliente e janela de edição de 48h.
                 </p>
               </CardContent>
             </Card>
@@ -251,8 +280,8 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Monitoramento SLA</h4>
                 <p className="text-muted-foreground text-sm">
-                  Dashboards em tempo real com métricas de compliance. 
-                  Alertas automáticos por email quando SLA próximo de vencer.
+                  SLAs por segmento e prioridade com horário comercial e feriados.
+                  Alertas automáticos por email quando próximo de vencer.
                 </p>
               </CardContent>
             </Card>
@@ -263,10 +292,10 @@ const Index = () => {
                 <div className="flex items-center justify-center w-12 h-12 bg-warning/10 rounded-lg mb-4 group-hover:bg-warning/20 transition-colors">
                   <Star className="w-6 h-6 text-warning" />
                 </div>
-                <h4 className="text-lg font-semibold mb-2">Satisfação (CSAT)</h4>
+                <h4 className="text-lg font-semibold mb-2">CSAT & Analytics</h4>
                 <p className="text-muted-foreground text-sm">
-                  Pesquisa de satisfação com rating 1-5 estrelas. 
-                  Ranking de analistas baseado em avaliações dos clientes.
+                  Pesquisa de 1–5 estrelas enviada na resolução, dashboard de satisfação
+                  com alertas, ranking de analistas e score combinado SLA+CSAT.
                 </p>
               </CardContent>
             </Card>
@@ -279,8 +308,8 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Base de Conhecimento</h4>
                 <p className="text-muted-foreground text-sm">
-                  Artigos FAQ com 3 níveis de visibilidade: privado, por cliente ou global. 
-                  Histórico de alterações e busca avançada.
+                  Artigos FAQ com visibilidade privada, por cliente ou global.
+                  Busca, contagem de visualizações, histórico e destaque de termos.
                 </p>
               </CardContent>
             </Card>
@@ -293,22 +322,22 @@ const Index = () => {
                 </div>
                 <h4 className="text-lg font-semibold mb-2">Relatórios Avançados</h4>
                 <p className="text-muted-foreground text-sm">
-                  7 tipos de relatórios: mensal, performance, categorias, comparativo, tempo, ranking e filas. 
-                  Envio automático por email.
+                  Mensal, performance, tempo de resolução, ranking de encerramento,
+                  distribuição de filas, horas por cliente e mais — com envio automático.
                 </p>
               </CardContent>
             </Card>
 
-            {/* Feature 6: Email */}
+            {/* Feature 6: Email Inbound */}
             <Card className="group hover:shadow-lg transition-all hover:border-primary/50">
               <CardContent className="p-6">
                 <div className="flex items-center justify-center w-12 h-12 bg-primary/10 rounded-lg mb-4 group-hover:bg-primary/20 transition-colors">
-                  <Mail className="w-6 h-6 text-primary" />
+                  <Inbox className="w-6 h-6 text-primary" />
                 </div>
-                <h4 className="text-lg font-semibold mb-2">Comunicação por Email</h4>
+                <h4 className="text-lg font-semibold mb-2">Email Bidirecional</h4>
                 <p className="text-muted-foreground text-sm">
-                  Notificações automáticas via Resend. Clientes respondem direto pelo email 
-                  e comentários são adicionados automaticamente ao ticket.
+                  Notificações via Resend e webhook inbound: o cliente responde pelo email
+                  e o comentário é adicionado automaticamente ao ticket correspondente.
                 </p>
               </CardContent>
             </Card>
@@ -337,6 +366,73 @@ const Index = () => {
                 className="w-full h-auto"
               />
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* RFC + Time Tracking Highlight */}
+      <section className="py-16 md:py-24">
+        <div className="container mx-auto px-4">
+          <div className="grid lg:grid-cols-2 gap-8">
+            <Card className="relative overflow-hidden border-accent/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent" />
+              <CardContent className="p-8 relative">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-lg bg-accent/10 flex items-center justify-center">
+                    <GitPullRequest className="w-6 h-6 text-accent" />
+                  </div>
+                  <span className="text-xs font-semibold text-accent uppercase tracking-wider">Novidade</span>
+                </div>
+                <h3 className="text-2xl font-bold mb-3">Gestão de Mudanças (RFC) ponta a ponta</h3>
+                <p className="text-muted-foreground mb-6">
+                  Solicite, aprove, execute e documente cada mudança com rastreabilidade total.
+                </p>
+                <ul className="space-y-3">
+                  {[
+                    "Etapas dinâmicas com progresso automático",
+                    "Aprovação obrigatória do gestor com justificativa",
+                    "Portal de execução para acompanhamento do cliente",
+                    "Geração e envio de PDF da mudança concluída",
+                    "Excluído do SLA de tickets — métricas justas",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-accent mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+
+            <Card className="relative overflow-hidden border-success/30">
+              <div className="absolute inset-0 bg-gradient-to-br from-success/5 to-transparent" />
+              <CardContent className="p-8 relative">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-12 h-12 rounded-lg bg-success/10 flex items-center justify-center">
+                    <Timer className="w-6 h-6 text-success" />
+                  </div>
+                  <span className="text-xs font-semibold text-success uppercase tracking-wider">Novidade</span>
+                </div>
+                <h3 className="text-2xl font-bold mb-3">Apontamento de horas profissional</h3>
+                <p className="text-muted-foreground mb-6">
+                  Controle preciso de horas trabalhadas, com projetos, hora extra e relatórios.
+                </p>
+                <ul className="space-y-3">
+                  {[
+                    "Horário comercial 08:00–18:30 validado automaticamente",
+                    "Projetos de cliente com flag de hora extra",
+                    "Edição permitida em até 48 horas após o registro",
+                    "Relatório de horas por cliente com fallback lifetime",
+                    "Cobertura de carga por analista calculada",
+                  ].map((item) => (
+                    <li key={item} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-success mt-0.5 flex-shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
           </div>
         </div>
       </section>
@@ -425,6 +521,66 @@ const Index = () => {
                 </p>
               </div>
             </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Portal do Tenant Admin</h4>
+                <p className="text-sm text-muted-foreground">
+                  Cada organização gerencia seus próprios usuários, equipes e relatórios
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+                <Zap className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Auto-alocação Inteligente</h4>
+                <p className="text-sm text-muted-foreground">
+                  Atribuição automática por segmento e liberação após 7 dias inativos
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
+                <UserCheck className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Times com Cores</h4>
+                <p className="text-sm text-muted-foreground">
+                  Times de DB (azul) e APP (verde), com gestão e responsáveis por fila
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center">
+                <Bell className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Notificações Inteligentes</h4>
+                <p className="text-sm text-muted-foreground">
+                  Roteamento por papel para analistas, gestores e clientes
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">RFC com PDF</h4>
+                <p className="text-sm text-muted-foreground">
+                  Documentação automática de mudanças em PDF para envio ao cliente
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -468,7 +624,7 @@ const Index = () => {
                       <div>
                         <h4 className="font-semibold">Visão 360° do Suporte</h4>
                         <p className="text-sm text-muted-foreground">
-                          Dashboard executivo com métricas de SLA, CSAT, volume de tickets e performance da equipe
+                          Dashboard executivo com SLA, CSAT, volume, tendência mensal e ranking de encerramento
                         </p>
                       </div>
                     </div>
@@ -479,18 +635,18 @@ const Index = () => {
                       <div>
                         <h4 className="font-semibold">Relatórios Executivos Automáticos</h4>
                         <p className="text-sm text-muted-foreground">
-                          Relatórios mensais enviados automaticamente para gestores e clientes
+                          Relatórios mensais agendados (pg_cron) e enviados a gestores e clientes
                         </p>
                       </div>
                     </div>
                     <div className="flex gap-4 items-start">
                       <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
-                        <Settings className="w-5 h-5 text-accent" />
+                        <GitPullRequest className="w-5 h-5 text-accent" />
                       </div>
                       <div>
-                        <h4 className="font-semibold">Configuração de SLAs por Cliente</h4>
+                        <h4 className="font-semibold">Aprovação de RFCs</h4>
                         <p className="text-sm text-muted-foreground">
-                          SLAs customizados por segmento e prioridade para cada contrato
+                          Aprove ou reprove mudanças com justificativa obrigatória e notificação automática
                         </p>
                       </div>
                     </div>
@@ -525,12 +681,12 @@ const Index = () => {
                     </div>
                     <div className="flex gap-4 items-start">
                       <div className="w-10 h-10 rounded-full bg-warning/10 flex items-center justify-center flex-shrink-0">
-                        <Bell className="w-5 h-5 text-warning" />
+                        <Timer className="w-5 h-5 text-warning" />
                       </div>
                       <div>
-                        <h4 className="font-semibold">Alertas de SLA em Tempo Real</h4>
+                        <h4 className="font-semibold">Apontamento de Horas</h4>
                         <p className="text-sm text-muted-foreground">
-                          Notificações visuais e por email quando SLA está próximo de vencer
+                          Registre horas em projetos do cliente direto pelo ticket, com hora extra opcional
                         </p>
                       </div>
                     </div>
@@ -570,7 +726,18 @@ const Index = () => {
                       <div>
                         <h4 className="font-semibold">Pesquisa de Satisfação</h4>
                         <p className="text-sm text-muted-foreground">
-                          Avalie o atendimento após a resolução e contribua para a melhoria contínua
+                          Avalie o atendimento de 1–5 estrelas direto pelo email de resolução
+                        </p>
+                      </div>
+                    </div>
+                    <div className="flex gap-4 items-start">
+                      <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center flex-shrink-0">
+                        <GitPullRequest className="w-5 h-5 text-accent" />
+                      </div>
+                      <div>
+                        <h4 className="font-semibold">Portal de RFCs</h4>
+                        <p className="text-sm text-muted-foreground">
+                          Acompanhe etapas de cada mudança e receba o PDF ao final da execução
                         </p>
                       </div>
                     </div>
