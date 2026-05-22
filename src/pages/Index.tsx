@@ -454,6 +454,66 @@ const Index = () => {
                 </p>
               </div>
             </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <Building2 className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Portal do Tenant Admin</h4>
+                <p className="text-sm text-muted-foreground">
+                  Cada organização gerencia seus próprios usuários, equipes e relatórios
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-success/10 rounded-lg flex items-center justify-center">
+                <Zap className="w-5 h-5 text-success" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Auto-alocação Inteligente</h4>
+                <p className="text-sm text-muted-foreground">
+                  Atribuição automática por segmento e liberação após 7 dias inativos
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-warning/10 rounded-lg flex items-center justify-center">
+                <UserCheck className="w-5 h-5 text-warning" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Times com Cores</h4>
+                <p className="text-sm text-muted-foreground">
+                  Times de DB (azul) e APP (verde), com gestão e responsáveis por fila
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-accent/10 rounded-lg flex items-center justify-center">
+                <Bell className="w-5 h-5 text-accent" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">Notificações Inteligentes</h4>
+                <p className="text-sm text-muted-foreground">
+                  Roteamento por papel para analistas, gestores e clientes
+                </p>
+              </div>
+            </div>
+
+            <div className="flex gap-4 p-4 rounded-lg hover:bg-muted/50 transition-colors">
+              <div className="flex-shrink-0 w-10 h-10 bg-primary/10 rounded-lg flex items-center justify-center">
+                <FileText className="w-5 h-5 text-primary" />
+              </div>
+              <div>
+                <h4 className="font-semibold mb-1">RFC com PDF</h4>
+                <p className="text-sm text-muted-foreground">
+                  Documentação automática de mudanças em PDF para envio ao cliente
+                </p>
+              </div>
+            </div>
           </div>
         </div>
       </section>
