@@ -152,6 +152,7 @@ const Dashboard = () => {
   const [priorityCounts, setPriorityCounts] = useState<PriorityCount[]>([]);
   const [topCategories, setTopCategories] = useState<CategoryCount[]>([]);
   const [totalForDistribution, setTotalForDistribution] = useState(0);
+  const [clientSegments, setClientSegments] = useState<string[] | null>(null);
   const navigate = useNavigate();
 
   // Determine if current user is a client user
@@ -172,6 +173,22 @@ const Dashboard = () => {
   useEffect(() => {
     loadDashboardStats();
   }, [profile]);
+
+  useEffect(() => {
+    const loadClientSegments = async () => {
+      if (!isClientUser || !profile?.client_id) {
+        setClientSegments(null);
+        return;
+      }
+      const { data } = await supabase
+        .from("clients")
+        .select("segments")
+        .eq("id", profile.client_id)
+        .maybeSingle();
+      setClientSegments(((data as any)?.segments as string[] | null) ?? []);
+    };
+    loadClientSegments();
+  }, [profile, isClientUser]);
 
   useEffect(() => {
     loadMonthlyTrend(trendPeriod);

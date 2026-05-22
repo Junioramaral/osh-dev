@@ -1,34 +1,25 @@
-## Filtrar Engine pelo cliente em "Nova Instância de Banco"
+## Problema
 
-### Problema
-No `DatabaseDialog.tsx` o campo **Engine** mostra todas as opções fixas (PostgreSQL, MySQL, Oracle, MongoDB, SQL Server) independente do cliente escolhido. A tabela `clients` já tem o campo `db_engines` (array com os engines contratados pelo cliente — ex.: ATPPOA só tem Oracle) e `segments` (DB/APP/...).
+Na seção "Distribuição por Segmento" do Dashboard, os cards "Tickets DB" e "Tickets APP" são exibidos para todo cliente, mesmo quando o cliente não possui aquele segmento contratado. Ex.: ATPPOA só tem "DB", mas o card "Tickets APP" aparece mesmo assim.
 
-### Mudanças em `src/components/databases/DatabaseDialog.tsx`
+## Solução
 
-1. **Buscar `db_engines` e `segments` junto com o cliente selecionado**
-   - Alterar o `useQuery` de clients para trazer também `db_engines` e `segments`.
-   - Criar `selectedClient = clients.find(c => c.id === selectedClientId)`.
+Para usuários do tipo cliente (isClientUser), carregar o campo `segments` do `clients` correspondente ao `profile.client_id` e renderizar apenas os cards cujos segmentos estão presentes nesse array.
 
-2. **Filtrar opções do Select de Engine**
-   - Lista base de engines vem do hook `useDatabaseEngines` (tabela `database_engines`) — já é o padrão dinâmico do sistema. Se preferir manter as fixas atuais, filtramos diretamente pelo array do cliente.
-   - Renderizar apenas as engines presentes em `selectedClient.db_engines`.
-   - Se nenhum cliente está selecionado: desabilitar o Select com placeholder "Selecione o cliente primeiro".
-   - Se o cliente não tem nenhum engine cadastrado: mostrar mensagem "Nenhum engine cadastrado para este cliente" e desabilitar o campo (orientar a editar o cliente).
+Para Otimizzo (super_admin, tenant_admin, analystas), continuar mostrando ambos os cards (visão global).
 
-3. **Resetar o engine quando trocar de cliente**
-   - `useEffect` observando `selectedClientId`: se o valor atual de `engine` não está em `db_engines` do novo cliente, limpar o campo (`form.setValue("engine", "")`). Não limpar quando estiver em modo edição inicial.
+## Alterações
 
-4. **Validar segmento DB (opcional, recomendado)**
-   - Se `selectedClient.segments` não inclui `'DB'`, exibir alerta no topo do formulário: "Este cliente não possui o segmento DB ativo" e desabilitar o submit. Isso evita cadastrar banco para cliente que só tem APP.
+**`src/pages/Dashboard.tsx`**
+1. Adicionar estado `clientSegments: string[] | null` (null = não filtrar / staff Otimizzo).
+2. Em `useEffect`, quando `isClientUser` for verdadeiro e existir `profile.client_id`, buscar `segments` da tabela `clients` (`select("segments").eq("id", profile.client_id).maybeSingle()`) e armazenar no estado.
+3. Montar `distributionCards` dinamicamente:
+   - Se `clientSegments` é null → incluir ambos DB e APP (comportamento atual para staff).
+   - Caso contrário → incluir DB somente se `clientSegments.includes("DB")`, e APP somente se `clientSegments.includes("APP")`.
+4. O card "Total de Clientes" (condicional para roles internos) permanece inalterado.
 
-5. **Ajuste no schema Zod**
-   - Trocar o `z.enum([...])` por `z.string().min(1, "Selecione um engine")` para aceitar a lista dinâmica do cliente sem quebrar o type.
+## Fora de escopo
 
-### Comportamento esperado
-- Super admin abre "Nova Instância" → escolhe ATPPOA → o select de Engine passa a mostrar apenas "Oracle".
-- Se trocar para um cliente sem engines, o campo fica desabilitado com mensagem.
-- Edição existente continua funcionando: o engine atual permanece selecionado.
-
-### Fora de escopo
-- Não alterar a tabela `clients` nem migrações.
-- Não mexer em outras telas (Applications/Machines).
+- Não alterar `MonthlyClientReport`, `PeriodComparisonReport` ou outras telas.
+- Não tocar em segmentos dinâmicos além de DB/APP nesta iteração (o dashboard atualmente só tem cards fixos para esses dois).
+- Sem mudanças de schema ou migrations.
