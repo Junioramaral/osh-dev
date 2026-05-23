@@ -1,25 +1,55 @@
-## Problema
+# Padronizar e-mails para compatibilidade Outlook + Webmail
 
-Na seção "Distribuição por Segmento" do Dashboard, os cards "Tickets DB" e "Tickets APP" são exibidos para todo cliente, mesmo quando o cliente não possui aquele segmento contratado. Ex.: ATPPOA só tem "DB", mas o card "Tickets APP" aparece mesmo assim.
+## Contexto
 
-## Solução
+A correção anterior aplicada ao e-mail de RFC (layout quebrava no Outlook) precisa ser estendida. Auditando as Edge Functions de e-mail, identifiquei que **6 das 7 funções** ainda usam padrões que o Outlook (desktop, especialmente Windows com Word rendering engine) não renderiza corretamente:
 
-Para usuários do tipo cliente (isClientUser), carregar o campo `segments` do `clients` correspondente ao `profile.client_id` e renderizar apenas os cards cujos segmentos estão presentes nesse array.
+- `display: flex` / `display: grid` → Outlook ignora, quebra o layout em coluna única desalinhada
+- `<style>` no `<head>` com classes → Outlook desktop suporta parcialmente, mas falha em muitos casos (Outlook.com, mobile)
+- `linear-gradient(...)` em backgrounds → Outlook não renderiza, fica sem cor de fundo
+- `border-radius`, `box-shadow` → ignorados pelo Outlook desktop
+- `<div>` empilhado para colunas → não vira coluna no Outlook
+- Emojis grandes via `font-size` → renderização inconsistente
 
-Para Otimizzo (super_admin, tenant_admin, analystas), continuar mostrando ambos os cards (visão global).
+## Funções afetadas
 
-## Alterações
+| Função | Problemas detectados | Severidade |
+|---|---|---|
+| `send-monthly-report` | flex em métricas, gradient header, bar-chart em flex, classes CSS | **Alta** (quebra muito no Outlook) |
+| `send-resolution-notification` | gradient header, gradient no CTA do CSAT, classes CSS | Alta |
+| `send-rfc-decision-notification` | gradient header dinâmico, classes CSS | Alta |
+| `send-comment-notification` | classes CSS, layout div | Média |
+| `send-analyst-notification` | classes CSS, layout div, botão action | Média |
+| `send-analyst-assignment-notification` | divs com `background:` inline (funciona razoável), sem gradient | Baixa (já quase ok) |
+| `send-rfc-report` | **já foi corrigido** | — |
 
-**`src/pages/Dashboard.tsx`**
-1. Adicionar estado `clientSegments: string[] | null` (null = não filtrar / staff Otimizzo).
-2. Em `useEffect`, quando `isClientUser` for verdadeiro e existir `profile.client_id`, buscar `segments` da tabela `clients` (`select("segments").eq("id", profile.client_id).maybeSingle()`) e armazenar no estado.
-3. Montar `distributionCards` dinamicamente:
-   - Se `clientSegments` é null → incluir ambos DB e APP (comportamento atual para staff).
-   - Caso contrário → incluir DB somente se `clientSegments.includes("DB")`, e APP somente se `clientSegments.includes("APP")`.
-4. O card "Total de Clientes" (condicional para roles internos) permanece inalterado.
+`submit-feedback` não envia e-mail (não precisa ajuste).
+
+## O que será feito
+
+Aplicar o **mesmo padrão "email-safe" do `send-rfc-report`** em todas as outras funções:
+
+1. **Substituir `<div>` por `<table role="presentation">`** para todo o esqueleto (container, header, content, footer, cards de métricas).
+2. **Remover `display: flex` e `display: grid`** — usar `<table>` com `<td>` para colunas (ex.: cards de métricas lado a lado).
+3. **Trocar `linear-gradient(...)` por cor sólida** (cor principal do gradiente atual) — mantém identidade visual sem quebrar no Outlook.
+4. **Mover todo CSS para `style=""` inline** em cada elemento (eliminar `<style>` no `<head>`, exceto `body` reset).
+5. **Substituir bar-chart flex** do relatório mensal por barras feitas com `<table>` + `<td>` com `background-color` e `height`.
+6. **Manter idêntica a aparência** em webmail moderno (Gmail, Apple Mail, etc.) — as mudanças são estruturais, não visuais.
+
+## Detalhes técnicos por função
+
+- **send-monthly-report**: maior refatoração. Cards de métricas (`.metrics` flex) → tabela 4 colunas. Bar-chart → tabela com altura proporcional via `height` + `background-color`. Headers de seção e badges convertidos para inline-style.
+- **send-resolution-notification**: gradient verde → `#28a745` sólido no header e no botão CSAT. Bloco CSAT (centralizado com gradient bg) → `<table>` centralizada com cor sólida.
+- **send-rfc-decision-notification**: gradients dinâmicos (aprovado/reprovado) → cores sólidas dinâmicas (`#28a745` / `#dc3545`).
+- **send-comment-notification** e **send-analyst-notification**: converter wrapper `.container/.header/.content/.footer` para tabelas; mover estilos para inline.
+- **send-analyst-assignment-notification**: pequenos ajustes — envolver em tabela presentation para garantir centralização em Outlook.
 
 ## Fora de escopo
 
-- Não alterar `MonthlyClientReport`, `PeriodComparisonReport` ou outras telas.
-- Não tocar em segmentos dinâmicos além de DB/APP nesta iteração (o dashboard atualmente só tem cards fixos para esses dois).
-- Sem mudanças de schema ou migrations.
+- Não vou alterar conteúdo textual, assuntos, lógica de envio, destinatários, anexos, headers (Reply-To, In-Reply-To), nem a função `submit-feedback`.
+- Não vou mexer em `receive-email-reply` (recebimento, não envio).
+- Não introduzo bibliotecas (React Email etc.) — mantenho HTML inline como já é hoje.
+
+## Validação
+
+Após o ajuste, os HTMLs gerados seguirão o mesmo padrão que já validamos no `send-rfc-report` (que renderiza corretamente no Outlook). Você pode testar disparando um e-mail real de cada tipo após implementação.
