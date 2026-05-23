@@ -1611,6 +1611,7 @@ export type Database = {
         | "fechado"
         | "aguardando_aprovacao"
         | "aprovado"
+        | "liberado"
       ticket_type:
         | "incidente"
         | "duvida"
@@ -1773,6 +1774,7 @@ export const Constants = {
         "fechado",
         "aguardando_aprovacao",
         "aprovado",
+        "liberado",
       ],
       ticket_type: [
         "incidente",

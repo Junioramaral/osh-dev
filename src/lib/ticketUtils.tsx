@@ -196,6 +196,8 @@ export const getStatusColor = (status: string) => {
       return 'bg-purple-100 text-purple-800 border-purple-300';
     case 'aguardando_cliente':
       return 'bg-yellow-100 text-yellow-800 border-yellow-300';
+    case 'liberado':
+      return 'bg-yellow-100 text-yellow-900 border-yellow-400';
     case 'resolvido':
       return 'bg-green-100 text-green-800 border-green-300';
     case 'fechado':
@@ -215,6 +217,8 @@ export const getStatusLabel = (status: string) => {
       return 'Em Atendimento';
     case 'aguardando_cliente':
       return 'Aguardando Cliente';
+    case 'liberado':
+      return 'Liberado';
     case 'resolvido':
       return 'Resolvido';
     case 'fechado':
