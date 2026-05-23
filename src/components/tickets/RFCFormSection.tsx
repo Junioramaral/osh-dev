@@ -17,6 +17,7 @@ import {
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Loader2, Send, FileText } from "lucide-react";
 import RFCStepBuilder, { RFCStep } from "./RFCStepBuilder";
+import { useAvailableSegments } from "@/hooks/useAvailableSegments";
 
 interface RFCFormSectionProps {
   onSuccess: (ticket: any) => void;
@@ -413,24 +414,11 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
       {/* 2. Segmento */}
       <div className="space-y-2">
         <Label>Segmento *</Label>
-        <RadioGroup
+        <RFCSegmentRadio
+          clientId={effectiveClientId}
           value={segment}
-          onValueChange={(v) => setSegment(v as "DB" | "APP")}
-          className="flex gap-6"
-        >
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="DB" id="rfc-seg-db" />
-            <Label htmlFor="rfc-seg-db" className="cursor-pointer font-normal">
-              Banco de Dados
-            </Label>
-          </div>
-          <div className="flex items-center gap-2">
-            <RadioGroupItem value="APP" id="rfc-seg-app" />
-            <Label htmlFor="rfc-seg-app" className="cursor-pointer font-normal">
-              Application
-            </Label>
-          </div>
-        </RadioGroup>
+          onChange={setSegment}
+        />
       </div>
 
       {/* 2b. Informações Técnicas */}
