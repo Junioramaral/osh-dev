@@ -300,7 +300,10 @@ All colors MUST be HSL.
 .faq-rich-content h1 { font-size: 1.5rem; font-weight: 700; margin: 0.5rem 0; }
 .faq-rich-content h2 { font-size: 1.25rem; font-weight: 700; margin: 0.5rem 0; }
 .faq-rich-content h3 { font-size: 1.125rem; font-weight: 600; margin: 0.5rem 0; }
-.faq-rich-content p { margin: 0.25rem 0; }
+.faq-rich-content p { margin: 0 0 0.75rem 0; line-height: 1.6; min-height: 1em; }
+.faq-rich-content p:last-child { margin-bottom: 0; }
+.faq-rich-content p:empty::before { content: "\00a0"; }
+.faq-rich-content p:has(br:only-child) { min-height: 1em; }
 .faq-rich-content ul,
 .faq-rich-content ol {
   padding-left: 1.5rem;
