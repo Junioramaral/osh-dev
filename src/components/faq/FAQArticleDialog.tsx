@@ -24,6 +24,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { RichTextEditor } from "@/components/ui/rich-text-editor";
 import {
   Select,
   SelectContent,
@@ -147,9 +148,21 @@ const articleSchema = z.object({
   segment: z.string().min(1, "Selecione um segmento"),
   db_engines: z.array(z.string()).default([]),
   app_product_ids: z.array(z.string()).default([]),
-  symptoms: z.string().min(10, "Sintomas deve ter pelo menos 10 caracteres"),
-  problem: z.string().min(10, "Problema deve ter pelo menos 10 caracteres"),
-  solution: z.string().min(10, "Solução deve ter pelo menos 10 caracteres"),
+  symptoms: z
+    .string()
+    .refine((v) => stripHtml(v).length >= 10, {
+      message: "Sintomas deve ter pelo menos 10 caracteres",
+    }),
+  problem: z
+    .string()
+    .refine((v) => stripHtml(v).length >= 10, {
+      message: "Problema deve ter pelo menos 10 caracteres",
+    }),
+  solution: z
+    .string()
+    .refine((v) => stripHtml(v).length >= 10, {
+      message: "Solução deve ter pelo menos 10 caracteres",
+    }),
   keywords: z.string().optional(),
   status: z.enum(["rascunho", "publicado"]),
 }).refine(data => {
