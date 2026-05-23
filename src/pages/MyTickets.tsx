@@ -3,6 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAnalystQueues } from "@/hooks/useAnalystQueues";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -475,16 +476,12 @@ export default function MyTickets() {
               <SelectItem value="resolvido">Resolvido</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Segmento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Segmentos</SelectItem>
-              <SelectItem value="DB">DB</SelectItem>
-              <SelectItem value="APP">APP</SelectItem>
-            </SelectContent>
-          </Select>
+          <SegmentSelect
+            value={segmentFilter}
+            onValueChange={setSegmentFilter}
+            shortLabels
+            className="w-[180px]"
+          />
 
           {(isOtimizzoUser || isSuperAdmin) && (
             <Select value={teamFilter} onValueChange={setTeamFilter}>
