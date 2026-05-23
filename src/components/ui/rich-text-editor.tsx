@@ -2,7 +2,7 @@ import { useEditor, EditorContent, type Editor } from "@tiptap/react";
 import StarterKit from "@tiptap/starter-kit";
 import { Underline } from "@tiptap/extension-underline";
 import { TextAlign } from "@tiptap/extension-text-align";
-import { TextStyle } from "@tiptap/extension-text-style";
+import { TextStyle, FontSize } from "@tiptap/extension-text-style";
 import { Color } from "@tiptap/extension-color";
 import { FontFamily } from "@tiptap/extension-font-family";
 import { Link } from "@tiptap/extension-link";
@@ -117,9 +117,9 @@ function Toolbar({ editor }: { editor: Editor }) {
         value={currentFontSize}
         onValueChange={(v) => {
           if (!v || v === "__default__") {
-            editor.chain().focus().unsetMark("textStyle").run();
+            editor.chain().focus().unsetFontSize().run();
           } else {
-            editor.chain().focus().setMark("textStyle", { fontSize: v }).run();
+            editor.chain().focus().setFontSize(v).run();
           }
         }}
       >
@@ -326,23 +326,6 @@ function Toolbar({ editor }: { editor: Editor }) {
   );
 }
 
-// Custom TextStyle extension that supports a `fontSize` attribute
-const TextStyleWithSize = TextStyle.extend({
-  addAttributes() {
-    return {
-      ...this.parent?.(),
-      fontSize: {
-        default: null,
-        parseHTML: (el) => (el as HTMLElement).style.fontSize || null,
-        renderHTML: (attrs) => {
-          if (!attrs.fontSize) return {};
-          return { style: `font-size: ${attrs.fontSize}` };
-        },
-      },
-    };
-  },
-});
-
 export function RichTextEditor({
   value,
   onChange,
@@ -356,7 +339,8 @@ export function RichTextEditor({
         heading: { levels: [1, 2, 3] },
       }),
       Underline,
-      TextStyleWithSize,
+      TextStyle,
+      FontSize,
       Color,
       FontFamily,
       TextAlign.configure({ types: ["heading", "paragraph"] }),
