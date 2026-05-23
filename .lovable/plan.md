@@ -1,41 +1,32 @@
-## Problema
+## Novo status "liberado" para tickets retornados à fila
 
-No editor (TipTap) cada `Enter` cria um novo parágrafo `<p>...</p>`. Quando você pressiona Enter duas vezes para criar uma "linha em branco", o TipTap salva um parágrafo vazio: `<p></p>`.
+### Objetivo
+Criar um novo status `liberado` no enum `ticket_status` e aplicá-lo automaticamente quando um ticket for desbloqueado por inatividade (retornar à fila), substituindo a lógica visual atual baseada apenas em `unlocked_at`.
 
-No editor isso aparece com altura visível (TipTap renderiza placeholder de bloco vazio). Mas na tela de visualização (`FAQArticleViewDialog`), o HTML é injetado via `dangerouslySetInnerHTML` e:
+### Alterações
 
-1. Parágrafos vazios (`<p></p>`) colapsam para altura 0 no navegador — não ocupam espaço.
-2. A regra atual em `src/index.css` é `.faq-rich-content p { margin: 0.25rem 0; }` — margem mínima, então mesmo parágrafos com conteúdo ficam quase grudados.
-3. `DOMPurify.sanitize()` mantém os `<p></p>` vazios, mas sem conteúdo eles não geram caixa visível.
+**1. Banco de dados (migration)**
+- Adicionar valor `liberado` ao enum `public.ticket_status` (`ALTER TYPE ... ADD VALUE 'liberado'`).
 
-Resultado: o texto aparece todo "colado" sem o espaçamento que você criou com Enter.
+**2. Edge Function `unlock-inactive-tickets`**
+- Ao desbloquear tickets inativos, além de limpar `analyst_id`/`lock_*` e setar `unlocked_at`, atualizar `status = 'liberado'`.
+- Manter o registro no `ticket_history` (action_type `unlocked_by_inactivity`).
 
-## Solução (apenas CSS, em `src/index.css`)
+**3. Frontend — `src/lib/ticketUtils.tsx`**
+- `getStatusColor`: adicionar case `liberado` com cor amarela (mantendo a identidade visual atual de "retornou à fila").
+- `getStatusLabel`: adicionar `liberado` → "Liberado".
 
-Ajustar as regras de `.faq-rich-content` para:
+**4. Listagens e filtros de status**
+- Incluir `liberado` nas opções de filtro/seleção de status em:
+  - `src/pages/Tickets.tsx`
+  - `src/pages/MyTickets.tsx`
+  - `src/pages/Dashboard.tsx` (se houver agrupamento por status)
+- Tratar `liberado` como ticket **aberto** (não entra no grupo resolvido/fechado).
 
-1. **Dar altura a parágrafos vazios** para preservar as quebras de linha em branco:
-   ```css
-   .faq-rich-content p:empty::before { content: "\00a0"; }
-   ```
-   (Também cobrir `<p><br></p>`, padrão alternativo de linha vazia.)
+### Pontos de atenção
+- O destaque amarelo na linha (`TicketRow.tsx`) hoje usa `unlocked_at`. Como o status `liberado` é mais explícito, mantemos o highlight atual (continua funcionando), mas a Badge de status passará a mostrar "Liberado".
+- Quando um analista assumir o ticket novamente, o fluxo normal de mudança de status (ex.: `em_atendimento`) sobrescreverá `liberado` — nenhum tratamento extra necessário.
+- RFCs continuam fora do fluxo de inatividade.
 
-2. **Aumentar a margem entre parágrafos** para um espaçamento natural de leitura (estilo Word):
-   ```css
-   .faq-rich-content p { margin: 0 0 0.75rem 0; line-height: 1.6; }
-   .faq-rich-content p:last-child { margin-bottom: 0; }
-   ```
-
-3. **Garantir que blocos vazios entre headings/listas também respirem** com `min-height: 1em` nos parágrafos.
-
-Nada muda no editor, no schema do banco, no `FAQArticleDialog` nem no fluxo de salvamento — o HTML continua o mesmo. A correção é puramente de renderização.
-
-## Arquivos afetados
-
-- `src/index.css` — atualizar bloco `.faq-rich-content` (regras de `p`, adicionar `p:empty::before` e variante `p:has(br:only-child)`).
-
-## Fora de escopo
-
-- Não alterar o editor TipTap.
-- Não migrar conteúdo existente no banco.
-- Não mexer em outros campos/textareas do projeto.
+### Não incluso
+- Nenhuma alteração em SLA, regras de negócio de fechamento, ou notificações por email além do que já existe.
