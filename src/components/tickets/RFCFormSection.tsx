@@ -589,3 +589,49 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
     </div>
   );
 }
+
+function RFCSegmentRadio({
+  clientId,
+  value,
+  onChange,
+}: {
+  clientId: string;
+  value: "DB" | "APP";
+  onChange: (v: "DB" | "APP") => void;
+}) {
+  const { segments } = useAvailableSegments(clientId || null);
+  useEffect(() => {
+    if (segments.length > 0 && !segments.includes(value)) {
+      onChange(segments[0] as "DB" | "APP");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segments.join(",")]);
+
+  const allowDB = segments.includes("DB");
+  const allowAPP = segments.includes("APP");
+
+  return (
+    <RadioGroup
+      value={value}
+      onValueChange={(v) => onChange(v as "DB" | "APP")}
+      className="flex gap-6"
+    >
+      {allowDB && (
+        <div className="flex items-center gap-2">
+          <RadioGroupItem value="DB" id="rfc-seg-db" />
+          <Label htmlFor="rfc-seg-db" className="cursor-pointer font-normal">
+            Banco de Dados
+          </Label>
+        </div>
+      )}
+      {allowAPP && (
+        <div className="flex items-center gap-2">
+          <RadioGroupItem value="APP" id="rfc-seg-app" />
+          <Label htmlFor="rfc-seg-app" className="cursor-pointer font-normal">
+            Application
+          </Label>
+        </div>
+      )}
+    </RadioGroup>
+  );
+}
