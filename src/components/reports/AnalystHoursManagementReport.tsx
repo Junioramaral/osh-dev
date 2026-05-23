@@ -1,4 +1,5 @@
 import { useState, useRef } from "react";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { ArrowLeft, Printer, Clock, FileText, Calculator, Percent, AlertTriangle, Users, Building2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -178,16 +179,10 @@ const AnalystHoursManagementReport = ({ onBack }: AnalystHoursManagementReportPr
 
             <div className="space-y-2">
               <label className="text-sm font-medium">Segmento</label>
-              <Select value={segment || "__all__"} onValueChange={setSegment}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Todos" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="__all__">Todos</SelectItem>
-                  <SelectItem value="DB">Database</SelectItem>
-                  <SelectItem value="APP">Aplicação</SelectItem>
-                </SelectContent>
-              </Select>
+              <SegmentSelect
+                value={segment === "__all__" || !segment ? "all" : segment}
+                onValueChange={(v) => setSegment(v === "all" ? "__all__" : v)}
+              />
             </div>
 
             <div className="flex items-end">
