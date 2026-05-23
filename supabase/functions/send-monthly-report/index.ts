@@ -185,265 +185,218 @@ function generateReportHTML(
 ): string {
   const monthName = MONTH_NAMES[month - 1];
   const generationDate = new Date().toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo" });
-  
+
+  const badgeStyles: Record<string, string> = {
+    p1: "background-color:#fee2e2;color:#dc2626;",
+    p2: "background-color:#fef3c7;color:#d97706;",
+    p3: "background-color:#dbeafe;color:#2563eb;",
+    p4: "background-color:#f1f5f9;color:#64748b;",
+    success: "background-color:#dcfce7;color:#16a34a;",
+    warning: "background-color:#fef3c7;color:#d97706;",
+    info: "background-color:#dbeafe;color:#2563eb;",
+    danger: "background-color:#fee2e2;color:#dc2626;",
+  };
+  const badge = (key: string, text: string) =>
+    `<span style="display:inline-block;padding:2px 8px;font-size:11px;font-weight:500;${badgeStyles[key] || ""}">${text}</span>`;
+
+  const slaKey = metrics.slaMetRate >= 90 ? "success" : metrics.slaMetRate >= 70 ? "warning" : "danger";
+
+  const metricCard = (value: string, label: string, variant: "default" | "success" | "warning" | "danger" = "default") => {
+    const bg = variant === "success" ? "#dcfce7" : variant === "warning" ? "#fef3c7" : variant === "danger" ? "#fee2e2" : "#f8f9fa";
+    const valColor = variant === "success" ? "#16a34a" : variant === "warning" ? "#d97706" : variant === "danger" ? "#dc2626" : "#1e293b";
+    return `<td width="25%" valign="top" style="padding:5px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${bg};">
+        <tr><td align="center" style="padding:20px 10px;">
+          <div style="font-size:26px;font-weight:bold;color:${valColor};line-height:1.1;">${value}</div>
+          <div style="font-size:12px;color:#64748b;margin-top:5px;">${label}</div>
+        </td></tr>
+      </table>
+    </td>`;
+  };
+
+  const sectionTitle = (txt: string) =>
+    `<h2 style="font-size:18px;font-weight:bold;color:#1e3a8a;margin:0 0 20px;padding-bottom:10px;border-bottom:2px solid #3b82f6;">${txt}</h2>`;
+
+  const slaBadgeFor = (t: TicketData) => {
+    if (t.sla_resolution_met === true) return badge("success", "✓");
+    if (t.sla_resolution_met === false) return badge("p1", "✗");
+    return badge("warning", "⏳");
+  };
+
   return `
 <!DOCTYPE html>
 <html>
-<head>
-  <meta charset="UTF-8">
-  <style>
-    body { font-family: Arial, sans-serif; margin: 0; padding: 0; background: #f5f5f5; }
-    .container { max-width: 700px; margin: 0 auto; background: white; }
-    .header { background: linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%); padding: 40px; text-align: center; }
-    .header h1 { color: white; font-size: 32px; margin: 0 0 10px 0; letter-spacing: 2px; }
-    .header h2 { color: white; font-size: 18px; margin: 0 0 20px 0; font-weight: normal; }
-    .header .client { color: rgba(255,255,255,0.9); font-size: 16px; margin: 5px 0; }
-    .header .competencia { color: rgba(255,255,255,0.8); font-size: 14px; }
-    .section { padding: 30px; }
-    .section-title { font-size: 18px; font-weight: bold; color: #1e3a8a; margin-bottom: 20px; border-bottom: 2px solid #3b82f6; padding-bottom: 10px; }
-    .metrics { display: flex; flex-wrap: wrap; gap: 15px; margin-bottom: 30px; }
-    .metric-card { flex: 1; min-width: 140px; background: #f8f9fa; padding: 20px; border-radius: 8px; text-align: center; }
-    .metric-card.success { background: #dcfce7; }
-    .metric-card.warning { background: #fef3c7; }
-    .metric-card.danger { background: #fee2e2; }
-    .metric-value { font-size: 28px; font-weight: bold; color: #1e293b; }
-    .metric-card.success .metric-value { color: #16a34a; }
-    .metric-card.warning .metric-value { color: #d97706; }
-    .metric-card.danger .metric-value { color: #dc2626; }
-    .metric-label { font-size: 12px; color: #64748b; margin-top: 5px; }
-    table { width: 100%; border-collapse: collapse; font-size: 12px; }
-    th { background: #f1f5f9; padding: 10px; text-align: left; border-bottom: 2px solid #e2e8f0; }
-    td { padding: 10px; border-bottom: 1px solid #e2e8f0; }
-    tr:hover { background: #f8fafc; }
-    .badge { display: inline-block; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 500; }
-    .badge-p1 { background: #fee2e2; color: #dc2626; }
-    .badge-p2 { background: #fef3c7; color: #d97706; }
-    .badge-p3 { background: #dbeafe; color: #2563eb; }
-    .badge-p4 { background: #f1f5f9; color: #64748b; }
-    .badge-success { background: #dcfce7; color: #16a34a; }
-    .badge-warning { background: #fef3c7; color: #d97706; }
-    .badge-info { background: #dbeafe; color: #2563eb; }
-    .footer { text-align: center; padding: 20px; color: #64748b; font-size: 12px; background: #f8fafc; }
-    .chart-section { margin: 20px 0; }
-    .bar-chart { display: flex; align-items: flex-end; height: 100px; gap: 10px; }
-    .bar { flex: 1; background: #3b82f6; border-radius: 4px 4px 0 0; min-height: 5px; position: relative; }
-    .bar-label { position: absolute; bottom: -20px; width: 100%; text-align: center; font-size: 10px; }
-    .bar-value { position: absolute; top: -20px; width: 100%; text-align: center; font-size: 11px; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <!-- Header / Capa -->
-    <div class="header">
-      <h1>OTIMIZZO</h1>
-      <h2>Relatório Mensal de Suporte</h2>
-      <p class="client"><strong>Cliente:</strong> ${clientName}</p>
-      <p class="competencia">Competência: ${monthName}/${year}</p>
-      <p class="competencia">Gerado em: ${generationDate}</p>
-    </div>
-    
-    <!-- Resumo Executivo -->
-    <div class="section">
-      <div class="section-title">📊 Resumo Executivo</div>
-      <div class="metrics">
-        <div class="metric-card">
-          <div class="metric-value">${metrics.total}</div>
-          <div class="metric-label">Total de Tickets</div>
-        </div>
-        <div class="metric-card success">
-          <div class="metric-value">${metrics.resolved}</div>
-          <div class="metric-label">Resolvidos</div>
-        </div>
-        <div class="metric-card warning">
-          <div class="metric-value">${metrics.pending}</div>
-          <div class="metric-label">Em Aberto</div>
-        </div>
-        <div class="metric-card ${metrics.slaMetRate >= 90 ? 'success' : metrics.slaMetRate >= 70 ? 'warning' : 'danger'}">
-          <div class="metric-value">${metrics.slaMetRate}%</div>
-          <div class="metric-label">SLA Cumprido</div>
-        </div>
-      </div>
-      
-      <div class="metrics">
-        <div class="metric-card">
-          <div class="metric-value">${metrics.avgResolutionHours}h</div>
-          <div class="metric-label">Tempo Médio Resolução</div>
-        </div>
-        <div class="metric-card success">
-          <div class="metric-value">${metrics.slaMetCount}</div>
-          <div class="metric-label">SLA Atendido</div>
-        </div>
-        <div class="metric-card danger">
-          <div class="metric-value">${metrics.slaNotMetCount}</div>
-          <div class="metric-label">SLA Não Atendido</div>
-        </div>
-        <div class="metric-card">
-          <div class="metric-value">${metrics.slaInProgress}</div>
-          <div class="metric-label">Em Andamento</div>
-        </div>
-      </div>
-    </div>
-    
-    <!-- Volume por Segmento e Prioridade -->
-    <div class="section">
-      <div class="section-title">📈 Distribuição de Tickets</div>
-      <table>
-        <tr>
-          <th>Segmento</th>
-          <th>Quantidade</th>
-          <th>%</th>
-        </tr>
-        <tr>
-          <td><span class="badge badge-info">DB</span> Banco de Dados</td>
-          <td>${metrics.bySegment.DB}</td>
-          <td>${metrics.total > 0 ? Math.round((metrics.bySegment.DB / metrics.total) * 100) : 0}%</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-success">APP</span> Aplicação</td>
-          <td>${metrics.bySegment.APP}</td>
-          <td>${metrics.total > 0 ? Math.round((metrics.bySegment.APP / metrics.total) * 100) : 0}%</td>
-        </tr>
-      </table>
-      
-      <table style="margin-top: 20px;">
-        <tr>
-          <th>Prioridade</th>
-          <th>Quantidade</th>
-          <th>%</th>
-        </tr>
-        <tr>
-          <td><span class="badge badge-p1">P1</span> Crítico</td>
-          <td>${metrics.byPriority.P1}</td>
-          <td>${metrics.total > 0 ? Math.round((metrics.byPriority.P1 / metrics.total) * 100) : 0}%</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-p2">P2</span> Alto</td>
-          <td>${metrics.byPriority.P2}</td>
-          <td>${metrics.total > 0 ? Math.round((metrics.byPriority.P2 / metrics.total) * 100) : 0}%</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-p3">P3</span> Médio</td>
-          <td>${metrics.byPriority.P3}</td>
-          <td>${metrics.total > 0 ? Math.round((metrics.byPriority.P3 / metrics.total) * 100) : 0}%</td>
-        </tr>
-        <tr>
-          <td><span class="badge badge-p4">P4</span> Baixo</td>
-          <td>${metrics.byPriority.P4}</td>
-          <td>${metrics.total > 0 ? Math.round((metrics.byPriority.P4 / metrics.total) * 100) : 0}%</td>
-        </tr>
-      </table>
-    </div>
-    
-    <!-- Top Categorias -->
-    ${metrics.topCategories.length > 0 ? `
-    <div class="section">
-      <div class="section-title">🏷️ Top 5 Categorias</div>
-      <table>
-        <tr>
-          <th>Categoria</th>
-          <th>Quantidade</th>
-          <th>%</th>
-        </tr>
-        ${metrics.topCategories.map(([cat, count]) => `
-        <tr>
-          <td>${cat}</td>
-          <td>${count}</td>
-          <td>${Math.round((count / metrics.total) * 100)}%</td>
-        </tr>
-        `).join("")}
-      </table>
-    </div>
-    ` : ""}
+<head><meta charset="UTF-8"></head>
+<body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;color:#333;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f5;padding:20px 0;">
+    <tr><td align="center">
+      <table role="presentation" width="700" cellpadding="0" cellspacing="0" border="0" style="max-width:700px;width:100%;background-color:#ffffff;">
+        <!-- Header -->
+        <tr><td style="background-color:#1e3a8a;padding:40px;text-align:center;">
+          <h1 style="color:#ffffff;font-size:32px;margin:0 0 10px;letter-spacing:2px;">OTIMIZZO</h1>
+          <h2 style="color:#ffffff;font-size:18px;margin:0 0 20px;font-weight:normal;">Relatório Mensal de Suporte</h2>
+          <p style="color:#ffffff;font-size:16px;margin:5px 0;"><strong>Cliente:</strong> ${clientName}</p>
+          <p style="color:#e0e7ff;font-size:14px;margin:5px 0;">Competência: ${monthName}/${year}</p>
+          <p style="color:#e0e7ff;font-size:14px;margin:5px 0;">Gerado em: ${generationDate}</p>
+        </td></tr>
 
-    <!-- Resumo Numérico - Últimos 6 Meses -->
-    ${monthlyVolume.length > 0 ? `
-    <div class="section">
-      <div class="section-title">📅 Resumo Numérico - Últimos 6 Meses</div>
-      <table>
-        <tr>
-          <th>Mês</th>
-          <th style="text-align:center;">Abertos</th>
-          <th style="text-align:center;">Fechados</th>
-          <th style="text-align:center;">Saldo</th>
-        </tr>
-        ${monthlyVolume.map((m) => {
-          const saldo = m.fechados - m.abertos;
-          const saldoColor = saldo >= 0 ? "#16a34a" : "#dc2626";
-          return `
-          <tr>
-            <td><strong>${m.monthLabel}</strong></td>
-            <td style="text-align:center; color:#d97706; font-weight:600;">${m.abertos}</td>
-            <td style="text-align:center; color:#16a34a; font-weight:600;">${m.fechados}</td>
-            <td style="text-align:center; color:${saldoColor}; font-weight:600;">${saldo > 0 ? "+" : ""}${saldo}</td>
-          </tr>`;
-        }).join("")}
-        ${(() => {
-          const totA = monthlyVolume.reduce((s, m) => s + m.abertos, 0);
-          const totF = monthlyVolume.reduce((s, m) => s + m.fechados, 0);
-          const totS = totF - totA;
-          return `
-          <tr style="background:#f1f5f9; font-weight:bold;">
-            <td>Total</td>
-            <td style="text-align:center; color:#d97706;">${totA}</td>
-            <td style="text-align:center; color:#16a34a;">${totF}</td>
-            <td style="text-align:center; color:${totS >= 0 ? "#16a34a" : "#dc2626"};">${totS > 0 ? "+" : ""}${totS}</td>
-          </tr>`;
-        })()}
+        <!-- Resumo Executivo -->
+        <tr><td style="padding:30px;">
+          ${sectionTitle("📊 Resumo Executivo")}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-bottom:10px;">
+            <tr>
+              ${metricCard(String(metrics.total), "Total de Tickets")}
+              ${metricCard(String(metrics.resolved), "Resolvidos", "success")}
+              ${metricCard(String(metrics.pending), "Em Aberto", "warning")}
+              ${metricCard(`${metrics.slaMetRate}%`, "SLA Cumprido", slaKey as any)}
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+            <tr>
+              ${metricCard(`${metrics.avgResolutionHours}h`, "Tempo Médio Resolução")}
+              ${metricCard(String(metrics.slaMetCount), "SLA Atendido", "success")}
+              ${metricCard(String(metrics.slaNotMetCount), "SLA Não Atendido", "danger")}
+              ${metricCard(String(metrics.slaInProgress), "Em Andamento")}
+            </tr>
+          </table>
+        </td></tr>
+
+        <!-- Distribuição -->
+        <tr><td style="padding:0 30px 30px;">
+          ${sectionTitle("📈 Distribuição de Tickets")}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;border-collapse:collapse;">
+            <tr>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Segmento</th>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Quantidade</th>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">%</th>
+            </tr>
+            <tr>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${badge("info", "DB")} Banco de Dados</td>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${metrics.bySegment.DB}</td>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${metrics.total > 0 ? Math.round((metrics.bySegment.DB / metrics.total) * 100) : 0}%</td>
+            </tr>
+            <tr>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${badge("success", "APP")} Aplicação</td>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${metrics.bySegment.APP}</td>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${metrics.total > 0 ? Math.round((metrics.bySegment.APP / metrics.total) * 100) : 0}%</td>
+            </tr>
+          </table>
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;border-collapse:collapse;margin-top:20px;">
+            <tr>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Prioridade</th>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Quantidade</th>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">%</th>
+            </tr>
+            ${(["P1","P2","P3","P4"] as const).map(p => {
+              const count = metrics.byPriority[p];
+              const label = p === "P1" ? "Crítico" : p === "P2" ? "Alto" : p === "P3" ? "Médio" : "Baixo";
+              return `<tr>
+                <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${badge(p.toLowerCase(), p)} ${label}</td>
+                <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${count}</td>
+                <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${metrics.total > 0 ? Math.round((count / metrics.total) * 100) : 0}%</td>
+              </tr>`;
+            }).join("")}
+          </table>
+        </td></tr>
+
+        ${metrics.topCategories.length > 0 ? `
+        <tr><td style="padding:0 30px 30px;">
+          ${sectionTitle("🏷️ Top 5 Categorias")}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;border-collapse:collapse;">
+            <tr>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Categoria</th>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Quantidade</th>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">%</th>
+            </tr>
+            ${metrics.topCategories.map(([cat, count]) => `
+            <tr>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${cat}</td>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${count}</td>
+              <td style="padding:10px;border-bottom:1px solid #e2e8f0;">${Math.round((count / metrics.total) * 100)}%</td>
+            </tr>`).join("")}
+          </table>
+        </td></tr>` : ""}
+
+        ${monthlyVolume.length > 0 ? `
+        <tr><td style="padding:0 30px 30px;">
+          ${sectionTitle("📅 Resumo Numérico - Últimos 6 Meses")}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="font-size:13px;border-collapse:collapse;">
+            <tr>
+              <th align="left" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Mês</th>
+              <th align="center" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Abertos</th>
+              <th align="center" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Fechados</th>
+              <th align="center" style="background-color:#f1f5f9;padding:10px;border-bottom:2px solid #e2e8f0;">Saldo</th>
+            </tr>
+            ${monthlyVolume.map((m) => {
+              const saldo = m.fechados - m.abertos;
+              const saldoColor = saldo >= 0 ? "#16a34a" : "#dc2626";
+              return `<tr>
+                <td style="padding:10px;border-bottom:1px solid #e2e8f0;"><strong>${m.monthLabel}</strong></td>
+                <td align="center" style="padding:10px;border-bottom:1px solid #e2e8f0;color:#d97706;font-weight:600;">${m.abertos}</td>
+                <td align="center" style="padding:10px;border-bottom:1px solid #e2e8f0;color:#16a34a;font-weight:600;">${m.fechados}</td>
+                <td align="center" style="padding:10px;border-bottom:1px solid #e2e8f0;color:${saldoColor};font-weight:600;">${saldo > 0 ? "+" : ""}${saldo}</td>
+              </tr>`;
+            }).join("")}
+            ${(() => {
+              const totA = monthlyVolume.reduce((s, m) => s + m.abertos, 0);
+              const totF = monthlyVolume.reduce((s, m) => s + m.fechados, 0);
+              const totS = totF - totA;
+              return `<tr style="background-color:#f1f5f9;font-weight:bold;">
+                <td style="padding:10px;">Total</td>
+                <td align="center" style="padding:10px;color:#d97706;">${totA}</td>
+                <td align="center" style="padding:10px;color:#16a34a;">${totF}</td>
+                <td align="center" style="padding:10px;color:${totS >= 0 ? "#16a34a" : "#dc2626"};">${totS > 0 ? "+" : ""}${totS}</td>
+              </tr>`;
+            })()}
+          </table>
+        </td></tr>` : ""}
+
+        <!-- Listagem -->
+        <tr><td style="padding:0 30px 30px;">
+          ${sectionTitle(`📋 Listagem de Tickets (${tickets.length})`)}
+          ${tickets.length > 0 ? `
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="table-layout:fixed;font-size:11px;border-collapse:collapse;">
+            <colgroup>
+              <col style="width:10%;" /><col style="width:32%;" /><col style="width:10%;" />
+              <col style="width:11%;" /><col style="width:14%;" /><col style="width:7%;" /><col style="width:16%;" />
+            </colgroup>
+            <tr>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">Número</th>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">Título</th>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">Segmento</th>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">Prioridade</th>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">Status</th>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">SLA</th>
+              <th align="left" style="background-color:#f1f5f9;padding:6px 4px;border-bottom:2px solid #e2e8f0;">Abertura</th>
+            </tr>
+            ${tickets.slice(0, 50).map(t => `
+            <tr>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;"><strong>${t.ticket_number}</strong></td>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.title}</td>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;">${badge(t.segment === "DB" ? "info" : "success", t.segment)}</td>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;">${badge(t.priority.toLowerCase(), t.priority)}</td>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;">${STATUS_LABELS[t.status] || t.status}</td>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;">${slaBadgeFor(t)}</td>
+              <td style="padding:6px 4px;border-bottom:1px solid #e2e8f0;font-size:10px;line-height:1.3;">${formatBRStacked(t.created_at)}</td>
+            </tr>`).join("")}
+          </table>
+          ${tickets.length > 50 ? `<p style="text-align:center;color:#64748b;margin-top:10px;">... e mais ${tickets.length - 50} tickets</p>` : ""}
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="margin-top:12px;background-color:#f8fafc;">
+            <tr><td style="padding:10px;font-size:11px;color:#475569;">
+              <strong>Legenda SLA:</strong> ${badge("success", "✓")} Cumprido &nbsp;•&nbsp; ${badge("p1", "✗")} Não Cumprido &nbsp;•&nbsp; ${badge("warning", "⏳")} Em Andamento
+            </td></tr>
+          </table>
+          ` : `<p style="text-align:center;color:#64748b;">Nenhum ticket registrado neste período.</p>`}
+        </td></tr>
+
+        <!-- Footer -->
+        <tr><td style="background-color:#f8fafc;padding:20px;text-align:center;color:#64748b;font-size:12px;">
+          <p style="margin:5px 0;">Este relatório foi gerado automaticamente pelo sistema Otimizzo.</p>
+          <p style="margin:5px 0;"><strong>Otimizzo</strong> - Excelência em Suporte</p>
+        </td></tr>
       </table>
-    </div>
-    ` : ""}
-    
-    <!-- Listagem de Tickets -->
-    <div class="section">
-      <div class="section-title">📋 Listagem de Tickets (${tickets.length})</div>
-      ${tickets.length > 0 ? `
-      <table style="table-layout: fixed; width: 100%; font-size: 11px;">
-        <colgroup>
-          <col style="width: 10%;" />
-          <col style="width: 32%;" />
-          <col style="width: 10%;" />
-          <col style="width: 11%;" />
-          <col style="width: 14%;" />
-          <col style="width: 7%;" />
-          <col style="width: 16%;" />
-        </colgroup>
-        <tr>
-          <th style="padding:6px 4px;">Número</th>
-          <th style="padding:6px 4px;">Título</th>
-          <th style="padding:6px 4px;">Segmento</th>
-          <th style="padding:6px 4px;">Prioridade</th>
-          <th style="padding:6px 4px;">Status</th>
-          <th style="padding:6px 4px;">SLA</th>
-          <th style="padding:6px 4px;">Abertura</th>
-        </tr>
-        ${tickets.slice(0, 50).map(t => `
-        <tr>
-          <td style="padding:6px 4px;"><strong>${t.ticket_number}</strong></td>
-          <td style="padding:6px 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${t.title}</td>
-          <td style="padding:6px 4px;"><span class="badge ${t.segment === "DB" ? "badge-info" : "badge-success"}">${t.segment}</span></td>
-          <td style="padding:6px 4px;"><span class="badge badge-${t.priority.toLowerCase()}">${t.priority}</span></td>
-          <td style="padding:6px 4px;">${STATUS_LABELS[t.status] || t.status}</td>
-          <td style="padding:6px 4px;"><span class="badge ${t.sla_resolution_met === true ? 'badge-success' : t.sla_resolution_met === false ? 'badge-p1' : 'badge-warning'}">${t.sla_resolution_met === true ? '✓' : t.sla_resolution_met === false ? '✗' : '⏳'}</span></td>
-          <td style="padding:6px 4px; font-size:10px; line-height:1.3;">${formatBRStacked(t.created_at)}</td>
-        </tr>
-        `).join("")}
-      </table>
-      ${tickets.length > 50 ? `<p style="text-align: center; color: #64748b; margin-top: 10px;">... e mais ${tickets.length - 50} tickets</p>` : ""}
-      <p style="margin-top: 12px; padding: 10px; background: #f8fafc; border-radius: 6px; font-size: 11px; color: #475569;">
-        <strong>Legenda SLA:</strong>
-        <span class="badge badge-success">✓</span> Cumprido &nbsp;•&nbsp;
-        <span class="badge badge-p1">✗</span> Não Cumprido &nbsp;•&nbsp;
-        <span class="badge badge-warning">⏳</span> Em Andamento
-      </p>
-      ` : `<p style="text-align: center; color: #64748b;">Nenhum ticket registrado neste período.</p>`}
-    </div>
-    
-    <!-- Footer -->
-    <div class="footer">
-      <p>Este relatório foi gerado automaticamente pelo sistema Otimizzo.</p>
-      <p><strong>Otimizzo</strong> - Excelência em Suporte</p>
-    </div>
-  </div>
+    </td></tr>
+  </table>
 </body>
 </html>
   `;
