@@ -1,55 +1,71 @@
-# Padronizar e-mails para compatibilidade Outlook + Webmail
+# Filtro dinâmico de Segmentos por cliente
 
-## Contexto
+## Problema
+Hoje todos os dropdowns "Segmento" mostram fixo `DB` e `APP`, mesmo para clientes que contratam só um. Ex.: ATPPOA (só DB) vê APP em Tickets, FAQ, SLA, CSAT e relatórios.
 
-A correção anterior aplicada ao e-mail de RFC (layout quebrava no Outlook) precisa ser estendida. Auditando as Edge Functions de e-mail, identifiquei que **6 das 7 funções** ainda usam padrões que o Outlook (desktop, especialmente Windows com Word rendering engine) não renderiza corretamente:
+Já existe a regra correta no Dashboard ("Distribuição por Segmento" lê `clients.segments`). Vamos padronizar isso em todos os lugares.
 
-- `display: flex` / `display: grid` → Outlook ignora, quebra o layout em coluna única desalinhada
-- `<style>` no `<head>` com classes → Outlook desktop suporta parcialmente, mas falha em muitos casos (Outlook.com, mobile)
-- `linear-gradient(...)` em backgrounds → Outlook não renderiza, fica sem cor de fundo
-- `border-radius`, `box-shadow` → ignorados pelo Outlook desktop
-- `<div>` empilhado para colunas → não vira coluna no Outlook
-- Emojis grandes via `font-size` → renderização inconsistente
+## Regra
+- Usuário **cliente**: mostrar apenas os segmentos presentes em `clients.segments` do próprio tenant (`profile.client_id`).
+  - Só DB → mostra "DB"
+  - Só APP → mostra "APP"
+  - Ambos → mostra "DB" e "APP" (+ "Todos Segmentos")
+  - Se houver apenas 1 segmento, ocultar a opção "Todos Segmentos" (ou esconder o filtro inteiro) e travar o valor.
+- Usuário **interno (Otimizzo / analista / admin)**:
+  - Em telas com filtro de cliente: quando um cliente específico estiver selecionado, restringir os segmentos aos contratados por aquele cliente; caso contrário (Todos/None), mostrar todos.
+  - Em telas sem filtro de cliente: mostrar todos os segmentos.
 
-## Funções afetadas
+## Implementação
 
-| Função | Problemas detectados | Severidade |
-|---|---|---|
-| `send-monthly-report` | flex em métricas, gradient header, bar-chart em flex, classes CSS | **Alta** (quebra muito no Outlook) |
-| `send-resolution-notification` | gradient header, gradient no CTA do CSAT, classes CSS | Alta |
-| `send-rfc-decision-notification` | gradient header dinâmico, classes CSS | Alta |
-| `send-comment-notification` | classes CSS, layout div | Média |
-| `send-analyst-notification` | classes CSS, layout div, botão action | Média |
-| `send-analyst-assignment-notification` | divs com `background:` inline (funciona razoável), sem gradient | Baixa (já quase ok) |
-| `send-rfc-report` | **já foi corrigido** | — |
+### 1. Novo hook `useAvailableSegments`
+`src/hooks/useAvailableSegments.ts`
+- Input: `clientId?: string` (opcional).
+- Lógica:
+  - Lê `useAuth()` para obter `profile`, `isClientUser`.
+  - Se `isClientUser`: busca `clients.segments` de `profile.client_id`.
+  - Caso contrário e `clientId` fornecido (≠ "all"): busca `clients.segments` desse cliente.
+  - Caso contrário: retorna `["DB","APP"]` (fallback completo).
+- Retorna `{ segments: ("DB"|"APP")[], isLoading }`.
+- Cache via React Query (`["available-segments", clientId|profile.client_id]`).
 
-`submit-feedback` não envia e-mail (não precisa ajuste).
+### 2. Componente reutilizável `SegmentSelect`
+`src/components/common/SegmentSelect.tsx`
+- Props: `value`, `onValueChange`, `clientId?`, `includeAll?` (default true), `className?`, `placeholder?`.
+- Usa `useAvailableSegments(clientId)`.
+- Render:
+  - Se `segments.length === 0` → não renderiza nada (ou disabled).
+  - Se `segments.length === 1` e `includeAll` → renderiza Select desabilitado fixo no único segmento e dispara `onValueChange(segment)` no mount (efeito) para garantir consistência.
+  - Senão → `Select` com opção "Todos Segmentos" (quando `includeAll`) + um `SelectItem` por segmento (labels padronizados: DB = "Banco de Dados", APP = "Aplicação"; em Tickets/MyTickets manter "DB"/"APP" curtos via prop `shortLabels`).
 
-## O que será feito
+### 3. Substituir os Selects existentes
 
-Aplicar o **mesmo padrão "email-safe" do `send-rfc-report`** em todas as outras funções:
+Trocar os blocos hardcoded por `<SegmentSelect />` (passando `clientId` quando a tela tiver filtro de cliente):
 
-1. **Substituir `<div>` por `<table role="presentation">`** para todo o esqueleto (container, header, content, footer, cards de métricas).
-2. **Remover `display: flex` e `display: grid`** — usar `<table>` com `<td>` para colunas (ex.: cards de métricas lado a lado).
-3. **Trocar `linear-gradient(...)` por cor sólida** (cor principal do gradiente atual) — mantém identidade visual sem quebrar no Outlook.
-4. **Mover todo CSS para `style=""` inline** em cada elemento (eliminar `<style>` no `<head>`, exceto `body` reset).
-5. **Substituir bar-chart flex** do relatório mensal por barras feitas com `<table>` + `<td>` com `background-color` e `height`.
-6. **Manter idêntica a aparência** em webmail moderno (Gmail, Apple Mail, etc.) — as mudanças são estruturais, não visuais.
+- `src/pages/Tickets.tsx` (linha ~628) — `shortLabels`, passar `clientFilter` se houver.
+- `src/pages/MyTickets.tsx` (linha ~483) — `shortLabels`.
+- `src/pages/FAQ.tsx` (linha ~319).
+- `src/pages/SLADashboard.tsx` (linha ~309).
+- `src/pages/CSATDashboard.tsx` (linha ~106).
+- `src/components/reports/CSATSatisfactionReport.tsx` (linha ~293) — passar `clientId` do filtro.
+- `src/components/reports/ResolutionTimeReport.tsx` (linha ~128).
+- `src/components/reports/QueueWorkloadReport.tsx` (linha ~131).
+- `src/components/reports/CategoriesReport.tsx` (linha ~105).
+- `src/components/reports/AnalystPerformanceReport.tsx` (linha ~155).
+- `src/components/reports/AnalystHoursManagementReport.tsx` (linha ~187).
+- `src/components/reports/ClosureRankingReport.tsx` (linhas ~344 e ~447).
 
-## Detalhes técnicos por função
+Em cada relatório, propagar o `clientId` selecionado no filtro existente. Quando o cliente mudar, se o `segment` atual não estiver mais disponível, resetar para `"all"` (ou para o único segmento permitido) dentro do `useEffect`.
 
-- **send-monthly-report**: maior refatoração. Cards de métricas (`.metrics` flex) → tabela 4 colunas. Bar-chart → tabela com altura proporcional via `height` + `background-color`. Headers de seção e badges convertidos para inline-style.
-- **send-resolution-notification**: gradient verde → `#28a745` sólido no header e no botão CSAT. Bloco CSAT (centralizado com gradient bg) → `<table>` centralizada com cor sólida.
-- **send-rfc-decision-notification**: gradients dinâmicos (aprovado/reprovado) → cores sólidas dinâmicas (`#28a745` / `#dc3545`).
-- **send-comment-notification** e **send-analyst-notification**: converter wrapper `.container/.header/.content/.footer` para tabelas; mover estilos para inline.
-- **send-analyst-assignment-notification**: pequenos ajustes — envolver em tabela presentation para garantir centralização em Outlook.
+### 4. Caso RFC
+`src/components/tickets/RFCFormSection.tsx` (RadioGroup DB/APP, linha ~422): também restringir aos segmentos do cliente do ticket. Se só houver 1, pré-selecionar e desabilitar o radio do outro.
 
-## Fora de escopo
+### 5. Fora de escopo
+- Dashboard já corrigido (mantém lógica atual).
+- Não mexer em lógica de negócio/SLA/queries, só na UI de seleção.
+- Sem migração de banco.
 
-- Não vou alterar conteúdo textual, assuntos, lógica de envio, destinatários, anexos, headers (Reply-To, In-Reply-To), nem a função `submit-feedback`.
-- Não vou mexer em `receive-email-reply` (recebimento, não envio).
-- Não introduzo bibliotecas (React Email etc.) — mantenho HTML inline como já é hoje.
-
-## Validação
-
-Após o ajuste, os HTMLs gerados seguirão o mesmo padrão que já validamos no `send-rfc-report` (que renderiza corretamente no Outlook). Você pode testar disparando um e-mail real de cada tipo após implementação.
+## Detalhes técnicos
+- `clients.segments` é `text[]` com valores `"DB"` / `"APP"`.
+- Tipos de `segment` no Supabase usam enum `"DB" | "APP"` — manter cast nas queries existentes.
+- Em telas com filtro `clientId === "all"` (visão interna), `SegmentSelect` deve mostrar ambos.
+- Garantir que ao trocar de cliente o estado `segment` seja saneado: `useEffect([clientId, availableSegments])` → se `segment !== "all"` e `!availableSegments.includes(segment)`, setar `"all"`.
