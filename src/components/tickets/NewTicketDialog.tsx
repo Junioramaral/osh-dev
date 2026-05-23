@@ -948,6 +948,25 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             </div>
           </div>
 
+          {/* Subcategory - logo abaixo de Categoria */}
+          {selectedCategoryId && subcategories && subcategories.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="subcategory">Subcategoria</Label>
+              <Select value={watch("subcategory") || ""} onValueChange={(value) => setValue("subcategory", value)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Selecione a subcategoria (opcional)" />
+                </SelectTrigger>
+                <SelectContent>
+                  {subcategories.map((sub) => (
+                    <SelectItem key={sub.id} value={sub.name}>
+                      {sub.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
+
           {/* 4. FAQ Selector - aparece após selecionar cliente */}
           {selectedClientId && (
             <FAQSelector
@@ -996,25 +1015,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               </div>
             ) : null;
           })()}
-
-          {/* Subcategory - only show if category is selected and has subcategories */}
-          {selectedCategoryId && subcategories && subcategories.length > 0 && (
-            <div className="space-y-2">
-              <Label htmlFor="subcategory">Subcategoria</Label>
-              <Select value={watch("subcategory") || ""} onValueChange={(value) => setValue("subcategory", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione a subcategoria (opcional)" />
-                </SelectTrigger>
-                <SelectContent>
-                  {subcategories.map((sub) => (
-                    <SelectItem key={sub.id} value={sub.name}>
-                      {sub.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
 
           {/* DB Specific Fields */}
           {segment === "DB" && (
