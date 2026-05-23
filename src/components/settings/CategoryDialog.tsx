@@ -107,6 +107,7 @@ export default function CategoryDialog({
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
       queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
       toast.success("Categoria criada com sucesso");
       onOpenChange(false);
@@ -132,6 +133,7 @@ export default function CategoryDialog({
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
       queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
       toast.success("Categoria atualizada com sucesso");
       onOpenChange(false);
