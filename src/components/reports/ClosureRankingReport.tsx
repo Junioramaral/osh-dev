@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { format, subMonths, startOfMonth, endOfMonth } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { ArrowLeft, FileDown, Trophy, Timer, Users, TrendingUp, TrendingDown, Minus, Star, ArrowLeftRight, UserMinus, UserPlus, Info } from "lucide-react";
@@ -335,16 +336,12 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
         <div className="flex gap-4 mb-6 print:hidden flex-wrap items-end">
           <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
 
-          <Select value={segment} onValueChange={setSegment}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Segmento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="DB">Database</SelectItem>
-              <SelectItem value="APP">Aplicação</SelectItem>
-            </SelectContent>
-          </Select>
+          <SegmentSelect
+            value={segment}
+            onValueChange={setSegment}
+            clientId={clientId}
+            className="w-[140px]"
+          />
 
           <Select value={clientId} onValueChange={setClientId}>
             <SelectTrigger className="w-[200px]">
@@ -438,16 +435,12 @@ const ClosureRankingReport = ({ onBack }: ClosureRankingReportProps) => {
           </div>
           
           <div className="flex gap-4">
-            <Select value={segment} onValueChange={setSegment}>
-              <SelectTrigger className="w-[140px]">
-                <SelectValue placeholder="Segmento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="DB">Database</SelectItem>
-                <SelectItem value="APP">Aplicação</SelectItem>
-              </SelectContent>
-            </Select>
+            <SegmentSelect
+              value={segment}
+              onValueChange={setSegment}
+              clientId={clientId}
+              className="w-[140px]"
+            />
 
             <Select value={clientId} onValueChange={setClientId}>
               <SelectTrigger className="w-[200px]">
