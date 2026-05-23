@@ -34,6 +34,16 @@ import { supabase } from "@/integrations/supabase/client";
 import type { Tables } from "@/integrations/supabase/types";
 import { FAQHistoryTab } from "./FAQHistoryTab";
 import { FAQLinkedTicketsTab } from "./FAQLinkedTicketsTab";
+import DOMPurify from "dompurify";
+
+const looksLikeHtml = (s: string) => /<\/?[a-z][\s\S]*>/i.test(s);
+const renderRich = (s: string) => {
+  if (!s) return { __html: "" };
+  const html = looksLikeHtml(s)
+    ? s
+    : s.replace(/\n/g, "<br/>");
+  return { __html: DOMPurify.sanitize(html) };
+};
 
 type FAQArticle = Tables<"faq_articles"> & {
   clients?: { name: string } | null;
@@ -212,9 +222,10 @@ export function FAQArticleViewDialog({
                 </div>
                 <Separator className="bg-yellow-600/20" />
                 <div className="bg-yellow-50 dark:bg-yellow-950/20 border border-yellow-200 dark:border-yellow-900/50 rounded-lg p-4">
-                  <p className="whitespace-pre-wrap text-foreground leading-relaxed">
-                    {article.symptoms}
-                  </p>
+                  <div
+                    className="faq-rich-content text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={renderRich(article.symptoms)}
+                  />
                 </div>
               </section>
             )}
@@ -230,9 +241,10 @@ export function FAQArticleViewDialog({
                 </div>
                 <Separator className="bg-red-600/20" />
                 <div className="bg-red-50 dark:bg-red-950/20 border border-red-200 dark:border-red-900/50 rounded-lg p-4">
-                  <p className="whitespace-pre-wrap text-foreground leading-relaxed">
-                    {article.problem}
-                  </p>
+                  <div
+                    className="faq-rich-content text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={renderRich(article.problem)}
+                  />
                 </div>
               </section>
             )}
@@ -248,9 +260,10 @@ export function FAQArticleViewDialog({
                 </div>
                 <Separator className="bg-green-600/20" />
                 <div className="bg-green-50 dark:bg-green-950/20 border border-green-200 dark:border-green-900/50 rounded-lg p-4">
-                  <p className="whitespace-pre-wrap text-foreground leading-relaxed">
-                    {article.solution}
-                  </p>
+                  <div
+                    className="faq-rich-content text-foreground leading-relaxed"
+                    dangerouslySetInnerHTML={renderRich(article.solution)}
+                  />
                 </div>
               </section>
             )}
