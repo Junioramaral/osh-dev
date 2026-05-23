@@ -98,11 +98,15 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
         <CardContent className="space-y-4">
           <div>
             <h4 className="font-medium mb-2 text-sm">Motivo da Abertura</h4>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.opening_reason}</p>
+            <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+              {ticket.opening_reason}
+            </div>
           </div>
           <div>
             <h4 className="font-medium mb-2 text-sm">Problema Enfrentado</h4>
-            <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.problem_faced}</p>
+            <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+              {ticket.problem_faced}
+            </div>
           </div>
           {ticket.error_displayed && (
             <div>
@@ -115,13 +119,17 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
           {ticket.reproduction_steps && (
             <div>
               <h4 className="font-medium mb-2 text-sm">Passos para Reprodução</h4>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.reproduction_steps}</p>
+              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+                {ticket.reproduction_steps}
+              </div>
             </div>
           )}
           {ticket.workaround && (
             <div>
               <h4 className="font-medium mb-2 text-sm">Workaround Aplicado</h4>
-              <p className="text-sm text-muted-foreground whitespace-pre-wrap">{ticket.workaround}</p>
+              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+                {ticket.workaround}
+              </div>
             </div>
           )}
         </CardContent>
