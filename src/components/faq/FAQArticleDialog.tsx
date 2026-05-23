@@ -38,6 +38,9 @@ import { Lock, Building2, Globe, Loader2, Paperclip, X, AlertTriangle, HelpCircl
 import { Database as DatabaseType, Json } from "@/integrations/supabase/types";
 import { FileUploadZone, FileWithPreview } from "@/components/tickets/FileUploadZone";
 
+const stripHtml = (html: string) =>
+  (html || "").replace(/<[^>]*>/g, "").replace(/&nbsp;/g, " ").trim();
+
 // Ícones SVG específicos para cada engine de banco de dados
 const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
   const iconProps = { className: "h-4 w-4 flex-shrink-0" };
@@ -693,13 +696,13 @@ export default function FAQArticleDialog({
                     <AlertTriangle className="h-4 w-4 text-yellow-500" />
                     Sintomas *
                   </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Descreva os sintomas observados pelo usuário..."
-                      className="min-h-[100px] resize-y"
-                      {...field}
-                    />
-                  </FormControl>
+                   <FormControl>
+                     <RichTextEditor
+                       value={field.value || ""}
+                       onChange={field.onChange}
+                       placeholder="Descreva os sintomas observados pelo usuário..."
+                     />
+                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -715,13 +718,13 @@ export default function FAQArticleDialog({
                     <HelpCircle className="h-4 w-4 text-red-500" />
                     Problema *
                   </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Descreva a causa raiz do problema..."
-                      className="min-h-[100px] resize-y"
-                      {...field}
-                    />
-                  </FormControl>
+                   <FormControl>
+                     <RichTextEditor
+                       value={field.value || ""}
+                       onChange={field.onChange}
+                       placeholder="Descreva a causa raiz do problema..."
+                     />
+                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
@@ -737,13 +740,13 @@ export default function FAQArticleDialog({
                     <CheckCircle className="h-4 w-4 text-green-500" />
                     Solução *
                   </FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Descreva os passos para resolver o problema..."
-                      className="min-h-[100px] resize-y"
-                      {...field}
-                    />
-                  </FormControl>
+                   <FormControl>
+                     <RichTextEditor
+                       value={field.value || ""}
+                       onChange={field.onChange}
+                       placeholder="Descreva os passos para resolver o problema..."
+                     />
+                   </FormControl>
                   <FormMessage />
                 </FormItem>
               )}
