@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -96,16 +97,7 @@ const CategoriesReport = ({ onBack }: CategoriesReportProps) => {
         {/* Filters - Hide on print */}
         <div className="flex gap-4 print:hidden flex-wrap items-end">
           <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
-          <Select value={segment} onValueChange={setSegment}>
-            <SelectTrigger className="w-48">
-              <SelectValue placeholder="Segmento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos</SelectItem>
-              <SelectItem value="DB">Banco de Dados</SelectItem>
-              <SelectItem value="APP">Aplicação</SelectItem>
-            </SelectContent>
-          </Select>
+          <SegmentSelect value={segment} onValueChange={setSegment} className="w-48" />
         </div>
 
         {/* Report Content - Print Wrapper */}
