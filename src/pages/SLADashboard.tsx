@@ -23,6 +23,7 @@ import {
 import { format, differenceInMinutes, subDays, startOfDay, endOfDay } from "date-fns";
 import { PieChart, Pie, Cell, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Legend, ResponsiveContainer, ReferenceLine } from "recharts";
 import { calculateSLAStatus, formatDuration, type SLAStatus } from "@/lib/ticketUtils";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 
 const SLADashboard = () => {
   const { profile, hasRole, isSuperAdmin, tenantId } = useAuth();
@@ -300,16 +301,11 @@ const SLADashboard = () => {
 
               <div>
                 <label className="text-sm font-medium mb-2 block">Segmento</label>
-                <Select value={segment} onValueChange={setSegment}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos</SelectItem>
-                    <SelectItem value="DB">Database (DB)</SelectItem>
-                    <SelectItem value="APP">Aplicativos (APP)</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SegmentSelect
+                  value={segment}
+                  onValueChange={setSegment}
+                  clientId={clientId}
+                />
               </div>
 
               <div>

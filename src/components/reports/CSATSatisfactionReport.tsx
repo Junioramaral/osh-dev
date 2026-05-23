@@ -1,4 +1,5 @@
 import { useState, useMemo } from "react";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -287,14 +288,12 @@ export default function CSATSatisfactionReport({ onBack }: Props) {
           <CardContent className="pt-6 space-y-3">
             <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
             <div className="flex gap-3 flex-wrap">
-              <Select value={segment} onValueChange={setSegment}>
-                <SelectTrigger className="w-44"><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos os Segmentos</SelectItem>
-                  <SelectItem value="DB">Banco de Dados</SelectItem>
-                  <SelectItem value="APP">Aplicação</SelectItem>
-                </SelectContent>
-              </Select>
+              <SegmentSelect
+                value={segment}
+                onValueChange={setSegment}
+                clientId={clientId}
+                className="w-44"
+              />
               <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? undefined : v)}>
                 <SelectTrigger className="w-56"><SelectValue placeholder="Cliente" /></SelectTrigger>
                 <SelectContent>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -120,16 +121,7 @@ export default function ResolutionTimeReport({ onBack }: ResolutionTimeReportPro
             <div className="flex gap-4 flex-wrap items-end">
               <ReportPeriodFilter value={periodState} onChange={setPeriodState} allowComparison={false} />
               <div className="w-48">
-                <Select value={segment} onValueChange={setSegment}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Segmento" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todos os Segmentos</SelectItem>
-                    <SelectItem value="DB">Banco de Dados</SelectItem>
-                    <SelectItem value="APP">Aplicação</SelectItem>
-                  </SelectContent>
-                </Select>
+                <SegmentSelect value={segment} onValueChange={setSegment} />
               </div>
             </div>
           </CardContent>

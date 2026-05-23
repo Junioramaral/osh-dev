@@ -29,6 +29,7 @@ import { ReleaseTicketDialog } from "@/components/tickets/ReleaseTicketDialog";
 import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 import { useDeleteTickets } from "@/hooks/useDeleteTickets";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { cn } from "@/lib/utils";
 
 export default function Tickets() {
@@ -620,16 +621,13 @@ export default function Tickets() {
               <SelectItem value="rfc">RFC</SelectItem>
             </SelectContent>
           </Select>
-          <Select value={segmentFilter} onValueChange={setSegmentFilter}>
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Segmento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Segmentos</SelectItem>
-              <SelectItem value="DB">DB</SelectItem>
-              <SelectItem value="APP">APP</SelectItem>
-            </SelectContent>
-          </Select>
+          <SegmentSelect
+            value={segmentFilter}
+            onValueChange={setSegmentFilter}
+            clientId={clientFilter}
+            shortLabels
+            className="w-[180px]"
+          />
 
           {isOtimizzoUser && (
             <Select value={clientFilter} onValueChange={setClientFilter}>

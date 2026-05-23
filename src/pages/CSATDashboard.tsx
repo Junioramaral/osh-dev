@@ -1,5 +1,6 @@
 import { useState } from "react";
 import AppLayout from "@/components/layout/AppLayout";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -97,16 +98,12 @@ const CSATDashboard = () => {
             allowComparison={false}
           />
           <div className="flex flex-wrap gap-4">
-            <Select value={segment} onValueChange={setSegment}>
-              <SelectTrigger className="w-40">
-                <SelectValue placeholder="Segmento" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="DB">Banco de Dados</SelectItem>
-                <SelectItem value="APP">Aplicação</SelectItem>
-              </SelectContent>
-            </Select>
+            <SegmentSelect
+              value={segment}
+              onValueChange={setSegment}
+              clientId={clientId}
+              className="w-40"
+            />
 
             <Select value={clientId || "all"} onValueChange={(v) => setClientId(v === "all" ? undefined : v)}>
               <SelectTrigger className="w-48">
