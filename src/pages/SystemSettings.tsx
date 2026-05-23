@@ -456,6 +456,7 @@ export default function SystemSettings() {
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
       queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
       toast.success("Status atualizado");
     },
@@ -474,6 +475,7 @@ export default function SystemSettings() {
       if (error) throw error;
     },
     onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
       queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
       toast.success("Categoria removida");
       setDeleteCategoryId(null);
