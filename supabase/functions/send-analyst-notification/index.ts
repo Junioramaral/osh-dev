@@ -123,55 +123,41 @@ const handler = async (req: Request): Promise<Response> => {
       html: `
         <!DOCTYPE html>
         <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background-color: #10b981; padding: 20px; border-radius: 8px 8px 0 0; }
-            .header h2 { margin: 0; color: #ffffff; }
-            .content { background-color: #ffffff; padding: 20px; border: 1px solid #e9ecef; }
-            .comment-box { background-color: #f0fdf4; padding: 15px; border-left: 4px solid #10b981; margin: 20px 0; }
-            .footer { background-color: #f8f9fa; padding: 15px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 8px 8px; }
-            .ticket-info { background-color: #ecfdf5; padding: 10px; border-radius: 4px; margin: 15px 0; }
-            .action-btn { display: inline-block; background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin-top: 15px; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <h2>📩 Nova Resposta do Cliente</h2>
-            </div>
-            
-            <div class="content">
-              <p>Olá <strong>${analystName}</strong>,</p>
-              
-              <p>O cliente respondeu ao ticket que você está atendendo:</p>
-              
-              <div class="ticket-info">
-                <strong>Ticket:</strong> #${ticketNumber}<br>
-                <strong>Título:</strong> ${ticketTitle}
-              </div>
-              
-              <div class="comment-box">
-                <p style="margin: 0 0 10px 0;"><strong>Cliente:</strong> ${clientName}</p>
-                <p style="margin: 0 0 10px 0;"><strong>Email:</strong> ${clientEmail}</p>
-                <p style="margin: 0 0 10px 0;"><strong>Data:</strong> ${currentDate}</p>
-                <hr style="border: none; border-top: 1px solid #bbf7d0; margin: 10px 0;">
-                <p style="white-space: pre-wrap;">${commentContent}</p>
-              </div>
-              
-              <p style="color: #6c757d; font-size: 14px;">
-                Acesse o sistema para responder ao cliente.
-              </p>
-            </div>
-            
-            <div class="footer">
-              <p style="margin: 5px 0;">Sistema de Tickets<br><strong>Otimizzo</strong></p>
-              <p style="margin: 5px 0; font-size: 11px; color: #999;">
-                Ticket #${ticketNumber}
-              </p>
-            </div>
-          </div>
+        <head><meta charset="UTF-8"></head>
+        <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f5;padding:20px 0;">
+            <tr><td align="center">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e9ecef;">
+                <tr><td style="background-color:#10b981;padding:20px;">
+                  <h2 style="margin:0;color:#ffffff;font-size:22px;">📩 Nova Resposta do Cliente</h2>
+                </td></tr>
+                <tr><td style="padding:20px;">
+                  <p style="margin:0 0 12px;">Olá <strong>${analystName}</strong>,</p>
+                  <p style="margin:0 0 12px;">O cliente respondeu ao ticket que você está atendendo:</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#ecfdf5;margin:15px 0;">
+                    <tr><td style="padding:10px;font-size:14px;">
+                      <strong>Ticket:</strong> #${ticketNumber}<br>
+                      <strong>Título:</strong> ${ticketTitle}
+                    </td></tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f0fdf4;border-left:4px solid #10b981;margin:20px 0;">
+                    <tr><td style="padding:15px;">
+                      <p style="margin:0 0 10px;"><strong>Cliente:</strong> ${clientName}</p>
+                      <p style="margin:0 0 10px;"><strong>Email:</strong> ${clientEmail}</p>
+                      <p style="margin:0 0 10px;"><strong>Data:</strong> ${currentDate}</p>
+                      <hr style="border:none;border-top:1px solid #bbf7d0;margin:10px 0;">
+                      <p style="white-space:pre-wrap;margin:0;">${commentContent}</p>
+                    </td></tr>
+                  </table>
+                  <p style="color:#6c757d;font-size:14px;margin:15px 0 0;">Acesse o sistema para responder ao cliente.</p>
+                </td></tr>
+                <tr><td style="background-color:#f8f9fa;padding:15px;text-align:center;font-size:12px;color:#6c757d;">
+                  <p style="margin:5px 0;">Sistema de Tickets<br><strong>Otimizzo</strong></p>
+                  <p style="margin:5px 0;font-size:11px;color:#999;">Ticket #${ticketNumber}</p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
         </body>
         </html>
       `,

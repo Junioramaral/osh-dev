@@ -142,99 +142,66 @@ const handler = async (req: Request): Promise<Response> => {
       html: `
         <!DOCTYPE html>
         <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: linear-gradient(135deg, #28a745 0%, #20c997 100%); padding: 30px 20px; border-radius: 8px 8px 0 0; text-align: center; }
-            .header h2 { margin: 0; color: #ffffff; font-size: 24px; }
-            .header .icon { font-size: 48px; margin-bottom: 10px; }
-            .status-badge { display: inline-block; background: #ffffff; color: #28a745; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-top: 15px; }
-            .content { background-color: #ffffff; padding: 25px; border: 1px solid #e9ecef; border-top: none; }
-            .ticket-info { background-color: #d4edda; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid #28a745; }
-            .ticket-info p { margin: 5px 0; font-size: 14px; }
-            .ticket-info strong { color: #155724; }
-            .resolution-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid #28a745; margin: 20px 0; }
-            .resolution-box h4 { margin: 0 0 10px 0; color: #28a745; font-size: 16px; }
-            .resolution-box p { margin: 10px 0; white-space: pre-wrap; }
-            .resolution-box .analyst { font-size: 12px; color: #6c757d; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6; }
-            .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 8px 8px; border: 1px solid #e9ecef; border-top: none; }
-            .feedback-note { background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center; }
-            .feedback-note p { margin: 0; font-size: 14px; color: #856404; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="icon">✅</div>
-              <h2>Ticket Resolvido</h2>
-              <span class="status-badge">RESOLVIDO</span>
-            </div>
-            
-            <div class="content">
-              <p>Olá <strong>${contactName}</strong>,</p>
-              
-              <p>Temos o prazer de informar que seu ticket foi <strong>resolvido</strong>!</p>
-              
-              <div class="ticket-info">
-                <p><strong>Ticket:</strong> #${ticketNumber}</p>
-                <p><strong>Título:</strong> ${ticketTitle}</p>
-                <p><strong>Data de Abertura:</strong> ${formatDate(createdAt)}</p>
-                <p><strong>Data de Resolução:</strong> ${formatDate(resolvedAt)}</p>
-              </div>
-              
-              <div class="resolution-box">
-                <h4>📋 Motivo da Resolução</h4>
-                <p>${resolutionReason}</p>
-                <p class="analyst">Resolvido por: <strong>${analystName}</strong></p>
-              </div>
-              
-              <!-- CSAT Feedback Section -->
-              <div style="text-align: center; margin: 30px 0; padding: 25px; background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 12px;">
-                <h3 style="margin: 0 0 10px 0; color: #333; font-size: 18px;">⭐ Como foi nosso atendimento?</h3>
-                <p style="margin: 0 0 20px 0; color: #666; font-size: 14px;">Sua opinião é muito importante para nós</p>
-                
-                <div style="margin: 20px 0;">
-                  <a href="${feedbackUrl}?rating=1" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
-                  <a href="${feedbackUrl}?rating=2" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
-                  <a href="${feedbackUrl}?rating=3" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
-                  <a href="${feedbackUrl}?rating=4" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
-                  <a href="${feedbackUrl}?rating=5" style="text-decoration: none; font-size: 28px; margin: 0 5px;">⭐</a>
-                </div>
-                
-                <p style="margin: 0 0 15px 0; font-size: 12px; color: #888;">
-                  Clique em uma estrela para avaliar rapidamente
-                </p>
-                
-                <a href="${feedbackUrl}" style="
-                  display: inline-block;
-                  background: linear-gradient(135deg, #28a745 0%, #20c997 100%);
-                  color: white;
-                  padding: 12px 28px;
-                  border-radius: 25px;
-                  text-decoration: none;
-                  font-weight: bold;
-                  font-size: 14px;
-                  box-shadow: 0 4px 15px rgba(40, 167, 69, 0.3);
-                ">
-                  Avaliar Atendimento
-                </a>
-              </div>
-              
-              <div class="feedback-note">
-                <p>💬 Se o problema não foi totalmente resolvido ou se você tiver alguma dúvida,<br>
-                <strong>basta responder este email</strong> e reabriremos seu ticket.</p>
-              </div>
-            </div>
-            
-            <div class="footer">
-              <p style="margin: 5px 0;">Agradecemos por utilizar nossos serviços!</p>
-              <p style="margin: 5px 0;"><strong>Equipe Otimizzo</strong></p>
-              <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">
-                Este email foi enviado em resposta ao Ticket #${ticketNumber}
-              </p>
-            </div>
-          </div>
+        <head><meta charset="UTF-8"></head>
+        <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f5;padding:20px 0;">
+            <tr><td align="center">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e9ecef;">
+                <tr><td style="background-color:#28a745;padding:30px 20px;text-align:center;">
+                  <div style="font-size:48px;line-height:1;margin-bottom:10px;">✅</div>
+                  <h2 style="margin:0;color:#ffffff;font-size:24px;">Ticket Resolvido</h2>
+                  <div style="margin-top:15px;">
+                    <span style="display:inline-block;background:#ffffff;color:#28a745;padding:8px 20px;font-weight:bold;font-size:14px;">RESOLVIDO</span>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:25px;">
+                  <p style="margin:0 0 12px;">Olá <strong>${contactName}</strong>,</p>
+                  <p style="margin:0 0 12px;">Temos o prazer de informar que seu ticket foi <strong>resolvido</strong>!</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#d4edda;border-left:4px solid #28a745;margin:20px 0;">
+                    <tr><td style="padding:15px;font-size:14px;color:#155724;">
+                      <p style="margin:5px 0;"><strong>Ticket:</strong> #${ticketNumber}</p>
+                      <p style="margin:5px 0;"><strong>Título:</strong> ${ticketTitle}</p>
+                      <p style="margin:5px 0;"><strong>Data de Abertura:</strong> ${formatDate(createdAt)}</p>
+                      <p style="margin:5px 0;"><strong>Data de Resolução:</strong> ${formatDate(resolvedAt)}</p>
+                    </td></tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8f9fa;border-left:4px solid #28a745;margin:20px 0;">
+                    <tr><td style="padding:20px;">
+                      <h4 style="margin:0 0 10px;color:#28a745;font-size:16px;">📋 Motivo da Resolução</h4>
+                      <p style="margin:10px 0;white-space:pre-wrap;">${resolutionReason}</p>
+                      <p style="font-size:12px;color:#6c757d;margin:15px 0 0;padding-top:10px;border-top:1px solid #dee2e6;">Resolvido por: <strong>${analystName}</strong></p>
+                    </td></tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8f9fa;margin:30px 0;">
+                    <tr><td style="padding:25px;text-align:center;">
+                      <h3 style="margin:0 0 10px;color:#333;font-size:18px;">⭐ Como foi nosso atendimento?</h3>
+                      <p style="margin:0 0 20px;color:#666;font-size:14px;">Sua opinião é muito importante para nós</p>
+                      <div style="margin:20px 0;font-size:28px;line-height:1;">
+                        <a href="${feedbackUrl}?rating=1" style="text-decoration:none;margin:0 5px;color:#f5b301;">★</a>
+                        <a href="${feedbackUrl}?rating=2" style="text-decoration:none;margin:0 5px;color:#f5b301;">★</a>
+                        <a href="${feedbackUrl}?rating=3" style="text-decoration:none;margin:0 5px;color:#f5b301;">★</a>
+                        <a href="${feedbackUrl}?rating=4" style="text-decoration:none;margin:0 5px;color:#f5b301;">★</a>
+                        <a href="${feedbackUrl}?rating=5" style="text-decoration:none;margin:0 5px;color:#f5b301;">★</a>
+                      </div>
+                      <p style="margin:0 0 15px;font-size:12px;color:#888;">Clique em uma estrela para avaliar rapidamente</p>
+                      <a href="${feedbackUrl}" style="display:inline-block;background-color:#28a745;color:#ffffff;padding:12px 28px;text-decoration:none;font-weight:bold;font-size:14px;">Avaliar Atendimento</a>
+                    </td></tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff3cd;margin:20px 0;">
+                    <tr><td style="padding:15px;text-align:center;font-size:14px;color:#856404;">
+                      💬 Se o problema não foi totalmente resolvido ou se você tiver alguma dúvida,<br>
+                      <strong>basta responder este email</strong> e reabriremos seu ticket.
+                    </td></tr>
+                  </table>
+                </td></tr>
+                <tr><td style="background-color:#f8f9fa;padding:20px;text-align:center;font-size:12px;color:#6c757d;">
+                  <p style="margin:5px 0;">Agradecemos por utilizar nossos serviços!</p>
+                  <p style="margin:5px 0;"><strong>Equipe Otimizzo</strong></p>
+                  <p style="margin:10px 0 0;font-size:11px;color:#999;">Este email foi enviado em resposta ao Ticket #${ticketNumber}</p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
         </body>
         </html>
       `,
