@@ -684,6 +684,19 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   });
 
   const onSubmit = async (data: TicketFormData) => {
+    // Subcategoria é obrigatória quando a categoria selecionada tem subcategorias disponíveis
+    if (subcategories && subcategories.length > 0 && !data.subcategory) {
+      form.setError("subcategory", {
+        type: "manual",
+        message: "Subcategoria é obrigatória",
+      });
+      toast({
+        title: "Subcategoria obrigatória",
+        description: "Selecione uma subcategoria para a categoria escolhida.",
+        variant: "destructive",
+      });
+      return;
+    }
     console.log("📝 Criando ticket com dados:", data);
     console.log("❌ Erros de validação:", errors);
 
