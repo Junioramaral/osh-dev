@@ -3,6 +3,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
+import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -305,22 +306,14 @@ export default function FAQ() {
             </Select>
           )}
 
-          <Select
+          <SegmentSelect
             value={segmentFilter}
             onValueChange={(v) => {
               setSegmentFilter(v);
               setSegmentTypeFilter("all");
             }}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Segmento" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos Segmentos</SelectItem>
-              <SelectItem value="DB">Banco de Dados</SelectItem>
-              <SelectItem value="APP">Aplicação</SelectItem>
-            </SelectContent>
-          </Select>
+            className="w-[180px]"
+          />
 
           {segmentFilter === "DB" && (
             <Select value={segmentTypeFilter} onValueChange={setSegmentTypeFilter}>
