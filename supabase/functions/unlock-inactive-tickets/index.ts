@@ -96,6 +96,7 @@ serve(async (req) => {
         lock_owner_id: null,
         lock_at: null,
         unlocked_at: new Date().toISOString(),
+        status: "liberado",
       })
       .in("id", ticketIds);
 

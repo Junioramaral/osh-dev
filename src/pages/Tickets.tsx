@@ -39,6 +39,7 @@ export default function Tickets() {
   const STATUS_OPTIONS: { value: string; label: string }[] = [
     { value: "rascunho", label: "Rascunho" },
     { value: "novo", label: "Novo" },
+    { value: "liberado", label: "Liberado" },
     { value: "em_atendimento", label: "Em Atendimento" },
     { value: "aguardando_cliente", label: "Aguardando Cliente" },
     { value: "aguardando_aprovacao", label: "Aguardando Aprovação" },
@@ -46,7 +47,7 @@ export default function Tickets() {
     { value: "resolvido", label: "Resolvido" },
     { value: "fechado", label: "Fechado" },
   ];
-  const DEFAULT_STATUS_FILTERS = ["rascunho", "novo", "em_atendimento", "aguardando_cliente", "aguardando_aprovacao", "aprovado"];
+  const DEFAULT_STATUS_FILTERS = ["rascunho", "novo", "liberado", "em_atendimento", "aguardando_cliente", "aguardando_aprovacao", "aprovado"];
   const [statusFilters, setStatusFilters] = useState<string[]>(DEFAULT_STATUS_FILTERS);
   const [segmentFilter, setSegmentFilter] = useState<string>("all");
   const [clientFilter, setClientFilter] = useState<string>("all");
@@ -490,6 +491,7 @@ export default function Tickets() {
     const statusPriority: Record<string, number> = {
       'rascunho': 0,
       'novo': 0,
+      'liberado': 0,
       'em_atendimento': 1,
       'aguardando_cliente': 2,
       'resolvido': 3,

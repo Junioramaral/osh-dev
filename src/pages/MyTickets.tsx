@@ -399,6 +399,7 @@ export default function MyTickets() {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
       'novo': 0,
+      'liberado': 0,
       'em_atendimento': 1,
       'aguardando_cliente': 2,
       'resolvido': 3,
@@ -469,6 +470,7 @@ export default function MyTickets() {
             <SelectContent>
               <SelectItem value="all">Todos Status</SelectItem>
               <SelectItem value="novo">Novo</SelectItem>
+              <SelectItem value="liberado">Liberado</SelectItem>
               <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
               <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
               <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
