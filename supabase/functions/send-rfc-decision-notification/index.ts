@@ -84,9 +84,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const isApproved = decision === "aprovada";
-    const headerColor = isApproved
-      ? "linear-gradient(135deg, #28a745 0%, #20c997 100%)"
-      : "linear-gradient(135deg, #dc3545 0%, #e74c3c 100%)";
+    const headerColor = isApproved ? "#28a745" : "#dc3545";
     const badgeColor = isApproved ? "#28a745" : "#dc3545";
     const badgeText = isApproved ? "APROVADA" : "REJEITADA";
     const icon = isApproved ? "✅" : "❌";
@@ -98,11 +96,11 @@ const handler = async (req: Request): Promise<Response> => {
     const commentColor = isApproved ? "#28a745" : "#dc3545";
 
     const rejectedNote = !isApproved
-      ? `<div style="background-color: #fff3cd; padding: 15px; border-radius: 8px; margin: 20px 0; text-align: center;">
-          <p style="margin: 0; font-size: 14px; color: #856404;">
+      ? `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#fff3cd;margin:20px 0;">
+          <tr><td style="padding:15px;text-align:center;font-size:14px;color:#856404;">
             ⚠️ A RFC retornou para <strong>rascunho</strong>. Faça os ajustes necessários e reenvie para aprovação.
-          </p>
-        </div>`
+          </td></tr>
+        </table>`
       : "";
 
     const subject = `[RFC #${ticketNumber}] ${isApproved ? "Aprovada" : "Rejeitada"} - ${ticketTitle}`;
@@ -116,59 +114,43 @@ const handler = async (req: Request): Promise<Response> => {
       html: `
         <!DOCTYPE html>
         <html>
-        <head>
-          <style>
-            body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; margin: 0; padding: 0; }
-            .container { max-width: 600px; margin: 0 auto; padding: 20px; }
-            .header { background: ${headerColor}; padding: 30px 20px; border-radius: 8px 8px 0 0; text-align: center; }
-            .header h2 { margin: 0; color: #ffffff; font-size: 24px; }
-            .header .icon { font-size: 48px; margin-bottom: 10px; }
-            .status-badge { display: inline-block; background: #ffffff; color: ${badgeColor}; padding: 8px 20px; border-radius: 20px; font-weight: bold; font-size: 14px; margin-top: 15px; }
-            .content { background-color: #ffffff; padding: 25px; border: 1px solid #e9ecef; border-top: none; }
-            .ticket-info { background-color: ${infoBg}; padding: 15px; border-radius: 8px; margin: 20px 0; border-left: 4px solid ${infoBorder}; }
-            .ticket-info p { margin: 5px 0; font-size: 14px; }
-            .ticket-info strong { color: ${infoTextColor}; }
-            .comment-box { background-color: #f8f9fa; padding: 20px; border-radius: 8px; border-left: 4px solid ${commentBorder}; margin: 20px 0; }
-            .comment-box h4 { margin: 0 0 10px 0; color: ${commentColor}; font-size: 16px; }
-            .comment-box p { margin: 10px 0; white-space: pre-wrap; }
-            .comment-box .gestor { font-size: 12px; color: #6c757d; margin-top: 15px; padding-top: 10px; border-top: 1px solid #dee2e6; }
-            .footer { background-color: #f8f9fa; padding: 20px; text-align: center; font-size: 12px; color: #6c757d; border-radius: 0 0 8px 8px; border: 1px solid #e9ecef; border-top: none; }
-          </style>
-        </head>
-        <body>
-          <div class="container">
-            <div class="header">
-              <div class="icon">${icon}</div>
-              <h2>RFC ${isApproved ? "Aprovada" : "Rejeitada"}</h2>
-              <span class="status-badge">${badgeText}</span>
-            </div>
-            
-            <div class="content">
-              <p>Olá <strong>${contactName}</strong>,</p>
-              
-              <p>Informamos que sua RFC foi <strong>${statusLabel}</strong>.</p>
-              
-              <div class="ticket-info">
-                <p><strong>RFC:</strong> #${ticketNumber}</p>
-                <p><strong>Título:</strong> ${ticketTitle}</p>
-              </div>
-              
-              <div class="comment-box">
-                <h4>💬 Comentário do Gestor</h4>
-                <p>${comentario}</p>
-                <p class="gestor">Decisão por: <strong>${gestorName}</strong></p>
-              </div>
-              
-              ${rejectedNote}
-            </div>
-            
-            <div class="footer">
-              <p style="margin: 5px 0;"><strong>Equipe Otimizzo</strong></p>
-              <p style="margin: 10px 0 0 0; font-size: 11px; color: #999;">
-                Este email foi enviado em referência à RFC #${ticketNumber}
-              </p>
-            </div>
-          </div>
+        <head><meta charset="UTF-8"></head>
+        <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f5;padding:20px 0;">
+            <tr><td align="center">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e9ecef;">
+                <tr><td style="background-color:${headerColor};padding:30px 20px;text-align:center;">
+                  <div style="font-size:48px;line-height:1;margin-bottom:10px;">${icon}</div>
+                  <h2 style="margin:0;color:#ffffff;font-size:24px;">RFC ${isApproved ? "Aprovada" : "Rejeitada"}</h2>
+                  <div style="margin-top:15px;">
+                    <span style="display:inline-block;background:#ffffff;color:${badgeColor};padding:8px 20px;font-weight:bold;font-size:14px;">${badgeText}</span>
+                  </div>
+                </td></tr>
+                <tr><td style="padding:25px;">
+                  <p style="margin:0 0 12px;">Olá <strong>${contactName}</strong>,</p>
+                  <p style="margin:0 0 12px;">Informamos que sua RFC foi <strong>${statusLabel}</strong>.</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${infoBg};border-left:4px solid ${infoBorder};margin:20px 0;">
+                    <tr><td style="padding:15px;font-size:14px;color:${infoTextColor};">
+                      <p style="margin:5px 0;"><strong>RFC:</strong> #${ticketNumber}</p>
+                      <p style="margin:5px 0;"><strong>Título:</strong> ${ticketTitle}</p>
+                    </td></tr>
+                  </table>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8f9fa;border-left:4px solid ${commentBorder};margin:20px 0;">
+                    <tr><td style="padding:20px;">
+                      <h4 style="margin:0 0 10px;color:${commentColor};font-size:16px;">💬 Comentário do Gestor</h4>
+                      <p style="margin:10px 0;white-space:pre-wrap;">${comentario}</p>
+                      <p style="font-size:12px;color:#6c757d;margin:15px 0 0;padding-top:10px;border-top:1px solid #dee2e6;">Decisão por: <strong>${gestorName}</strong></p>
+                    </td></tr>
+                  </table>
+                  ${rejectedNote}
+                </td></tr>
+                <tr><td style="background-color:#f8f9fa;padding:20px;text-align:center;font-size:12px;color:#6c757d;">
+                  <p style="margin:5px 0;"><strong>Equipe Otimizzo</strong></p>
+                  <p style="margin:10px 0 0;font-size:11px;color:#999;">Este email foi enviado em referência à RFC #${ticketNumber}</p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
         </body>
         </html>
       `,

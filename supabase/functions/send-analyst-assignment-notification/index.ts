@@ -74,30 +74,35 @@ serve(async (req) => {
       html: `
         <!DOCTYPE html>
         <html>
-        <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
-          <div style="max-width: 600px; margin: 0 auto; padding: 20px;">
-            <div style="background-color: #2563eb; padding: 20px; border-radius: 8px 8px 0 0;">
-              <h2 style="margin: 0; color: #ffffff;">🎯 Novo ${label} Atribuído</h2>
-            </div>
-            <div style="background:#fff; padding:20px; border:1px solid #e9ecef;">
-              <p>Olá <strong>${analystName}</strong>,</p>
-              <p>Você foi atribuído ao ${label.toLowerCase()} abaixo:</p>
-              <div style="background:#eff6ff; padding:12px; border-left:4px solid #2563eb; margin:15px 0;">
-                <p style="margin:0;"><strong>${label}:</strong> #${ticket.ticket_number}</p>
-                <p style="margin:6px 0 0;"><strong>Título:</strong> ${ticket.title}</p>
-                <p style="margin:6px 0 0;"><strong>Cliente:</strong> ${clientName}</p>
-                <p style="margin:6px 0 0;"><strong>Prioridade:</strong> ${ticket.priority}</p>
-              </div>
-              <p style="margin-top:20px;">
-                <a href="${link}" style="display:inline-block; background:#2563eb; color:#fff; padding:12px 24px; text-decoration:none; border-radius:6px;">
-                  Abrir ${label}
-                </a>
-              </p>
-            </div>
-            <div style="background:#f8f9fa; padding:15px; text-align:center; font-size:12px; color:#6c757d; border-radius:0 0 8px 8px;">
-              <p style="margin:5px 0;">Sistema de Tickets · <strong>Otimizzo</strong></p>
-            </div>
-          </div>
+        <head><meta charset="UTF-8"></head>
+        <body style="margin:0;padding:0;background-color:#f5f5f5;font-family:Arial,sans-serif;line-height:1.6;color:#333;">
+          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f5f5f5;padding:20px 0;">
+            <tr><td align="center">
+              <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="max-width:600px;width:100%;background-color:#ffffff;border:1px solid #e9ecef;">
+                <tr><td style="background-color:#2563eb;padding:20px;">
+                  <h2 style="margin:0;color:#ffffff;font-size:22px;">🎯 Novo ${label} Atribuído</h2>
+                </td></tr>
+                <tr><td style="padding:20px;">
+                  <p style="margin:0 0 12px;">Olá <strong>${analystName}</strong>,</p>
+                  <p style="margin:0 0 12px;">Você foi atribuído ao ${label.toLowerCase()} abaixo:</p>
+                  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#eff6ff;border-left:4px solid #2563eb;margin:15px 0;">
+                    <tr><td style="padding:12px;font-size:14px;">
+                      <p style="margin:0;"><strong>${label}:</strong> #${ticket.ticket_number}</p>
+                      <p style="margin:6px 0 0;"><strong>Título:</strong> ${ticket.title}</p>
+                      <p style="margin:6px 0 0;"><strong>Cliente:</strong> ${clientName}</p>
+                      <p style="margin:6px 0 0;"><strong>Prioridade:</strong> ${ticket.priority}</p>
+                    </td></tr>
+                  </table>
+                  <p style="margin-top:20px;">
+                    <a href="${link}" style="display:inline-block;background-color:#2563eb;color:#ffffff;padding:12px 24px;text-decoration:none;font-weight:bold;">Abrir ${label}</a>
+                  </p>
+                </td></tr>
+                <tr><td style="background-color:#f8f9fa;padding:15px;text-align:center;font-size:12px;color:#6c757d;">
+                  <p style="margin:5px 0;">Sistema de Tickets · <strong>Otimizzo</strong></p>
+                </td></tr>
+              </table>
+            </td></tr>
+          </table>
         </body>
         </html>
       `,
