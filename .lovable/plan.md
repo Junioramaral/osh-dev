@@ -1,32 +1,52 @@
-## Causa raiz
+## Objetivo
 
-Na tela de Configurações do Sistema, a **lista de categorias** é carregada com a query key `["ticket_categories_with_counts"]` (linha 243 de `SystemSettings.tsx`), mas todas as mutations (criar, editar, ativar/inativar, remover) invalidam uma chave diferente: `["ticket_categories"]`.
+Substituir os campos `Textarea` simples de **Sintomas**, **Problema** e **Solução** no diálogo de criação/edição de artigos da Base de Conhecimento por um editor rich text (estilo Word), com: negrito, itálico, sublinhado, tachado, títulos (H1/H2/H3), lista com marcadores, lista numerada, alinhamento (esquerda/centro/direita/justificado), tamanho/família de fonte, cor de texto, link, desfazer/refazer e limpar formatação.
 
-Como as chaves não batem, o React Query nunca refaz o fetch da lista visível — só quando a página recarrega e a query roda do zero. É exatamente isso que você está observando.
+## Abordagem técnica
 
-Locais afetados pelo mesmo bug:
-- `src/pages/SystemSettings.tsx` linha 459 — toggle ativo/inativo da categoria
-- `src/pages/SystemSettings.tsx` linha 477 — delete da categoria
-- `src/components/settings/CategoryDialog.tsx` linhas 113 e 137 — create e update da categoria
+Usar **TipTap** (`@tiptap/react` + `@tiptap/starter-kit` + extensões: `underline`, `text-align`, `text-style`, `color`, `font-family`, `link`). É leve, headless e se integra bem com React Hook Form. Os campos passarão a armazenar **HTML** (string), mantendo compatibilidade com o schema atual (colunas `text` em `faq_articles.symptoms/problem/solution`).
 
-## Correção
+## Itens da implementação
 
-Trocar a invalidação em todos os 4 pontos acima para invalidar **ambas** as chaves, garantindo que tanto a lista da tela quanto qualquer outro consumidor sejam atualizados:
+1. **Novo componente** `src/components/ui/rich-text-editor.tsx`
+   - Toolbar fixa no topo com botões agrupados:
+     - Família de fonte (select) + Tamanho (select com presets: 12/14/16/18/20/24/28)
+     - B / I / U / S (tachado)
+     - H1 / H2 / H3 / parágrafo
+     - Lista com marcadores / Lista numerada
+     - Alinhamento: esquerda / centro / direita / justificado
+     - Cor do texto (color picker)
+     - Inserir link / remover link
+     - Desfazer / refazer / limpar formatação
+   - Props: `value: string`, `onChange: (html: string) => void`, `placeholder?: string`, `minHeight?: string`, `error?: boolean`
+   - Estilizado via tokens semânticos (`border-input`, `bg-background`, `text-foreground`, `ring-ring`) para casar com o restante do design system, em vez de cores hardcoded.
 
-```ts
-queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
-queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
-```
+2. **Estilos do conteúdo** em `src/index.css`
+   - Classe `.faq-rich-content` com regras para `h1/h2/h3`, `ul/ol`, `a`, `strong`, `em`, `u`, `s`, e alinhamentos, garantindo render consistente no editor e na visualização.
 
-## Varredura nas outras telas
+3. **Atualizar `src/components/faq/FAQArticleDialog.tsx`**
+   - Trocar os três `<Textarea>` (Sintomas/Problema/Solução) pelo `<RichTextEditor>` dentro dos respectivos `FormField`.
+   - Ajustar a validação Zod: como o valor passa a ser HTML, a regra `min(10)` ficaria enganosa (tags inflam o tamanho). Mudar para uma validação que considere o texto puro (strip de tags) com mínimo de 10 caracteres.
 
-Fiz uma varredura nas demais query keys do `SystemSettings.tsx` e os pares lista↔mutation estão consistentes (`segments`, `queues`, `database_engines`, `application_products`, `teams-with-queues`/`teams`). O bug de cache órfão está isolado em categorias.
+4. **Atualizar `src/components/faq/FAQArticleViewDialog.tsx`**
+   - Renderizar os três campos como HTML (`dangerouslySetInnerHTML`) dentro de um container com a classe `.faq-rich-content`, em vez de texto plano. Sanitizar com `DOMPurify` antes de renderizar para evitar XSS, já que admins podem inserir HTML.
 
-Outras telas (FAQ, Clientes, Máquinas, Aplicativos, RFC, Tickets, Tenant) já usam hooks dedicados (`useClientMutations`, `useMachineMutations`, `useDatabaseMutations`, etc.) com as mesmas chaves nas leituras e mutations — não há sintoma similar reportado lá. Se você notar o mesmo comportamento em alguma tela específica, me avise que eu incluo na correção.
+5. **Compatibilidade com artigos antigos**
+   - Conteúdo legado em texto puro continua válido (o editor aceita string sem tags). Não é necessária migração de dados.
 
-## Arquivos a editar
+6. **Dependências a adicionar**
+   - `@tiptap/react`, `@tiptap/pm`, `@tiptap/starter-kit`, `@tiptap/extension-underline`, `@tiptap/extension-text-align`, `@tiptap/extension-text-style`, `@tiptap/extension-color`, `@tiptap/extension-font-family`, `@tiptap/extension-link`, `dompurify` + `@types/dompurify`.
 
-- `src/pages/SystemSettings.tsx`
-- `src/components/settings/CategoryDialog.tsx`
+## Fora de escopo
 
-Nenhuma mudança de schema, RLS ou Realtime — é apenas alinhamento de chaves de cache do React Query.
+- Não altero o `Textarea` de outras telas (descrição de tickets, comentários, etc.) — só os três campos da FAQ pedidos.
+- Não mexo em busca/full-text (a coluna continua armazenando o conteúdo; a busca atual em `symptoms/title` continua funcionando, apenas indexando o HTML — caso queira ignorar tags na busca, fica para um próximo passo).
+- Sem upload de imagem dentro do editor neste momento (anexos continuam no `FileUploadZone` existente). Posso adicionar depois se quiser.
+
+## Arquivos a editar/criar
+
+- criar `src/components/ui/rich-text-editor.tsx`
+- editar `src/components/faq/FAQArticleDialog.tsx`
+- editar `src/components/faq/FAQArticleViewDialog.tsx`
+- editar `src/index.css` (estilos `.faq-rich-content`)
+- `package.json` (novas dependências)
