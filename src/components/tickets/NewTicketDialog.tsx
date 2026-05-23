@@ -964,10 +964,16 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
           {/* Subcategory - logo abaixo de Categoria */}
           {selectedCategoryId && subcategories && subcategories.length > 0 && (
             <div className="space-y-2">
-              <Label htmlFor="subcategory">Subcategoria</Label>
-              <Select value={watch("subcategory") || ""} onValueChange={(value) => setValue("subcategory", value)}>
+              <Label htmlFor="subcategory">Subcategoria *</Label>
+              <Select
+                value={watch("subcategory") || ""}
+                onValueChange={(value) => {
+                  setValue("subcategory", value);
+                  form.clearErrors("subcategory");
+                }}
+              >
                 <SelectTrigger>
-                  <SelectValue placeholder="Selecione a subcategoria (opcional)" />
+                  <SelectValue placeholder="Selecione a subcategoria" />
                 </SelectTrigger>
                 <SelectContent>
                   {subcategories.map((sub) => (
@@ -977,6 +983,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   ))}
                 </SelectContent>
               </Select>
+              {errors.subcategory && (
+                <p className="text-sm text-destructive">{errors.subcategory.message}</p>
+              )}
             </div>
           )}
 
