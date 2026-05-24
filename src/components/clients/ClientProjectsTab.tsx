@@ -107,7 +107,7 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
       <div className="flex justify-between items-center">
         <h3 className="text-lg font-semibold">Projetos</h3>
         {!showNewForm && (
-          <Button size="sm" onClick={() => setShowNewForm(true)}>
+          <Button type="button" size="sm" onClick={() => setShowNewForm(true)}>
             <Plus className="h-4 w-4 mr-2" />
             Novo Projeto
           </Button>
@@ -154,11 +154,11 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" size="sm" onClick={() => { setShowNewForm(false); setNewProject({ name: "", description: "", is_overtime: false }); }}>
+              <Button type="button" variant="outline" size="sm" onClick={() => { setShowNewForm(false); setNewProject({ name: "", description: "", is_overtime: false }); }}>
                 <X className="h-4 w-4 mr-1" />
                 Cancelar
               </Button>
-              <Button size="sm" onClick={handleAddProject} disabled={!newProject.name.trim() || createProject.isPending}>
+              <Button type="button" size="sm" onClick={handleAddProject} disabled={!newProject.name.trim() || createProject.isPending}>
                 <Save className="h-4 w-4 mr-1" />
                 Salvar
               </Button>
@@ -218,11 +218,11 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
                       </div>
                     </div>
                     <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={cancelEdit}>
+                      <Button type="button" variant="outline" size="sm" onClick={cancelEdit}>
                         <X className="h-4 w-4 mr-1" />
                         Cancelar
                       </Button>
-                      <Button size="sm" onClick={() => handleUpdateProject(project)} disabled={!editingData.name.trim() || updateProject.isPending}>
+                      <Button type="button" size="sm" onClick={() => handleUpdateProject(project)} disabled={!editingData.name.trim() || updateProject.isPending}>
                         <Save className="h-4 w-4 mr-1" />
                         Salvar
                       </Button>
@@ -256,10 +256,11 @@ export default function ClientProjectsTab({ clientId, mode }: ClientProjectsTabP
                           {project.is_active ? "Ativo" : "Inativo"}
                         </span>
                       </div>
-                      <Button variant="ghost" size="icon" onClick={() => startEdit(project)}>
+                      <Button type="button" variant="ghost" size="icon" onClick={() => startEdit(project)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <Button 
+                        type="button"
                         variant="ghost" 
                         size="icon"
                         onClick={() => { setProjectToDelete(project); setDeleteDialogOpen(true); }}
