@@ -482,7 +482,7 @@ export default function TenantAdmin() {
                       <div>
                         <CardTitle className="text-lg">{tenant.name}</CardTitle>
                         {tenant.cnpj && (
-                          <CardDescription className="text-xs">{tenant.cnpj}</CardDescription>
+                          <CardDescription className="text-xs">{formatCnpj(tenant.cnpj)}</CardDescription>
                         )}
                       </div>
                     </div>
