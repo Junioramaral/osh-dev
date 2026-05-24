@@ -25,7 +25,25 @@ const Auth = () => {
     const { error } = await signIn(loginData.email, loginData.password);
     
     if (error) {
-      toast.error(error.message);
+      const msg = (error.message || "").toLowerCase();
+      let title = "Erro ao entrar";
+      let description = "Tente novamente em instantes. Se o problema persistir, contate o suporte.";
+
+      if (msg.includes("invalid login credentials") || msg.includes("invalid_credentials")) {
+        title = "Não foi possível entrar";
+        description = "Email ou senha incorretos. Verifique seus dados e tente novamente.";
+      } else if (msg.includes("email not confirmed")) {
+        title = "Email não confirmado";
+        description = "Confirme seu email antes de acessar o sistema.";
+      } else if (msg.includes("too many requests") || msg.includes("rate limit")) {
+        title = "Muitas tentativas";
+        description = "Aguarde alguns instantes antes de tentar novamente.";
+      } else if (msg.includes("user not found")) {
+        title = "Usuário não encontrado";
+        description = "Não encontramos uma conta com este email.";
+      }
+
+      toast.error(title, { description });
     }
     // Não mostrar toast de sucesso aqui - será mostrado no useEffect se precisar trocar senha
     
