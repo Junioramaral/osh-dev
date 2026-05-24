@@ -1,19 +1,15 @@
-## Objetivo
-Substituir a mensagem genérica "Invalid login credentials" (vinda do Supabase, em inglês) por uma mensagem amigável em português, com título e descrição padronizados como os demais toasts do sistema.
+## Causa
+No `ClientProjectsTab.tsx`, a aba de Projetos é renderizada dentro do `<form>` do `ClientDialog`. Os botões internos (Salvar, Cancelar, Novo Projeto, editar, excluir, toggle) não declaram `type="button"`, então o HTML padrão os trata como `type="submit"`. Ao clicar em "Salvar" do projeto:
+1. O projeto é criado (toast "Projeto criado com sucesso!").
+2. O click também submete o form do cliente, disparando "Cliente atualizado com sucesso!" e fechando o diálogo — voltando o usuário para a listagem de clientes.
 
-## Mudanças
+O replay confirma os dois toasts em sequência.
 
-**Arquivo:** `src/pages/Auth.tsx`
+## Correção
+Em `src/components/clients/ClientProjectsTab.tsx`, adicionar `type="button"` em todos os `<Button>`:
+- "Novo Projeto"
+- "Cancelar" e "Salvar" do formulário de novo projeto
+- "Cancelar" e "Salvar" do formulário de edição
+- Botões de ícone (editar, excluir)
 
-No `handleLogin`, ao invés de `toast.error(error.message)`, mapear o `error.message` retornado pelo Supabase para mensagens amigáveis em PT-BR:
-
-- `Invalid login credentials` → título: "Não foi possível entrar" / descrição: "Email ou senha incorretos. Verifique seus dados e tente novamente."
-- `Email not confirmed` → "Email não confirmado" / "Confirme seu email antes de acessar."
-- `Too many requests` / rate limit → "Muitas tentativas" / "Aguarde alguns instantes antes de tentar novamente."
-- Fallback (qualquer outro erro) → "Erro ao entrar" / "Tente novamente em instantes. Se o problema persistir, contate o suporte."
-
-A função usará `toast.error(titulo, { description: ... })` para manter o mesmo padrão visual dos outros toasts do app (ex.: "Erro ao enviar email" no reset de senha).
-
-## Fora do escopo
-- Não altera lógica de autenticação.
-- Não altera mensagens de outras páginas.
+Sem isso, qualquer click dentro da aba pode submeter o form externo. Fora de escopo: alterações em hooks, RLS ou no `ClientDialog`.
