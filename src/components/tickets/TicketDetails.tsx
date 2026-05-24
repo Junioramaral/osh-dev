@@ -10,9 +10,9 @@ interface TicketDetailsProps {
 function InfoRow({ label, value }: { label: string; value: any }) {
   if (!value) return null;
   return (
-    <div className="flex justify-between py-2 border-b last:border-b-0">
-      <span className="text-sm text-muted-foreground">{label}</span>
-      <span className="text-sm font-medium">{value}</span>
+    <div className="flex flex-col gap-0.5 py-2 border-b last:border-b-0 sm:flex-row sm:justify-between sm:items-start sm:gap-4">
+      <span className="text-sm text-muted-foreground shrink-0">{label}</span>
+      <span className="text-sm font-medium break-words sm:text-right min-w-0">{value}</span>
     </div>
   );
 }
@@ -28,8 +28,8 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
             Descrição do Problema
           </CardTitle>
         </CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground whitespace-pre-wrap">
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
+          <p className="text-sm text-muted-foreground whitespace-pre-wrap break-words">
             {ticket.description || "Sem descrição"}
           </p>
         </CardContent>
@@ -43,7 +43,7 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
             Informações Técnicas
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
           <div className="space-y-0">
             <InfoRow label="Segmento" value={ticket.segment} />
             {ticket.segment === 'DB' && (
@@ -75,7 +75,7 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
             Detalhes do Ticket
           </CardTitle>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-4 sm:p-6 pt-0 sm:pt-0">
           <div className="space-y-0">
             <InfoRow label="Tipo" value={getTicketTypeLabel(ticket.ticket_type)} />
             <InfoRow label="Categoria" value={ticket.category} />
@@ -95,23 +95,23 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
             Análise
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 p-4 sm:p-6 pt-0 sm:pt-0">
           <div>
             <h4 className="font-medium mb-2 text-sm">Motivo da Abertura</h4>
-            <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+            <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap break-words">
               {ticket.opening_reason}
             </div>
           </div>
           <div>
             <h4 className="font-medium mb-2 text-sm">Problema Enfrentado</h4>
-            <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+            <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap break-words">
               {ticket.problem_faced}
             </div>
           </div>
           {ticket.error_displayed && (
             <div>
               <h4 className="font-medium mb-2 text-sm">Erro Exibido</h4>
-              <pre className="bg-muted p-3 rounded-md overflow-x-auto text-xs">
+              <pre className="bg-muted p-3 rounded-md overflow-x-auto text-xs max-w-full">
                 <code>{ticket.error_displayed}</code>
               </pre>
             </div>
@@ -119,7 +119,7 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
           {ticket.reproduction_steps && (
             <div>
               <h4 className="font-medium mb-2 text-sm">Passos para Reprodução</h4>
-              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap break-words">
                 {ticket.reproduction_steps}
               </div>
             </div>
@@ -127,7 +127,7 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
           {ticket.workaround && (
             <div>
               <h4 className="font-medium mb-2 text-sm">Workaround Aplicado</h4>
-              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap">
+              <div className="bg-muted p-3 rounded-md text-sm text-muted-foreground whitespace-pre-wrap break-words">
                 {ticket.workaround}
               </div>
             </div>
