@@ -21,10 +21,11 @@ import {
 } from "@/components/ui/select";
 import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel, getPriorityColor } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer, Pencil } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer, Pencil, Sliders } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "./RequiredFieldsBeforeResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
+import { SLAAdjustDialog } from "./SLAAdjustDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +56,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
   const [showRequiredFieldsDialog, setShowRequiredFieldsDialog] = useState(false);
   const [savingRequiredFields, setSavingRequiredFields] = useState(false);
+  const [showSLAAdjustDialog, setShowSLAAdjustDialog] = useState(false);
   const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
@@ -184,7 +186,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   
   // Apenas analistas Otimizzo/SuperAdmin podem registrar horas (não clientes, não viewers)
   const canLogTime = (isOtimizzoUser || isSuperAdmin) && !isViewer;
-  const { resolveTicketWithReason, updateTicketStatus, updateTicketPriority } = useTicketActions();
+  const { resolveTicketWithReason, updateTicketStatus, updateTicketPriority, adjustSLA } = useTicketActions();
+  const canAdjustSLA = (isOtimizzoUser || isSuperAdmin) && !isViewer && ticket.record_type !== 'rfc';
   
   const slaStatus = calculateSLAStatus(ticket);
   const now = new Date();
