@@ -1,4 +1,4 @@
-import { ReactNode, useState, useCallback, useMemo } from "react";
+import { ReactNode, useState, useCallback, useMemo, useEffect } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
@@ -35,6 +35,19 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId, signOut, loading, mustChangePassword } = useAuth();
   const [open, setOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [sidebarPinned, setSidebarPinned] = useState<boolean>(() => {
+    if (typeof window === "undefined") return true;
+    const stored = localStorage.getItem("sidebar:pinned");
+    return stored === null ? true : stored === "true";
+  });
+  const [sidebarHovered, setSidebarHovered] = useState(false);
+
+  useEffect(() => {
+    localStorage.setItem("sidebar:pinned", String(sidebarPinned));
+  }, [sidebarPinned]);
+
+  const sidebarExpanded = sidebarPinned || sidebarHovered;
+  const togglePin = useCallback(() => setSidebarPinned((p) => !p), []);
   
   const { data: pendingCount = 0 } = usePendingTicketsCount();
   const { data: myTicketsCount = 0 } = useMyTicketsCount();
@@ -87,8 +100,17 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   return (
     <div className="flex h-screen bg-background print:block print:h-auto print:overflow-visible">
       {/* Desktop Sidebar */}
-      <aside className="hidden md:flex md:flex-col w-64 h-screen bg-sidebar text-sidebar-foreground print:hidden">
+      <aside
+        className={`hidden md:flex md:flex-col h-screen bg-sidebar text-sidebar-foreground print:hidden overflow-hidden transition-[width] duration-200 ease-out ${
+          sidebarExpanded ? "w-64" : "w-16"
+        }`}
+        onMouseEnter={() => setSidebarHovered(true)}
+        onMouseLeave={() => setSidebarHovered(false)}
+      >
         <SidebarContent
+          collapsed={!sidebarExpanded}
+          pinned={sidebarPinned}
+          onTogglePin={togglePin}
           operationalNav={operationalNav}
           adminNav={adminNav}
           pendingCount={pendingCount}
@@ -124,6 +146,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
             <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">
               <div className="flex flex-col h-full">
                 <SidebarContent
+                  collapsed={false}
+                  pinned={true}
+                  onTogglePin={togglePin}
                   operationalNav={operationalNav}
                   adminNav={adminNav}
                   pendingCount={pendingCount}
