@@ -19,7 +19,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel } from "@/lib/ticketUtils";
+import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel, getPriorityColor } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
 import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer, Pencil } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
@@ -184,7 +184,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   
   // Apenas analistas Otimizzo/SuperAdmin podem registrar horas (não clientes, não viewers)
   const canLogTime = (isOtimizzoUser || isSuperAdmin) && !isViewer;
-  const { resolveTicketWithReason, updateTicketStatus } = useTicketActions();
+  const { resolveTicketWithReason, updateTicketStatus, updateTicketPriority } = useTicketActions();
   
   const slaStatus = calculateSLAStatus(ticket);
   const now = new Date();
@@ -340,6 +340,29 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                     <SelectItem value="novo">Novo</SelectItem>
                     <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
                     <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label className="text-xs text-muted-foreground">Alterar Prioridade</Label>
+                <Select
+                  value={ticket.priority}
+                  onValueChange={(value) =>
+                    updateTicketPriority.mutate({ ticketId: ticket.id, priority: value as any })
+                  }
+                  disabled={updateTicketPriority.isPending}
+                >
+                  <SelectTrigger className="w-full">
+                    <SelectValue>
+                      <Badge className={getPriorityColor(ticket.priority)}>{ticket.priority}</Badge>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="P1"><Badge className={getPriorityColor("P1")}>P1</Badge> <span className="ml-2">Crítico</span></SelectItem>
+                    <SelectItem value="P2"><Badge className={getPriorityColor("P2")}>P2</Badge> <span className="ml-2">Alta</span></SelectItem>
+                    <SelectItem value="P3"><Badge className={getPriorityColor("P3")}>P3</Badge> <span className="ml-2">Média</span></SelectItem>
+                    <SelectItem value="P4"><Badge className={getPriorityColor("P4")}>P4</Badge> <span className="ml-2">Baixa</span></SelectItem>
                   </SelectContent>
                 </Select>
               </div>
