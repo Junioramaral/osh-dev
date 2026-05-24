@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { Database } from "@/integrations/supabase/types";
 
 type TicketStatus = Database["public"]["Enums"]["ticket_status"];
+type TicketPriority = Database["public"]["Enums"]["ticket_priority"];
 
 export function useTicketActions() {
   const queryClient = useQueryClient();
@@ -191,5 +192,6 @@ export function useTicketActions() {
   return {
     resolveTicketWithReason,
     updateTicketStatus,
+    updateTicketPriority,
   };
 }
