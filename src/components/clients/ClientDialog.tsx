@@ -267,11 +267,12 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
 
       if (mode === "create") {
         await createClient.mutateAsync(clientData as any);
+        onOpenChange(false);
+        form.reset();
       } else if (client) {
         await updateClient.mutateAsync({ id: client.id, data: clientData as any });
+        // Manter o diálogo aberto após salvar no modo edit
       }
-      onOpenChange(false);
-      form.reset();
     } catch (error) {
       console.error("Error saving client:", error);
     }
