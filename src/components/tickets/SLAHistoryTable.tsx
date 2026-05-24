@@ -11,12 +11,15 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { CheckCircle2, XCircle, Clock, Pause, Sliders } from "lucide-react";
 import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOURS } from "@/lib/businessHours";
+import { useTicketSLAPauses } from "@/hooks/useTicketSLAPauses";
+import { getStatusLabel } from "@/lib/ticketUtils";
 
 interface SLAHistoryTableProps {
   ticket: any;
 }
 
 export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
+  const { data: pauses = [] } = useTicketSLAPauses(ticket.id);
   const createdAt = new Date(ticket.created_at);
   const firstResponseAt = ticket.first_response_at ? new Date(ticket.first_response_at) : null;
   const firstResponseDeadline = ticket.sla_first_response_deadline ? new Date(ticket.sla_first_response_deadline) : null;
@@ -212,6 +215,68 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
           ))}
         </TableBody>
       </Table>
+
+      {pauses.length > 0 && (
+        <div className="mt-6">
+          <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
+            <Pause className="h-4 w-4" />
+            Histórico de Pausas do SLA
+          </h4>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Pausado em</TableHead>
+                <TableHead>Status durante pausa</TableHead>
+                <TableHead>Retomado em</TableHead>
+                <TableHead>Duração</TableHead>
+                <TableHead>Pausado por</TableHead>
+                <TableHead>Retomado por</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pauses.map((p) => {
+                const pausedAt = new Date(p.paused_at);
+                const resumedAt = p.resumed_at ? new Date(p.resumed_at) : null;
+                const minutes =
+                  p.pause_minutes ??
+                  (resumedAt
+                    ? Math.max(0, Math.floor((resumedAt.getTime() - pausedAt.getTime()) / 60000))
+                    : Math.max(0, Math.floor((Date.now() - pausedAt.getTime()) / 60000)));
+                const h = Math.floor(minutes / 60);
+                const m = minutes % 60;
+                const durationStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
+                return (
+                  <TableRow key={p.id}>
+                    <TableCell>{format(pausedAt, "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
+                    <TableCell>
+                      <Badge variant="outline" className="text-xs">
+                        {getStatusLabel(p.status_during_pause)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {resumedAt ? (
+                        format(resumedAt, "dd/MM/yyyy HH:mm", { locale: ptBR })
+                      ) : (
+                        <Badge variant="outline" className="text-xs gap-1 border-slate-400 text-slate-700">
+                          <Pause className="h-3 w-3" />
+                          Em pausa
+                        </Badge>
+                      )}
+                    </TableCell>
+                    <TableCell>{durationStr}</TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {p.paused_by_name || "Sistema"}
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {resumedAt ? (p.resumed_by_name || "Sistema") : "-"}
+                    </TableCell>
+                  </TableRow>
+                );
+              })}
+            </TableBody>
+          </Table>
+        </div>
+      )}
     </div>
   );
 }

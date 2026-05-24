@@ -1,30 +1,23 @@
-## Problema
+## Objetivo
 
-No `TicketHeader.tsx`, o badge "SLA Pausado" aparece duas vezes porque duas lógicas independentes renderizam o mesmo estado:
+Exibir, na aba SLA do ticket, o histórico detalhado de pausas (quando pausou, quando retomou, status durante a pausa, duração e por quem) — usando os registros já gravados em `ticket_sla_pauses`.
 
-1. `calculateSLAStatus(ticket)` em `src/lib/ticketUtils.tsx` já retorna `type: 'paused'` com label "SLA Pausado" quando `ticket.sla_paused_at` está preenchido (adicionado na última iteração).
-2. Um bloco extra `{ticket.sla_paused_at && <Badge>...SLA Pausado...</Badge>}` foi adicionado em paralelo no header.
+## Mudanças
 
-## Correção
+### 1. Hook novo: `src/hooks/useTicketSLAPauses.ts`
+- Faz `select` em `ticket_sla_pauses` filtrando por `ticket_id`, ordenado por `paused_at` desc.
+- Faz join leve via segunda query para buscar `full_name` dos `paused_by` / `resumed_by` em `profiles`.
 
-Remover o bloco duplicado em `src/components/tickets/TicketHeader.tsx`:
+### 2. `src/components/tickets/SLAHistoryTable.tsx`
+- Chamar `useTicketSLAPauses(ticket.id)`.
+- Após a tabela atual, adicionar nova seção "Histórico de Pausas do SLA" com tabela:
+  - Colunas: Pausado em | Status | Retomado em | Duração | Pausado por | Retomado por
+  - Linha em andamento (sem `resumed_at`) mostra badge "Em pausa" e calcula duração até `now()`.
+  - Se não há pausas, esconde a seção.
+- Formatar com `date-fns` + `ptBR` no padrão já usado (`dd/MM/yyyy HH:mm`).
+- Status traduzido via `getStatusLabel` de `ticketUtils`.
 
-```tsx
-{ticket.sla_paused_at && (
-  <Badge variant="outline" className="bg-slate-200 ...">
-    <Pause className="h-3 w-3 mr-1" />
-    SLA Pausado
-  </Badge>
-)}
-```
+## Fora de escopo
 
-O badge continuará aparecendo via `slaStatus` (rota oficial), mantendo consistência com a lista de tickets e demais telas que já usam `calculateSLAStatus`.
-
-Manter o badge "SLA Ajustado" (esse não é duplicado — não há equivalente em `calculateSLAStatus`).
-
-Limpar o import `Pause` de `lucide-react` se não for mais usado no arquivo (manter `Sliders` pois "SLA Ajustado" continua).
-
-## Escopo
-
-- Apenas `src/components/tickets/TicketHeader.tsx`.
-- Sem mudanças de banco, hooks ou outros componentes.
+- Sem mudanças de banco (a tabela e o trigger já existem e gravam).
+- Sem alteração em relatórios — o dado fica disponível para uso posterior.
