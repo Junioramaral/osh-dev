@@ -21,10 +21,12 @@ import {
 } from "@/components/ui/select";
 import { calculateSLAStatus, formatDuration, getStatusColor, getStatusLabel, getPriorityColor } from "@/lib/ticketUtils";
 import { differenceInMinutes } from "date-fns";
-import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer, Pencil } from "lucide-react";
+import { BookOpen, ExternalLink, CheckCircle, Star, User, Clock, Timer, Pencil, Sliders } from "lucide-react";
 import { TicketResolveDialog } from "./TicketResolveDialog";
 import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "./RequiredFieldsBeforeResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
+import { SLAAdjustDialog } from "./SLAAdjustDialog";
+import { SLARecalculatePromptDialog } from "./SLARecalculatePromptDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
@@ -55,6 +57,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showTimeLogDialog, setShowTimeLogDialog] = useState(false);
   const [showRequiredFieldsDialog, setShowRequiredFieldsDialog] = useState(false);
   const [savingRequiredFields, setSavingRequiredFields] = useState(false);
+  const [showSLAAdjustDialog, setShowSLAAdjustDialog] = useState(false);
+  const [pendingPriority, setPendingPriority] = useState<string | null>(null);
   const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
@@ -184,7 +188,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   
   // Apenas analistas Otimizzo/SuperAdmin podem registrar horas (não clientes, não viewers)
   const canLogTime = (isOtimizzoUser || isSuperAdmin) && !isViewer;
-  const { resolveTicketWithReason, updateTicketStatus, updateTicketPriority } = useTicketActions();
+  const { resolveTicketWithReason, updateTicketStatus, updateTicketPriority, adjustSLA } = useTicketActions();
+  const canAdjustSLA = (isOtimizzoUser || isSuperAdmin) && !isViewer && ticket.record_type !== 'rfc';
   
   const slaStatus = calculateSLAStatus(ticket);
   const now = new Date();
@@ -340,6 +345,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                     <SelectItem value="novo">Novo</SelectItem>
                     <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
                     <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
+                    <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -348,9 +354,9 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                 <Label className="text-xs text-muted-foreground">Alterar Prioridade</Label>
                 <Select
                   value={ticket.priority}
-                  onValueChange={(value) =>
-                    updateTicketPriority.mutate({ ticketId: ticket.id, priority: value as any })
-                  }
+                  onValueChange={(value) => {
+                    if (value !== ticket.priority) setPendingPriority(value);
+                  }}
                   disabled={updateTicketPriority.isPending}
                 >
                   <SelectTrigger className="w-full">
@@ -376,6 +382,18 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                 Resolver Ticket
               </Button>
             </>
+          )}
+
+          {/* Adjust SLA Button - analysts/admins only, not for resolved tickets */}
+          {canAdjustSLA && !isResolved && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowSLAAdjustDialog(true)}
+            >
+              <Sliders className="h-4 w-4 mr-2" />
+              Ajustar SLA
+            </Button>
           )}
 
           {/* Log Time Button - visible for Otimizzo/SuperAdmin even on resolved tickets */}
@@ -448,6 +466,38 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         }}
         onConfirm={handleRequiredFieldsConfirm}
         isLoading={savingRequiredFields}
+      />
+
+      <SLAAdjustDialog
+        open={showSLAAdjustDialog}
+        onOpenChange={setShowSLAAdjustDialog}
+        ticket={ticket}
+        onConfirm={async (values) => {
+          await adjustSLA.mutateAsync({
+            ticketId: ticket.id,
+            firstResponseDeadline: values.firstResponseDeadline,
+            resolutionDeadline: values.resolutionDeadline,
+            reason: values.reason,
+          });
+          setShowSLAAdjustDialog(false);
+        }}
+        isLoading={adjustSLA.isPending}
+      />
+
+      <SLARecalculatePromptDialog
+        open={!!pendingPriority}
+        onOpenChange={(o) => { if (!o) setPendingPriority(null); }}
+        newPriority={pendingPriority || ""}
+        onConfirm={(recalc, reason) => {
+          if (!pendingPriority) return;
+          updateTicketPriority.mutate({
+            ticketId: ticket.id,
+            priority: pendingPriority as any,
+            recalculateSLA: recalc,
+            reason,
+          });
+          setPendingPriority(null);
+        }}
       />
 
       {/* Time Log Dialog */}

@@ -1,9 +1,9 @@
 import { differenceInMinutes } from "date-fns";
-import { AlertTriangle, Clock, CheckCircle2, Check } from "lucide-react";
+import { AlertTriangle, Clock, CheckCircle2, Check, Pause } from "lucide-react";
 import { isBusinessHoursPriority, calculateBusinessMinutes, type BusinessHoursConfig, DEFAULT_BUSINESS_HOURS } from "./businessHours";
 
 export type SLAStatus = {
-  type: 'met' | 'on-time' | 'warning' | 'overdue' | 'not-applicable';
+  type: 'met' | 'on-time' | 'warning' | 'overdue' | 'not-applicable' | 'paused';
   label: string;
   color: string;
   icon: React.ReactNode;
@@ -43,7 +43,18 @@ export const calculateSLAStatus = (ticket: any, businessHoursConfig?: BusinessHo
   }
 
   const now = new Date();
-  
+
+  // SLA paused (ticket in a status that pauses the SLA clock)
+  if (ticket.sla_paused_at && ticket.status !== 'resolvido' && ticket.status !== 'fechado') {
+    return {
+      type: 'paused',
+      label: 'SLA Pausado',
+      color: 'bg-slate-200 text-slate-800 border-slate-400',
+      icon: <Pause className="h-3 w-3" />,
+      borderClass: 'border-l-4 border-slate-400'
+    };
+  }
+
   if (ticket.status === 'resolvido' || ticket.status === 'fechado') {
     if (ticket.sla_first_response_met && ticket.sla_resolution_met) {
       return {

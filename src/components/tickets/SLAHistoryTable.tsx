@@ -9,7 +9,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle2, XCircle, Clock } from "lucide-react";
+import { CheckCircle2, XCircle, Clock, Pause, Sliders } from "lucide-react";
 import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOURS } from "@/lib/businessHours";
 
 interface SLAHistoryTableProps {
@@ -99,6 +99,17 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
   };
   
   const slaTypeLabel = useBusinessHours ? " (HU)" : "";
+
+  const originalFR = ticket.sla_first_response_deadline_original
+    ? format(new Date(ticket.sla_first_response_deadline_original), "dd/MM/yyyy HH:mm", { locale: ptBR })
+    : null;
+  const originalRes = ticket.sla_resolution_deadline_original
+    ? format(new Date(ticket.sla_resolution_deadline_original), "dd/MM/yyyy HH:mm", { locale: ptBR })
+    : null;
+
+  const wasAdjusted = !!ticket.sla_adjusted_at;
+  const pausedMinutes = ticket.sla_paused_total_minutes || 0;
+  const currentlyPaused = !!ticket.sla_paused_at;
   
   const slaRows = [
     {
@@ -129,14 +140,54 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
   
   return (
     <div>
+      <div className="mb-3 flex flex-wrap gap-2">
       {useBusinessHours && (
-        <div className="mb-3">
           <Badge variant="secondary" className="text-xs">
             <Clock className="h-3 w-3 mr-1" />
             SLA em Horas Úteis (09:00-18:00, Seg-Sex)
           </Badge>
+      )}
+        {currentlyPaused && (
+          <Badge variant="outline" className="text-xs gap-1 border-slate-400 text-slate-700">
+            <Pause className="h-3 w-3" />
+            SLA Pausado agora
+          </Badge>
+        )}
+        {pausedMinutes > 0 && (
+          <Badge variant="outline" className="text-xs gap-1">
+            <Pause className="h-3 w-3" />
+            Total pausado: {Math.floor(pausedMinutes / 60)}h {pausedMinutes % 60}min
+          </Badge>
+        )}
+        {wasAdjusted && (
+          <Badge variant="outline" className="text-xs gap-1 border-amber-500 text-amber-700">
+            <Sliders className="h-3 w-3" />
+            SLA Ajustado Manualmente
+          </Badge>
+        )}
+      </div>
+
+      {wasAdjusted && ticket.sla_adjustment_reason && (
+        <div className="mb-3 p-3 rounded-md bg-amber-50 dark:bg-amber-950/20 border border-amber-200 dark:border-amber-800 text-xs">
+          <p className="font-semibold text-amber-800 dark:text-amber-300 mb-1">
+            Motivo do ajuste:
+          </p>
+          <p className="text-amber-700 dark:text-amber-400 whitespace-pre-wrap">
+            {ticket.sla_adjustment_reason}
+          </p>
+          {ticket.sla_adjusted_at && (
+            <p className="text-amber-600 dark:text-amber-500 mt-1">
+              Em {format(new Date(ticket.sla_adjusted_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+            </p>
+          )}
+          {(originalFR || originalRes) && (
+            <p className="text-amber-600 dark:text-amber-500 mt-1">
+              Prazo original: 1ª resp. {originalFR || "-"} / resolução {originalRes || "-"}
+            </p>
+          )}
         </div>
       )}
+
       <Table>
         <TableHeader>
           <TableRow>

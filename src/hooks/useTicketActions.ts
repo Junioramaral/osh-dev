@@ -193,13 +193,56 @@ export function useTicketActions() {
     mutationFn: async ({
       ticketId,
       priority,
+      recalculateSLA,
+      reason,
     }: {
       ticketId: string;
       priority: TicketPriority;
+      recalculateSLA?: boolean;
+      reason?: string;
     }) => {
+      const updates: Record<string, any> = { priority };
+
+      if (recalculateSLA) {
+        // Fetch ticket + client SLA settings
+        const { data: t, error: tErr } = await supabase
+          .from("tickets")
+          .select("client_id, segment, record_type")
+          .eq("id", ticketId)
+          .single();
+        if (tErr) throw tErr;
+        if (t.record_type === "rfc") {
+          throw new Error("RFCs não possuem SLA");
+        }
+
+        const { data: c, error: cErr } = await supabase
+          .from("clients")
+          .select("*")
+          .eq("id", t.client_id)
+          .single();
+        if (cErr) throw cErr;
+
+        const segPrefix = t.segment === "DB" ? "sla_db" : "sla_app";
+        const p = priority.toLowerCase();
+        const frMin = (c as any)[`${segPrefix}_${p}_first_response`] as number;
+        const resMin = (c as any)[`${segPrefix}_${p}_resolution`] as number;
+
+        const now = new Date();
+        const fr = new Date(now.getTime() + frMin * 60_000).toISOString();
+        const res = new Date(now.getTime() + resMin * 60_000).toISOString();
+
+        updates.sla_first_response_deadline = fr;
+        updates.sla_resolution_deadline = res;
+        updates.sla_adjustment_reason = `Recalculado por mudança de prioridade${reason ? `: ${reason}` : ""}`;
+        updates.sla_adjusted_at = now.toISOString();
+
+        const { data: { user } } = await supabase.auth.getUser();
+        if (user) updates.sla_adjusted_by = user.id;
+      }
+
       const { error } = await supabase
         .from("tickets")
-        .update({ priority })
+        .update(updates)
         .eq("id", ticketId);
       if (error) throw error;
     },
@@ -215,9 +258,49 @@ export function useTicketActions() {
     },
   });
 
+  const adjustSLA = useMutation({
+    mutationFn: async ({
+      ticketId,
+      firstResponseDeadline,
+      resolutionDeadline,
+      reason,
+    }: {
+      ticketId: string;
+      firstResponseDeadline: string | null;
+      resolutionDeadline: string | null;
+      reason: string;
+    }) => {
+      if (reason.trim().length < 10) {
+        throw new Error("Motivo deve ter pelo menos 10 caracteres");
+      }
+      const { data: { user } } = await supabase.auth.getUser();
+      const updates: Record<string, any> = {
+        sla_adjustment_reason: reason.trim(),
+        sla_adjusted_at: new Date().toISOString(),
+        sla_adjusted_by: user?.id || null,
+      };
+      if (firstResponseDeadline) updates.sla_first_response_deadline = firstResponseDeadline;
+      if (resolutionDeadline) updates.sla_resolution_deadline = resolutionDeadline;
+
+      const { error } = await supabase.from("tickets").update(updates).eq("id", ticketId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("SLA ajustado com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao ajustar SLA: " + error.message);
+    },
+  });
+
   return {
     resolveTicketWithReason,
     updateTicketStatus,
     updateTicketPriority,
+    adjustSLA,
   };
 }
