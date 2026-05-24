@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Lock, Trash2, Pause, Sliders } from "lucide-react";
+import { ArrowLeft, Lock, Trash2, Sliders } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
@@ -56,12 +56,6 @@ export default function TicketHeader({ ticket }: TicketHeaderProps) {
               <Badge variant="outline" className="bg-amber-500/10 text-amber-700 border-amber-500/20">
                 <Lock className="h-3 w-3 mr-1" />
                 Assumido
-              </Badge>
-            )}
-            {ticket.sla_paused_at && (
-              <Badge variant="outline" className="bg-slate-200 text-slate-800 border-slate-400">
-                <Pause className="h-3 w-3 mr-1" />
-                SLA Pausado
               </Badge>
             )}
             {ticket.sla_adjusted_at && (
