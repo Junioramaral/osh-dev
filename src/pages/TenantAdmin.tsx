@@ -15,6 +15,7 @@ import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { toast } from "sonner";
 import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
+import { formatCnpj } from "@/lib/cnpjUtils";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Loader2 } from "lucide-react";
 
@@ -359,8 +360,10 @@ export default function TenantAdmin() {
                   <Input
                     id="tenant-cnpj"
                     value={newTenant.cnpj}
-                    onChange={(e) => setNewTenant(prev => ({ ...prev, cnpj: e.target.value }))}
+                    onChange={(e) => setNewTenant(prev => ({ ...prev, cnpj: formatCnpj(e.target.value) }))}
                     placeholder="00.000.000/0000-00"
+                    maxLength={18}
+                    inputMode="numeric"
                   />
                 </div>
 
@@ -479,7 +482,7 @@ export default function TenantAdmin() {
                       <div>
                         <CardTitle className="text-lg">{tenant.name}</CardTitle>
                         {tenant.cnpj && (
-                          <CardDescription className="text-xs">{tenant.cnpj}</CardDescription>
+                          <CardDescription className="text-xs">{formatCnpj(tenant.cnpj)}</CardDescription>
                         )}
                       </div>
                     </div>

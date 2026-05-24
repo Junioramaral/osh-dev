@@ -1,30 +1,34 @@
-## Problema
+## Objetivo
 
-Ao clicar em "Salvar Alterações" no diálogo de Editar Cliente (abas Informações Básicas, Contrato e SLAs), o diálogo fecha automaticamente e o usuário volta para a lista de clientes, perdendo o contexto da edição em andamento. A aba Projetos não tem esse problema porque o salvar ali é independente.
+Aplicar máscara visual de CNPJ (`00.000.000/0000-00`) em todos os inputs e exibições do sistema, melhorando legibilidade e padronização.
 
-## Solução
+## Estratégia
 
-Manter o diálogo aberto após salvar com sucesso. O cliente continua na mesma aba que estava editando, podendo navegar para outras abas, fazer mais ajustes ou fechar manualmente quando terminar.
+Criar um utilitário central `src/lib/cnpjUtils.ts` (espelhando o padrão de `phoneUtils.ts`) com:
+- `formatCnpj(value)` — formata uma string em `00.000.000/0000-00` (aceita parcial durante digitação)
+- `unformatCnpj(value)` — retorna apenas dígitos (máx 14)
+- `isValidCnpj(value)` — validação opcional via dígitos verificadores
 
-## Mudanças
+A persistência no banco continua como string. Vamos salvar **com a máscara** (consistente com o que já existe hoje no banco) para não quebrar registros antigos. A formatação é aplicada na entrada de qualquer valor, então mesmo dados antigos sem máscara serão exibidos formatados.
 
-**`src/components/clients/ClientDialog.tsx`** — função `onSubmit`:
-- Remover `onOpenChange(false)` após salvar.
-- Remover `form.reset()` após salvar (no modo edit; manter reset apenas no modo create se decidir fechar nesse modo).
-- No modo `create`: após criar o cliente com sucesso, **transicionar para modo edit** mantendo o diálogo aberto, para permitir cadastrar Projetos e demais detalhes do cliente recém-criado. Isso exige que o componente passe a guardar o `client` retornado pelo `createClient.mutateAsync` em estado interno e que o pai (`Clients.tsx`) consiga refletir essa edição. Alternativa mais simples: manter aberto no modo edit; no modo create, fechar como hoje (o usuário reabre o cliente recém-criado se quiser editar Projetos).
+## Alterações
 
-Recomendo a alternativa simples (menor risco): **modo edit nunca fecha automaticamente**; modo create continua fechando ao criar (comportamento atual já é coerente, pois a aba Projetos no create está bloqueada com mensagem "Salve o cliente primeiro").
+### 1. Novo arquivo `src/lib/cnpjUtils.ts`
+Funções utilitárias de formatação/limpeza/validação.
 
-- O toast "Cliente atualizado com sucesso!" do hook `useUpdateClient` já dá feedback visual suficiente de que salvou.
-- Manter o botão "Cancelar" (que chama `onOpenChange(false)`) como única forma de fechar manualmente, junto do X padrão do Dialog.
+### 2. Inputs de CNPJ (digitação com máscara em tempo real)
+- `src/components/clients/ClientDialog.tsx` (campo CNPJ na aba "Informações Básicas") — aplicar `formatCnpj` no `onChange`, limitar a 18 chars.
+- `src/pages/TenantAdmin.tsx` (form Novo Tenant) — mesmo tratamento.
+- `src/pages/TenantDetail.tsx` (form Editar Tenant) — mesmo tratamento.
 
-## Resumo das telas analisadas
+### 3. Exibições de CNPJ (garantir máscara mesmo se vier sem formatação do banco)
+- `src/pages/Clients.tsx` linha 132 — `CNPJ: {formatCnpj(client.cnpj)}`
+- `src/pages/TenantDetail.tsx` linha 476 — `CNPJ: {tenant.cnpj ? formatCnpj(tenant.cnpj) : "N/A"}`
+- `src/pages/TenantAdmin.tsx` linha 482 — `{formatCnpj(tenant.cnpj)}`
 
-| Aba | Comportamento atual ao salvar | Após correção |
-|---|---|---|
-| Informações Básicas | Fecha o diálogo | Permanece aberto |
-| Contrato | Fecha o diálogo | Permanece aberto |
-| SLAs | Fecha o diálogo | Permanece aberto |
-| Projetos | Já permanece aberto (correção anterior) | Sem alteração |
+### 4. Validação leve (opcional, não bloqueante)
+No `clientSchema` (ClientDialog) e nos forms de tenant, manter o campo opcional. Validar formato (14 dígitos) apenas se preenchido, exibindo mensagem amigável.
 
-Nenhuma alteração em hooks, RLS ou backend é necessária.
+## Fora de escopo
+- Não alterar dados existentes no banco (sem migration).
+- Não validar dígitos verificadores como obrigatório — apenas o comprimento.

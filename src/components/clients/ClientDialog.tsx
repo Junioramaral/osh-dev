@@ -14,6 +14,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
 import { Loader2, Database, Package, Mail, FolderKanban } from "lucide-react";
 import ClientProjectsTab from "./ClientProjectsTab";
+import { formatCnpj } from "@/lib/cnpjUtils";
 
 // Ícones SVG específicos para cada engine de banco de dados
 const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
@@ -323,7 +324,14 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                       <FormItem>
                         <FormLabel>CNPJ</FormLabel>
                         <FormControl>
-                          <Input {...field} placeholder="00.000.000/0000-00" />
+                          <Input
+                            {...field}
+                            value={formatCnpj(field.value || "")}
+                            onChange={(e) => field.onChange(formatCnpj(e.target.value))}
+                            placeholder="00.000.000/0000-00"
+                            maxLength={18}
+                            inputMode="numeric"
+                          />
                         </FormControl>
                         <FormMessage />
                       </FormItem>

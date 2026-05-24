@@ -10,6 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Plus, Building2, AlertCircle, Mail } from "lucide-react";
 import ClientDialog from "@/components/clients/ClientDialog";
+import { formatCnpj } from "@/lib/cnpjUtils";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Client = Tables<"clients">;
@@ -129,7 +130,7 @@ export default function Clients() {
                 <CardContent className="space-y-3">
                   {client.cnpj && (
                     <p className="text-sm text-muted-foreground">
-                      CNPJ: {client.cnpj}
+                      CNPJ: {formatCnpj(client.cnpj)}
                     </p>
                   )}
                   <div className="flex items-center gap-2">

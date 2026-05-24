@@ -28,6 +28,7 @@ import {
   DialogFooter,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { formatCnpj } from "@/lib/cnpjUtils";
 import { PhoneInput } from "@/components/ui/phone-input";
 import { Label } from "@/components/ui/label";
 import { cleanPhone, isValidPhone, formatPhone } from "@/lib/phoneUtils";
@@ -473,7 +474,7 @@ const TenantDetail = () => {
             </Button>
             <div>
               <h1 className="text-3xl font-bold">{tenant.name}</h1>
-              <p className="text-muted-foreground">CNPJ: {tenant.cnpj || "N/A"}</p>
+              <p className="text-muted-foreground">CNPJ: {tenant.cnpj ? formatCnpj(tenant.cnpj) : "N/A"}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -549,8 +550,10 @@ const TenantDetail = () => {
                       <Input
                         id="cnpj"
                         value={editForm.cnpj}
-                        onChange={(e) => setEditForm((prev) => ({ ...prev, cnpj: e.target.value }))}
+                        onChange={(e) => setEditForm((prev) => ({ ...prev, cnpj: formatCnpj(e.target.value) }))}
                         placeholder="00.000.000/0000-00"
+                        maxLength={18}
+                        inputMode="numeric"
                       />
                       <p className="text-xs text-muted-foreground mt-1">
                         Pode ser preenchido ou alterado posteriormente
