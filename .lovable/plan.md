@@ -1,35 +1,55 @@
 ## Objetivo
 
-Garantir que o card "Análise" (e os demais campos de `TicketDetails.tsx`) quebrem linha corretamente e tenham espaçamento adequado em telas pequenas (≤390px), sem overflow horizontal.
+Transformar a sidebar atual (largura fixa `w-64`) em uma sidebar retrátil estilo "icon rail":
+- **Recolhida (padrão)**: faixa estreita (~`w-16`) mostrando só os ícones de navegação + avatar + botões inferiores
+- **Expandida**: largura cheia (`w-64`) mostrando ícones + rótulos
+- **Gatilho**: hover do mouse sobre a faixa OU clique em um botão de pin/trigger no topo
+- **Tooltips**: quando colapsada, cada item de navegação exibe tooltip com o nome ao passar o mouse
+- **Mobile**: mantém o comportamento atual (Sheet/Drawer pelo menu hamburger), sem alteração
 
-## Problemas identificados em `src/components/tickets/TicketDetails.tsx`
+## Abordagem
 
-1. **InfoRow** usa `flex justify-between` sem permitir quebra: rótulo e valor disputam espaço; valores longos (hostnames, e-mails, nomes de instância) podem ser comprimidos ou estourar.
-2. Blocos do card **Análise** (`Motivo da Abertura`, `Problema Enfrentado`, `Passos para Reprodução`, `Workaround`) usam `whitespace-pre-wrap` sem `break-words` — URLs ou tokens longos sem espaço causam overflow horizontal.
-3. O bloco **Erro Exibido** (`<pre><code>`) só tem `overflow-x-auto`; em mobile fica com scroll horizontal sem indicação. Manter scroll é aceitável (é código), mas garantir `max-w-full` e largura confinada ao card.
-4. `CardContent` padrão usa `p-6` (24px) — em 390px sobra pouco espaço útil. Reduzir para `p-4 sm:p-6` apenas nos cards de detalhes.
+Em vez de migrar para o `Sidebar` do shadcn (refator grande, afeta `AppLayout`, mobile, header, badges customizados), faremos um upgrade incremental no `AppLayout.tsx` e `SidebarContent.tsx` existentes — preservando toda a lógica de navegação, contadores (`TicketCountBadge`), `SLAAlertBell`, perfil e logout.
 
-## Mudanças
+### 1. Estado de expansão (`AppLayout.tsx`)
+- Adicionar estado local `sidebarExpanded` (boolean) + `sidebarPinned` (boolean, persistido em `localStorage`)
+- Expandida = `sidebarPinned || sidebarExpanded` (hover)
+- Handlers: `onMouseEnter` expande, `onMouseLeave` recolhe (só quando não está pinned)
+- `<aside>` recebe `onMouseEnter/Leave` e classes condicionais: `w-16` recolhida / `w-64` expandida, com `transition-[width] duration-200 ease-out`
 
-### `src/components/tickets/TicketDetails.tsx`
+### 2. `SidebarContent.tsx`
+- Receber nova prop `collapsed: boolean`
+- Header (logo + título):
+  - Recolhido: só o ícone do logo centralizado; esconder textos "Otimizzo / Service Hub"; mover `SLAAlertBell` para fora ou esconder quando colapsado (já existe no mobile header)
+- Adicionar botão de pin/toggle no topo (ícone `PanelLeftClose` / `PanelLeftOpen` da lucide-react) que alterna `sidebarPinned`
+- Itens de navegação (`operationalNav` e `adminNav`):
+  - Quando `collapsed`: esconder o `{item.name}` e os badges (`TicketCountBadge`); centralizar o ícone (`justify-center`); envolver o `NavLink` em `Tooltip` (side="right") mostrando o nome + contador se houver
+  - Quando expandido: layout atual
+  - Esconder os títulos "Operacional" / "Administrativo" quando recolhido
+- Bloco do perfil (avatar + nome + email + role):
+  - Recolhido: só avatar centralizado, com tooltip mostrando nome/email/role
+- Botões "Configurações" e "Sair":
+  - Recolhido: só ícone centralizado com tooltip
 
-- **InfoRow**: trocar `flex justify-between` por layout responsivo:
-  - Mobile: `flex flex-col gap-0.5` (label em cima, valor embaixo).
-  - `sm:` em diante: `sm:flex-row sm:justify-between sm:items-start sm:gap-4`.
-  - Valor recebe `break-words text-right sm:text-right` (em mobile fica alinhado à esquerda naturalmente pelo flex-col).
-- **Blocos de texto do card Análise**: adicionar `break-words` junto de `whitespace-pre-wrap` em todos os `<div className="bg-muted p-3 ...">`.
-- **Bloco Erro Exibido (`<pre>`)**: manter `overflow-x-auto`, adicionar `max-w-full` e `whitespace-pre` explícito (já é default do `<pre>`); garantir que o pai (`CardContent`) não cause overflow — adicionar `min-w-0` quando necessário.
-- **CardContent** dos quatro cards: padding responsivo `p-4 sm:p-6` (sobrescrever via className).
-- **CardHeader**: ajustar `pb-3` já está ok; nada a mudar.
+### 3. Tooltips
+- Usar `Tooltip`/`TooltipTrigger`/`TooltipContent` de `@/components/ui/tooltip` (já existe `TooltipProvider` no `App.tsx`)
+- `side="right"`, `sideOffset={8}` para não sobrepor a faixa
 
-### Escopo
+### 4. Persistência do pin
+- `localStorage.getItem("sidebar:pinned")` na inicialização (default: pinned=true para não quebrar UX atual de quem já usa expandida); usuário pode despinar para ativar o modo icon rail com hover
 
-Apenas `src/components/tickets/TicketDetails.tsx`. Sem mudanças de lógica, hooks ou dados. Sem alterações em outros componentes do TicketDetail (sidebar, header, timeline).
+### 5. Detalhes visuais
+- Quando recolhida: `px-2` nos containers, ícones em `w-5 h-5` para boa hit area, item ativo mantém `bg-sidebar-accent`
+- Badge de contador ainda aparece colado ao ícone quando recolhido (pequeno dot vermelho com número, posicionado `absolute -top-1 -right-1`) para não perder informação crítica de tickets pendentes
+- `overflow-hidden` no `<aside>` para evitar flicker de texto durante transição
 
-## Validação
+## Arquivos afetados
 
-Após a aplicação, abrir um ticket no preview mobile (390x754) e conferir:
-- Nenhum scroll horizontal na página.
-- Labels e valores legíveis no card "Informações Técnicas" e "Detalhes do Ticket".
-- Blocos de texto longos quebram dentro do card.
-- Bloco de erro com scroll horizontal interno, sem estourar o card.
+- `src/components/layout/AppLayout.tsx` — estado de expansão, handlers de hover, classes condicionais no `<aside>` desktop
+- `src/components/layout/SidebarContent.tsx` — prop `collapsed`, tooltips, layout condicional, botão de pin, badge de contador colapsado
+
+## Fora de escopo
+
+- Mobile (Sheet) permanece igual
+- Não migramos para `@/components/ui/sidebar` (shadcn)
+- Sem mudanças em rotas, lógica de auth, hooks de contadores
