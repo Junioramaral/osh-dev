@@ -189,6 +189,32 @@ export function useTicketActions() {
     },
   });
 
+  const updateTicketPriority = useMutation({
+    mutationFn: async ({
+      ticketId,
+      priority,
+    }: {
+      ticketId: string;
+      priority: TicketPriority;
+    }) => {
+      const { error } = await supabase
+        .from("tickets")
+        .update({ priority })
+        .eq("id", ticketId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success("Prioridade atualizada com sucesso!");
+      queryClient.invalidateQueries({ queryKey: ["tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["my-tickets"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-history"] });
+    },
+    onError: (error: any) => {
+      toast.error("Erro ao atualizar prioridade: " + error.message);
+    },
+  });
+
   return {
     resolveTicketWithReason,
     updateTicketStatus,
