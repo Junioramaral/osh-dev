@@ -1,55 +1,77 @@
 ## Objetivo
 
-Transformar a sidebar atual (largura fixa `w-64`) em uma sidebar retrátil estilo "icon rail":
-- **Recolhida (padrão)**: faixa estreita (~`w-16`) mostrando só os ícones de navegação + avatar + botões inferiores
-- **Expandida**: largura cheia (`w-64`) mostrando ícones + rótulos
-- **Gatilho**: hover do mouse sobre a faixa OU clique em um botão de pin/trigger no topo
-- **Tooltips**: quando colapsada, cada item de navegação exibe tooltip com o nome ao passar o mouse
-- **Mobile**: mantém o comportamento atual (Sheet/Drawer pelo menu hamburger), sem alteração
+Substituir a sidebar atual (custom em `AppLayout.tsx` + `SidebarContent.tsx`) por uma sidebar baseada no componente shadcn `@/components/ui/sidebar` com `collapsible="icon"`, que:
 
-## Abordagem
+- Inicia **colapsada** por padrão (trilho ~3rem com ícones).
+- Expande automaticamente no **hover** sobre o trilho e recolhe no `onMouseLeave` (transição 200ms já nativa do shadcn).
+- Mostra **tooltips à direita** nos itens quando colapsada (suportado nativamente via prop `tooltip` do `SidebarMenuButton`).
+- Destaca o item ativo (rota atual) em ambos os estados usando tokens `sidebar-accent` / `primary`.
+- No mobile (<768px) vira off-canvas drawer (`Sheet`) — comportamento nativo do shadcn `Sidebar`.
 
-Em vez de migrar para o `Sidebar` do shadcn (refator grande, afeta `AppLayout`, mobile, header, badges customizados), faremos um upgrade incremental no `AppLayout.tsx` e `SidebarContent.tsx` existentes — preservando toda a lógica de navegação, contadores (`TicketCountBadge`), `SLAAlertBell`, perfil e logout.
+## Arquitetura
 
-### 1. Estado de expansão (`AppLayout.tsx`)
-- Adicionar estado local `sidebarExpanded` (boolean) + `sidebarPinned` (boolean, persistido em `localStorage`)
-- Expandida = `sidebarPinned || sidebarExpanded` (hover)
-- Handlers: `onMouseEnter` expande, `onMouseLeave` recolhe (só quando não está pinned)
-- `<aside>` recebe `onMouseEnter/Leave` e classes condicionais: `w-16` recolhida / `w-64` expandida, com `transition-[width] duration-200 ease-out`
+### 1. `AppLayout.tsx` — virar app shell
+- Remover toda a `<aside>` custom, estado `sidebarPinned`/`sidebarHovered`, handlers de hover, props para `SidebarContent`, e o `Sheet` mobile.
+- Envolver tudo com `<SidebarProvider defaultOpen={false}>` em um flex container `w-full`.
+- Renderizar `<AppSidebar />` (novo) + `<main>` com o conteúdo (`{children}`).
+- Adicionar header mobile compacto com `<SidebarTrigger />` (hambúrguer) + logo + `SLAAlertBell`. No desktop, esse header não aparece (md:hidden) — a sidebar gerencia seu próprio header.
+- Manter `ProfileEditDialog`, `mustChangePassword`, `loading`, `signOut`, contadores (`usePendingTicketsCount`, `useMyTicketsCount`), permissões (`isSuperAdmin`, `isTenantAdmin`, etc.).
+- Passar contadores, permissões, profile, `onProfileOpen`, `signOut` como props para `<AppSidebar />`.
 
-### 2. `SidebarContent.tsx`
-- Receber nova prop `collapsed: boolean`
-- Header (logo + título):
-  - Recolhido: só o ícone do logo centralizado; esconder textos "Otimizzo / Service Hub"; mover `SLAAlertBell` para fora ou esconder quando colapsado (já existe no mobile header)
-- Adicionar botão de pin/toggle no topo (ícone `PanelLeftClose` / `PanelLeftOpen` da lucide-react) que alterna `sidebarPinned`
-- Itens de navegação (`operationalNav` e `adminNav`):
-  - Quando `collapsed`: esconder o `{item.name}` e os badges (`TicketCountBadge`); centralizar o ícone (`justify-center`); envolver o `NavLink` em `Tooltip` (side="right") mostrando o nome + contador se houver
-  - Quando expandido: layout atual
-  - Esconder os títulos "Operacional" / "Administrativo" quando recolhido
-- Bloco do perfil (avatar + nome + email + role):
-  - Recolhido: só avatar centralizado, com tooltip mostrando nome/email/role
-- Botões "Configurações" e "Sair":
-  - Recolhido: só ícone centralizado com tooltip
+### 2. Novo `src/components/layout/AppSidebar.tsx`
+Substitui `SidebarContent.tsx` (que será deletado). Estrutura:
 
-### 3. Tooltips
-- Usar `Tooltip`/`TooltipTrigger`/`TooltipContent` de `@/components/ui/tooltip` (já existe `TooltipProvider` no `App.tsx`)
-- `side="right"`, `sideOffset={8}` para não sobrepor a faixa
+```text
+<Sidebar collapsible="icon" onMouseEnter={...} onMouseLeave={...}>
+  <SidebarHeader>
+    logo (sempre) + "Otimizzo / Service Hub" (some no colapsado) + SLAAlertBell
+  </SidebarHeader>
+  <SidebarContent>
+    <SidebarGroup label="Operacional">
+      <SidebarMenu> items com SidebarMenuButton tooltip={item.name} </SidebarMenu>
+    </SidebarGroup>
+    <SidebarGroup label="Administrativo"> ... </SidebarGroup>
+  </SidebarContent>
+  <SidebarFooter>
+    avatar + nome/email (some no colapsado) + Configurações + Sair (tooltips quando colapsado)
+  </SidebarFooter>
+</Sidebar>
+```
 
-### 4. Persistência do pin
-- `localStorage.getItem("sidebar:pinned")` na inicialização (default: pinned=true para não quebrar UX atual de quem já usa expandida); usuário pode despinar para ativar o modo icon rail com hover
+#### Hover-to-expand
+- Usar `useSidebar()` para acessar `setOpen` e `isMobile`.
+- No `<Sidebar>` (componente raiz), adicionar `onMouseEnter={() => !isMobile && setOpen(true)}` e `onMouseLeave={() => !isMobile && setOpen(false)}`.
+- Não usar a borda/trigger lateral de redimensionamento — apenas hover.
+- `defaultOpen={false}` no `SidebarProvider` garante estado inicial colapsado.
 
-### 5. Detalhes visuais
-- Quando recolhida: `px-2` nos containers, ícones em `w-5 h-5` para boa hit area, item ativo mantém `bg-sidebar-accent`
-- Badge de contador ainda aparece colado ao ícone quando recolhido (pequeno dot vermelho com número, posicionado `absolute -top-1 -right-1`) para não perder informação crítica de tickets pendentes
-- `overflow-hidden` no `<aside>` para evitar flicker de texto durante transição
+#### Itens de navegação
+- Cada item usa `<SidebarMenuButton asChild tooltip={item.name} isActive={pathname === item.href}>` envolvendo `<NavLink to={item.href}>` com ícone + `<span>{item.name}</span>`. A prop `tooltip` do shadcn já mostra o tooltip à direita só quando colapsado.
+- Para os badges (`TicketCountBadge` em "Tickets" e "Meus Tickets"): usar `<SidebarMenuBadge>` quando expandido. Quando colapsado, mostrar um dot pequeno absolute no canto do ícone (já que `SidebarMenuBadge` é escondido pelo shadcn no modo icon). Usaremos um `<span>` posicionado com `group-data-[collapsible=icon]:block hidden` para o dot, e o badge normal com `group-data-[collapsible=icon]:hidden` para o número.
+
+#### Grupos
+- `<SidebarGroupLabel>` ("Operacional" / "Administrativo") — o shadcn já esconde labels automaticamente no modo icon-collapsed.
+
+#### Footer
+- Avatar clicável (`onProfileOpen`). Em expandido: avatar + nome + email + role. Em colapsado: só avatar (com tooltip via Radix `Tooltip` wrapper, pois o `SidebarMenuButton` tooltip é só para itens de menu).
+- Botão "Configurações" (`NavLink` para `/system-settings`, só se `isSuperAdmin || isViewer`) e "Sair" — usar `<SidebarMenuButton tooltip="...">` para herdar o comportamento de tooltip colapsado.
+
+### 3. Tokens / cores
+- Usar exclusivamente tokens já existentes: `bg-sidebar`, `text-sidebar-foreground`, `bg-sidebar-accent`, `text-sidebar-accent-foreground`, `text-primary` (para ícone do item ativo). Sem cores hardcoded.
+
+### 4. Deletar
+- `src/components/layout/SidebarContent.tsx` (substituído por `AppSidebar.tsx`).
+
+### 5. Mobile
+- Nativo do shadcn: `collapsible="icon"` em mobile renderiza como `Sheet` off-canvas via `<SidebarTrigger>`.
+- Header mobile no `AppLayout` contém o trigger.
 
 ## Arquivos afetados
 
-- `src/components/layout/AppLayout.tsx` — estado de expansão, handlers de hover, classes condicionais no `<aside>` desktop
-- `src/components/layout/SidebarContent.tsx` — prop `collapsed`, tooltips, layout condicional, botão de pin, badge de contador colapsado
+- `src/components/layout/AppLayout.tsx` — reescrito como app shell com `SidebarProvider`
+- `src/components/layout/AppSidebar.tsx` — **novo**, sidebar shadcn collapsible icon
+- `src/components/layout/SidebarContent.tsx` — **deletado**
 
 ## Fora de escopo
 
-- Mobile (Sheet) permanece igual
-- Não migramos para `@/components/ui/sidebar` (shadcn)
-- Sem mudanças em rotas, lógica de auth, hooks de contadores
+- Lógica de contadores, auth, navegação (rotas) e badges de contagem permanecem idênticas.
+- Sem mudanças em outras páginas/componentes (o `main` continua recebendo `children`).
