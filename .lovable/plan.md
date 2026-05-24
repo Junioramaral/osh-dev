@@ -1,32 +1,19 @@
-## Novo status "liberado" para tickets retornados à fila
+## Objetivo
+Substituir a mensagem genérica "Invalid login credentials" (vinda do Supabase, em inglês) por uma mensagem amigável em português, com título e descrição padronizados como os demais toasts do sistema.
 
-### Objetivo
-Criar um novo status `liberado` no enum `ticket_status` e aplicá-lo automaticamente quando um ticket for desbloqueado por inatividade (retornar à fila), substituindo a lógica visual atual baseada apenas em `unlocked_at`.
+## Mudanças
 
-### Alterações
+**Arquivo:** `src/pages/Auth.tsx`
 
-**1. Banco de dados (migration)**
-- Adicionar valor `liberado` ao enum `public.ticket_status` (`ALTER TYPE ... ADD VALUE 'liberado'`).
+No `handleLogin`, ao invés de `toast.error(error.message)`, mapear o `error.message` retornado pelo Supabase para mensagens amigáveis em PT-BR:
 
-**2. Edge Function `unlock-inactive-tickets`**
-- Ao desbloquear tickets inativos, além de limpar `analyst_id`/`lock_*` e setar `unlocked_at`, atualizar `status = 'liberado'`.
-- Manter o registro no `ticket_history` (action_type `unlocked_by_inactivity`).
+- `Invalid login credentials` → título: "Não foi possível entrar" / descrição: "Email ou senha incorretos. Verifique seus dados e tente novamente."
+- `Email not confirmed` → "Email não confirmado" / "Confirme seu email antes de acessar."
+- `Too many requests` / rate limit → "Muitas tentativas" / "Aguarde alguns instantes antes de tentar novamente."
+- Fallback (qualquer outro erro) → "Erro ao entrar" / "Tente novamente em instantes. Se o problema persistir, contate o suporte."
 
-**3. Frontend — `src/lib/ticketUtils.tsx`**
-- `getStatusColor`: adicionar case `liberado` com cor amarela (mantendo a identidade visual atual de "retornou à fila").
-- `getStatusLabel`: adicionar `liberado` → "Liberado".
+A função usará `toast.error(titulo, { description: ... })` para manter o mesmo padrão visual dos outros toasts do app (ex.: "Erro ao enviar email" no reset de senha).
 
-**4. Listagens e filtros de status**
-- Incluir `liberado` nas opções de filtro/seleção de status em:
-  - `src/pages/Tickets.tsx`
-  - `src/pages/MyTickets.tsx`
-  - `src/pages/Dashboard.tsx` (se houver agrupamento por status)
-- Tratar `liberado` como ticket **aberto** (não entra no grupo resolvido/fechado).
-
-### Pontos de atenção
-- O destaque amarelo na linha (`TicketRow.tsx`) hoje usa `unlocked_at`. Como o status `liberado` é mais explícito, mantemos o highlight atual (continua funcionando), mas a Badge de status passará a mostrar "Liberado".
-- Quando um analista assumir o ticket novamente, o fluxo normal de mudança de status (ex.: `em_atendimento`) sobrescreverá `liberado` — nenhum tratamento extra necessário.
-- RFCs continuam fora do fluxo de inatividade.
-
-### Não incluso
-- Nenhuma alteração em SLA, regras de negócio de fechamento, ou notificações por email além do que já existe.
+## Fora do escopo
+- Não altera lógica de autenticação.
+- Não altera mensagens de outras páginas.
