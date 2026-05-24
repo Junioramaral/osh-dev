@@ -1,12 +1,12 @@
-import { ReactNode, useState, useCallback, useMemo, useEffect } from "react";
+import { ReactNode, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Navigate } from "react-router-dom";
-import { Button } from "@/components/ui/button";
 import { usePendingTicketsCount } from "@/hooks/usePendingTicketsCount";
 import { useMyTicketsCount } from "@/hooks/useMyTicketsCount";
 import { SLAAlertBell } from "@/components/layout/SLAAlertBell";
 import { ProfileEditDialog } from "@/components/profile/ProfileEditDialog";
-import SidebarContent from "@/components/layout/SidebarContent";
+import AppSidebar from "@/components/layout/AppSidebar";
+import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import {
   LayoutDashboard,
   Users,
@@ -16,16 +16,13 @@ import {
   AppWindow,
   Server,
   FileText,
-  Menu,
   BarChart3,
-  
   FileBarChart,
   Star,
   ClipboardCheck,
   ClipboardList,
   ShieldCheck,
 } from "lucide-react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 
 interface AppLayoutProps {
   children: ReactNode;
@@ -33,26 +30,11 @@ interface AppLayoutProps {
 
 const AppLayout = ({ children }: AppLayoutProps) => {
   const { user, profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId, signOut, loading, mustChangePassword } = useAuth();
-  const [open, setOpen] = useState(false);
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
-  const [sidebarPinned, setSidebarPinned] = useState<boolean>(() => {
-    if (typeof window === "undefined") return true;
-    const stored = localStorage.getItem("sidebar:pinned");
-    return stored === null ? true : stored === "true";
-  });
-  const [sidebarHovered, setSidebarHovered] = useState(false);
 
-  useEffect(() => {
-    localStorage.setItem("sidebar:pinned", String(sidebarPinned));
-  }, [sidebarPinned]);
-
-  const sidebarExpanded = sidebarPinned || sidebarHovered;
-  const togglePin = useCallback(() => setSidebarPinned((p) => !p), []);
-  
   const { data: pendingCount = 0 } = usePendingTicketsCount();
   const { data: myTicketsCount = 0 } = useMyTicketsCount();
 
-  const handleClose = useCallback(() => setOpen(false), []);
   const handleProfileOpen = useCallback(() => setProfileDialogOpen(true), []);
 
   const operationalNav = useMemo(() => [
@@ -98,19 +80,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   }
 
   return (
-    <div className="flex h-screen bg-background print:block print:h-auto print:overflow-visible">
-      {/* Desktop Sidebar */}
-      <aside
-        className={`hidden md:flex md:flex-col h-screen bg-sidebar text-sidebar-foreground print:hidden overflow-hidden transition-[width] duration-200 ease-out ${
-          sidebarExpanded ? "w-64" : "w-16"
-        }`}
-        onMouseEnter={() => setSidebarHovered(true)}
-        onMouseLeave={() => setSidebarHovered(false)}
-      >
-        <SidebarContent
-          collapsed={!sidebarExpanded}
-          pinned={sidebarPinned}
-          onTogglePin={togglePin}
+    <SidebarProvider defaultOpen={false}>
+      <div className="flex min-h-screen w-full bg-background print:block print:h-auto print:overflow-visible">
+        <AppSidebar
           operationalNav={operationalNav}
           adminNav={adminNav}
           pendingCount={pendingCount}
@@ -121,63 +93,33 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           isTenantAdmin={isTenantAdmin}
           isViewer={isViewer}
           isOtimizzoUser={isOtimizzoUser}
-          onClose={handleClose}
           onProfileOpen={handleProfileOpen}
           signOut={signOut}
         />
-      </aside>
 
-      {/* Mobile Header */}
-      <div className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card print:hidden">
-        <div className="flex items-center gap-2">
-          <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
-            <Server className="w-4 h-4 text-primary-foreground" />
-          </div>
-          <span className="font-semibold">Otimizzo</span>
-        </div>
-        <div className="flex items-center gap-2">
-          <SLAAlertBell />
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon">
-                <Menu className="w-5 h-5" />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-64 p-0 bg-sidebar text-sidebar-foreground">
-              <div className="flex flex-col h-full">
-                <SidebarContent
-                  collapsed={false}
-                  pinned={true}
-                  onTogglePin={togglePin}
-                  operationalNav={operationalNav}
-                  adminNav={adminNav}
-                  pendingCount={pendingCount}
-                  myTicketsCount={myTicketsCount}
-                  profile={profile}
-                  userEmail={user?.email}
-                  isSuperAdmin={isSuperAdmin}
-                  isTenantAdmin={isTenantAdmin}
-                  isViewer={isViewer}
-                  isOtimizzoUser={isOtimizzoUser}
-                  onClose={handleClose}
-                  onProfileOpen={handleProfileOpen}
-                  signOut={signOut}
-                />
+        <div className="flex-1 flex flex-col min-w-0">
+          {/* Mobile Header */}
+          <div className="md:hidden flex items-center justify-between p-4 border-b border-border bg-card print:hidden">
+            <div className="flex items-center gap-2">
+              <SidebarTrigger />
+              <div className="flex items-center justify-center w-8 h-8 bg-primary rounded-lg">
+                <Server className="w-4 h-4 text-primary-foreground" />
               </div>
-            </SheetContent>
-          </Sheet>
+              <span className="font-semibold">Otimizzo</span>
+            </div>
+            <SLAAlertBell />
+          </div>
+
+          <main className="flex-1 overflow-auto print:overflow-visible print:h-auto print:block">
+            <div className="container mx-auto p-6 print:max-w-none print:p-0 print:m-0">
+              {children}
+            </div>
+          </main>
         </div>
+
+        <ProfileEditDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
       </div>
-
-      {/* Main Content */}
-      <main className="flex-1 overflow-auto print:overflow-visible print:h-auto print:block">
-        <div className="container mx-auto p-6 print:max-w-none print:p-0 print:m-0">
-          {children}
-        </div>
-      </main>
-
-      <ProfileEditDialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen} />
-    </div>
+    </SidebarProvider>
   );
 };
 
