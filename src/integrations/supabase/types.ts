@@ -1095,6 +1095,42 @@ export type Database = {
           },
         ]
       }
+      ticket_sla_pauses: {
+        Row: {
+          created_at: string
+          id: string
+          pause_minutes: number | null
+          paused_at: string
+          paused_by: string | null
+          resumed_at: string | null
+          resumed_by: string | null
+          status_during_pause: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          pause_minutes?: number | null
+          paused_at: string
+          paused_by?: string | null
+          resumed_at?: string | null
+          resumed_by?: string | null
+          status_during_pause: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          pause_minutes?: number | null
+          paused_at?: string
+          paused_by?: string | null
+          resumed_at?: string | null
+          resumed_by?: string | null
+          status_during_pause?: string
+          ticket_id?: string
+        }
+        Relationships: []
+      }
       ticket_subcategories: {
         Row: {
           category_id: string
@@ -1237,9 +1273,16 @@ export type Database = {
           resolved_by: string | null
           rfc_progress: number | null
           segment: Database["public"]["Enums"]["ticket_segment"]
+          sla_adjusted_at: string | null
+          sla_adjusted_by: string | null
+          sla_adjustment_reason: string | null
           sla_first_response_deadline: string | null
+          sla_first_response_deadline_original: string | null
           sla_first_response_met: boolean | null
+          sla_paused_at: string | null
+          sla_paused_total_minutes: number
           sla_resolution_deadline: string | null
+          sla_resolution_deadline_original: string | null
           sla_resolution_met: boolean | null
           started_at: string
           status: Database["public"]["Enums"]["ticket_status"] | null
@@ -1300,9 +1343,16 @@ export type Database = {
           resolved_by?: string | null
           rfc_progress?: number | null
           segment: Database["public"]["Enums"]["ticket_segment"]
+          sla_adjusted_at?: string | null
+          sla_adjusted_by?: string | null
+          sla_adjustment_reason?: string | null
           sla_first_response_deadline?: string | null
+          sla_first_response_deadline_original?: string | null
           sla_first_response_met?: boolean | null
+          sla_paused_at?: string | null
+          sla_paused_total_minutes?: number
           sla_resolution_deadline?: string | null
+          sla_resolution_deadline_original?: string | null
           sla_resolution_met?: boolean | null
           started_at: string
           status?: Database["public"]["Enums"]["ticket_status"] | null
@@ -1363,9 +1413,16 @@ export type Database = {
           resolved_by?: string | null
           rfc_progress?: number | null
           segment?: Database["public"]["Enums"]["ticket_segment"]
+          sla_adjusted_at?: string | null
+          sla_adjusted_by?: string | null
+          sla_adjustment_reason?: string | null
           sla_first_response_deadline?: string | null
+          sla_first_response_deadline_original?: string | null
           sla_first_response_met?: boolean | null
+          sla_paused_at?: string | null
+          sla_paused_total_minutes?: number
           sla_resolution_deadline?: string | null
+          sla_resolution_deadline_original?: string | null
           sla_resolution_met?: boolean | null
           started_at?: string
           status?: Database["public"]["Enums"]["ticket_status"] | null
