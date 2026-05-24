@@ -343,6 +343,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                     <SelectItem value="novo">Novo</SelectItem>
                     <SelectItem value="em_atendimento">Em Atendimento</SelectItem>
                     <SelectItem value="aguardando_cliente">Aguardando Cliente</SelectItem>
+                    <SelectItem value="aguardando_aprovacao">Aguardando Aprovação</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -379,6 +380,18 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                 Resolver Ticket
               </Button>
             </>
+          )}
+
+          {/* Adjust SLA Button - analysts/admins only, not for resolved tickets */}
+          {canAdjustSLA && !isResolved && (
+            <Button
+              variant="outline"
+              className="w-full"
+              onClick={() => setShowSLAAdjustDialog(true)}
+            >
+              <Sliders className="h-4 w-4 mr-2" />
+              Ajustar SLA
+            </Button>
           )}
 
           {/* Log Time Button - visible for Otimizzo/SuperAdmin even on resolved tickets */}
@@ -451,6 +464,22 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         }}
         onConfirm={handleRequiredFieldsConfirm}
         isLoading={savingRequiredFields}
+      />
+
+      <SLAAdjustDialog
+        open={showSLAAdjustDialog}
+        onOpenChange={setShowSLAAdjustDialog}
+        ticket={ticket}
+        onConfirm={async (values) => {
+          await adjustSLA.mutateAsync({
+            ticketId: ticket.id,
+            firstResponseDeadline: values.firstResponseDeadline,
+            resolutionDeadline: values.resolutionDeadline,
+            reason: values.reason,
+          });
+          setShowSLAAdjustDialog(false);
+        }}
+        isLoading={adjustSLA.isPending}
       />
 
       {/* Time Log Dialog */}
