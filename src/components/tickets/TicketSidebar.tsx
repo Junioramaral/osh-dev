@@ -26,6 +26,7 @@ import { TicketResolveDialog } from "./TicketResolveDialog";
 import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "./RequiredFieldsBeforeResolveDialog";
 import { TimeLogDialog } from "./TimeLogDialog";
 import { SLAAdjustDialog } from "./SLAAdjustDialog";
+import { SLARecalculatePromptDialog } from "./SLARecalculatePromptDialog";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,6 +58,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [showRequiredFieldsDialog, setShowRequiredFieldsDialog] = useState(false);
   const [savingRequiredFields, setSavingRequiredFields] = useState(false);
   const [showSLAAdjustDialog, setShowSLAAdjustDialog] = useState(false);
+  const [pendingPriority, setPendingPriority] = useState<string | null>(null);
   const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
@@ -352,9 +354,9 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
                 <Label className="text-xs text-muted-foreground">Alterar Prioridade</Label>
                 <Select
                   value={ticket.priority}
-                  onValueChange={(value) =>
-                    updateTicketPriority.mutate({ ticketId: ticket.id, priority: value as any })
-                  }
+                  onValueChange={(value) => {
+                    if (value !== ticket.priority) setPendingPriority(value);
+                  }}
                   disabled={updateTicketPriority.isPending}
                 >
                   <SelectTrigger className="w-full">
@@ -480,6 +482,22 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
           setShowSLAAdjustDialog(false);
         }}
         isLoading={adjustSLA.isPending}
+      />
+
+      <SLARecalculatePromptDialog
+        open={!!pendingPriority}
+        onOpenChange={(o) => { if (!o) setPendingPriority(null); }}
+        newPriority={pendingPriority || ""}
+        onConfirm={(recalc, reason) => {
+          if (!pendingPriority) return;
+          updateTicketPriority.mutate({
+            ticketId: ticket.id,
+            priority: pendingPriority as any,
+            recalculateSLA: recalc,
+            reason,
+          });
+          setPendingPriority(null);
+        }}
       />
 
       {/* Time Log Dialog */}
