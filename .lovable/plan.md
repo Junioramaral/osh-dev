@@ -1,23 +1,20 @@
-## Objetivo
+## Aplicar filtro de múltiplos status em "Meus Tickets"
 
-Exibir, na aba SLA do ticket, o histórico detalhado de pausas (quando pausou, quando retomou, status durante a pausa, duração e por quem) — usando os registros já gravados em `ticket_sla_pauses`.
+Replicar o filtro de status multi-seleção (popover com checkboxes) já existente em `src/pages/Tickets.tsx` para `src/pages/MyTickets.tsx`, substituindo o atual `Select` de status único.
 
-## Mudanças
+### Alterações em `src/pages/MyTickets.tsx`
 
-### 1. Hook novo: `src/hooks/useTicketSLAPauses.ts`
-- Faz `select` em `ticket_sla_pauses` filtrando por `ticket_id`, ordenado por `paused_at` desc.
-- Faz join leve via segunda query para buscar `full_name` dos `paused_by` / `resumed_by` em `profiles`.
+1. Imports: adicionar `Popover, PopoverContent, PopoverTrigger`, `Button`, `Checkbox` (já presente), `ChevronDown` do lucide-react.
+2. Substituir estado:
+   - Remover `statusFilter: string` com valor `"all"`.
+   - Adicionar `STATUS_OPTIONS` e `DEFAULT_STATUS_FILTERS` idênticos a Tickets.tsx (mesmos 9 status e mesmos 7 default ativos).
+   - Adicionar `statusFilters: string[]` inicializado com `DEFAULT_STATUS_FILTERS`.
+3. Atualizar filtro:
+   - Trocar `matchesStatus = statusFilter === "all" || ticket.status === statusFilter` por `matchesStatus = statusFilters.length === 0 ? false : statusFilters.includes(ticket.status)`.
+4. UI: substituir o `<Select>` de status pelo `<Popover>` com mesma estrutura visual de Tickets.tsx (botão com contagem, opções "Selecionar todos" / "Limpar", lista de checkboxes).
+5. Empty state: ajustar verificação para usar `statusFilters` em vez de `statusFilter !== "all"`.
 
-### 2. `src/components/tickets/SLAHistoryTable.tsx`
-- Chamar `useTicketSLAPauses(ticket.id)`.
-- Após a tabela atual, adicionar nova seção "Histórico de Pausas do SLA" com tabela:
-  - Colunas: Pausado em | Status | Retomado em | Duração | Pausado por | Retomado por
-  - Linha em andamento (sem `resumed_at`) mostra badge "Em pausa" e calcula duração até `now()`.
-  - Se não há pausas, esconde a seção.
-- Formatar com `date-fns` + `ptBR` no padrão já usado (`dd/MM/yyyy HH:mm`).
-- Status traduzido via `getStatusLabel` de `ticketUtils`.
+### Fora do escopo
 
-## Fora de escopo
-
-- Sem mudanças de banco (a tabela e o trigger já existem e gravam).
-- Sem alteração em relatórios — o dado fica disponível para uso posterior.
+- Nenhuma alteração em `Tickets.tsx`, hooks, ou lógica de backend.
+- Sem mudanças nos demais filtros (segmento, time, tipo).
