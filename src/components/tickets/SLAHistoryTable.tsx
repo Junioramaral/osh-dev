@@ -13,6 +13,8 @@ import { CheckCircle2, XCircle, Clock, Pause, Sliders } from "lucide-react";
 import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOURS } from "@/lib/businessHours";
 import { useTicketSLAPauses } from "@/hooks/useTicketSLAPauses";
 import { getStatusLabel } from "@/lib/ticketUtils";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Info } from "lucide-react";
 
 interface SLAHistoryTableProps {
   ticket: any;
@@ -221,6 +223,16 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
           <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
             <Pause className="h-4 w-4" />
             Histórico de Pausas do SLA
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Info className="h-3.5 w-3.5 text-muted-foreground cursor-help" />
+                </TooltipTrigger>
+                <TooltipContent className="max-w-xs text-xs">
+                  Para P3/P4 contamos apenas horário útil (09–18, dias úteis). Para P1/P2 o tempo é corrido (24x7).
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           </h4>
           <Table>
             <TableHeader>
@@ -229,12 +241,15 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
                 <TableHead>Status durante pausa</TableHead>
                 <TableHead>Retomado em</TableHead>
                 <TableHead>Duração</TableHead>
+                <TableHead>Descontado do SLA</TableHead>
                 <TableHead>Pausado por</TableHead>
                 <TableHead>Retomado por</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pauses.map((p) => {
+              {(() => {
+                let totalDiscounted = 0;
+                const rows = pauses.map((p) => {
                 const pausedAt = new Date(p.paused_at);
                 const resumedAt = p.resumed_at ? new Date(p.resumed_at) : null;
                 const minutes =
@@ -245,6 +260,14 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
                 const h = Math.floor(minutes / 60);
                 const m = minutes % 60;
                 const durationStr = h > 0 ? `${h}h ${m}min` : `${m}min`;
+                const endP = resumedAt || new Date();
+                const discountedMin = useBusinessHours
+                  ? calculateBusinessMinutes(pausedAt, endP, DEFAULT_BUSINESS_HOURS)
+                  : minutes;
+                totalDiscounted += discountedMin;
+                const dh = Math.floor(discountedMin / 60);
+                const dm = discountedMin % 60;
+                const discountedStr = dh > 0 ? `${dh}h ${dm}min` : `${dm}min`;
                 return (
                   <TableRow key={p.id}>
                     <TableCell>{format(pausedAt, "dd/MM/yyyy HH:mm", { locale: ptBR })}</TableCell>
@@ -264,6 +287,12 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
                       )}
                     </TableCell>
                     <TableCell>{durationStr}</TableCell>
+                    <TableCell className="font-medium">
+                      {discountedStr}
+                      {!resumedAt && (
+                        <span className="ml-2 text-xs text-muted-foreground">(em curso)</span>
+                      )}
+                    </TableCell>
                     <TableCell className="text-sm text-muted-foreground">
                       {p.paused_by_name || "Sistema"}
                     </TableCell>
@@ -272,7 +301,23 @@ export default function SLAHistoryTable({ ticket }: SLAHistoryTableProps) {
                     </TableCell>
                   </TableRow>
                 );
-              })}
+                });
+                const th = Math.floor(totalDiscounted / 60);
+                const tm = totalDiscounted % 60;
+                const totalStr = th > 0 ? `${th}h ${tm}min` : `${tm}min`;
+                return (
+                  <>
+                    {rows}
+                    <TableRow className="bg-muted/40">
+                      <TableCell colSpan={4} className="text-right font-semibold">
+                        Total descontado do SLA
+                      </TableCell>
+                      <TableCell className="font-semibold">{totalStr}</TableCell>
+                      <TableCell colSpan={2} />
+                    </TableRow>
+                  </>
+                );
+              })()}
             </TableBody>
           </Table>
         </div>

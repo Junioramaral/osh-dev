@@ -3,10 +3,12 @@ import { Clock, Target, Pause, TrendingUp } from "lucide-react";
 import { differenceInMinutes } from "date-fns";
 import { Badge } from "@/components/ui/badge";
 import { isBusinessHoursPriority, calculateBusinessMinutes, DEFAULT_BUSINESS_HOURS } from "@/lib/businessHours";
+import type { SLAPauseRow } from "@/hooks/useTicketSLAPauses";
 
 interface SLAMetricsCardsProps {
   ticket: any;
   holidays?: string[];
+  pauses?: SLAPauseRow[];
 }
 
 function formatDuration(minutes: number): string {
@@ -24,7 +26,7 @@ function formatDuration(minutes: number): string {
   }
 }
 
-export default function SLAMetricsCards({ ticket, holidays = [] }: SLAMetricsCardsProps) {
+export default function SLAMetricsCards({ ticket, holidays = [], pauses }: SLAMetricsCardsProps) {
   const createdAt = new Date(ticket.created_at);
   const resolvedAt = ticket.resolved_at ? new Date(ticket.resolved_at) : new Date();
   const useBusinessHours = isBusinessHoursPriority(ticket.priority);
@@ -36,15 +38,26 @@ export default function SLAMetricsCards({ ticket, holidays = [] }: SLAMetricsCar
   const usefulMinutes = useBusinessHours
     ? calculateBusinessMinutes(createdAt, resolvedAt, DEFAULT_BUSINESS_HOURS, holidays)
     : totalMinutesCalendar;
-  
-  // Tempo em pausa (difference between calendar and business for P3/P4)
-  const pauseMinutes = useBusinessHours
-    ? Math.max(0, totalMinutesCalendar - usefulMinutes)
-    : 0;
-  
+
+  // Tempo em pausa: prefer real pause records, fallback to heuristic
+  let pauseMinutes = 0;
+  if (pauses && pauses.length > 0) {
+    pauseMinutes = pauses.reduce((sum, p) => {
+      const startP = new Date(p.paused_at);
+      const endP = p.resumed_at ? new Date(p.resumed_at) : new Date();
+      const mins = useBusinessHours
+        ? calculateBusinessMinutes(startP, endP, DEFAULT_BUSINESS_HOURS, holidays)
+        : Math.max(0, Math.floor((endP.getTime() - startP.getTime()) / 60000));
+      return sum + mins;
+    }, 0);
+  } else {
+    pauseMinutes = useBusinessHours ? Math.max(0, totalMinutesCalendar - usefulMinutes) : 0;
+  }
+
   // Eficiência
-  const efficiency = totalMinutesCalendar > 0 
-    ? ((usefulMinutes / totalMinutesCalendar) * 100).toFixed(1)
+  const denom = usefulMinutes + pauseMinutes;
+  const efficiency = denom > 0
+    ? ((usefulMinutes / denom) * 100).toFixed(1)
     : "100.0";
   
   const metrics = [

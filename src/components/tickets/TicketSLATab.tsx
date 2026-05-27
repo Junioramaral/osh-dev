@@ -3,16 +3,18 @@ import SLAHistoryTable from "./SLAHistoryTable";
 import SLATimelineChart from "./SLATimelineChart";
 import SLAMetricsCards from "./SLAMetricsCards";
 import SLANotificationsLog from "./SLANotificationsLog";
+import { useTicketSLAPauses } from "@/hooks/useTicketSLAPauses";
 
 interface TicketSLATabProps {
   ticket: any;
 }
 
 export default function TicketSLATab({ ticket }: TicketSLATabProps) {
+  const { data: pauses = [] } = useTicketSLAPauses(ticket.id);
   return (
     <div className="space-y-6">
       {/* Métricas de Performance */}
-      <SLAMetricsCards ticket={ticket} />
+      <SLAMetricsCards ticket={ticket} pauses={pauses} />
       
       {/* Timeline Visual */}
       <Card className="p-6">
