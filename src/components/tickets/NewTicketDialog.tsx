@@ -106,7 +106,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       frequency: "pontual",
       business_impact: "medio",
       ticket_type: "incidente",
-      priority: "P3",
+      priority: "P4",
       started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
     },
   });
@@ -235,7 +235,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         frequency: "pontual",
         business_impact: "medio",
         ticket_type: "incidente",
-        priority: "P3",
+        priority: "P4",
         started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
       });
     }
