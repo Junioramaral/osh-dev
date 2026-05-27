@@ -1593,6 +1593,10 @@ export type Database = {
         Args: { _minutes: number; _start_time: string }
         Returns: string
       }
+      business_minutes_between: {
+        Args: { _end: string; _start: string }
+        Returns: number
+      }
       can_analyst_view_ticket: {
         Args: { _ticket_queue_id: string; _user_id: string }
         Returns: boolean
