@@ -712,7 +712,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
               </TabsContent>
             </Tabs>
 
-            {activeTab !== "projects" && (
+            {activeTab !== "projects" && activeTab !== "users" && activeTab !== "report" && (
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancelar
