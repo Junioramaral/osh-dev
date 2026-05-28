@@ -293,8 +293,10 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className={`grid w-full ${mode === "edit" ? "grid-cols-6" : "grid-cols-4"}`}>
                 <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
+                {mode === "edit" && <TabsTrigger value="users">Usuários</TabsTrigger>}
+                {mode === "edit" && <TabsTrigger value="report">Relatório</TabsTrigger>}
                 <TabsTrigger value="contract">Contrato</TabsTrigger>
                 <TabsTrigger value="sla">SLAs</TabsTrigger>
                 <TabsTrigger value="projects">
