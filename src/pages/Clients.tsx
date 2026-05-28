@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
+import { useNavigate } from "react-router-dom";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import AppLayout from "@/components/layout/AppLayout";
@@ -17,6 +18,7 @@ type Client = Tables<"clients">;
 
 export default function Clients() {
   const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
+  const navigate = useNavigate();
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogMode, setDialogMode] = useState<"create" | "edit">("create");
   const [selectedClient, setSelectedClient] = useState<Client | null>(null);
@@ -103,11 +105,7 @@ export default function Clients() {
               <Card
                 key={client.id}
                 className="hover:shadow-lg transition-shadow cursor-pointer"
-                onClick={() => {
-                  setDialogMode("edit");
-                  setSelectedClient(client);
-                  setDialogOpen(true);
-                }}
+                onClick={() => navigate(`/clients/${client.id}`)}
               >
                 <CardHeader>
                   <CardTitle className="flex items-center gap-2">

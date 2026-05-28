@@ -258,7 +258,8 @@ export function TenantUsersManager({ tenantId, tenantDomain, maxUsers }: TenantU
               ))}
             </div>
           ) : users && users.length > 0 ? (
-            <Table>
+            <div className="w-full overflow-x-auto">
+            <Table className="min-w-[760px]">
               <TableHeader>
                 <TableRow>
                   <TableHead>Nome</TableHead>
@@ -373,6 +374,7 @@ export function TenantUsersManager({ tenantId, tenantDomain, maxUsers }: TenantU
                 })}
               </TableBody>
             </Table>
+            </div>
           ) : (
             <div className="text-center py-8 text-muted-foreground">Nenhum usuário cadastrado neste tenant.</div>
           )}
