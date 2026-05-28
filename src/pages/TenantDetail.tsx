@@ -658,11 +658,6 @@ const TenantDetail = () => {
           </CardContent>
         </Card>
 
-        <TenantUsersManager
-          tenantId={tenantId!}
-          tenantDomain={tenant.domain}
-          maxUsers={tenant.max_users}
-        />
       </div>
     </AppLayout>
   );
