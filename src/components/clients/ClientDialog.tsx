@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Database, Package, Mail, FolderKanban } from "lucide-react";
 import ClientProjectsTab from "./ClientProjectsTab";
 import { formatCnpj } from "@/lib/cnpjUtils";
+import { TenantUsersManager } from "@/components/tenants/TenantUsersManager";
+import { TenantUserReport } from "@/components/tenants/TenantUserReport";
 
 // Ícones SVG específicos para cada engine de banco de dados
 const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
@@ -291,8 +293,10 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-              <TabsList className="grid w-full grid-cols-4">
+              <TabsList className={`grid w-full ${mode === "edit" ? "grid-cols-6" : "grid-cols-4"}`}>
                 <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
+                {mode === "edit" && <TabsTrigger value="users">Usuários</TabsTrigger>}
+                {mode === "edit" && <TabsTrigger value="report">Relatório</TabsTrigger>}
                 <TabsTrigger value="contract">Contrato</TabsTrigger>
                 <TabsTrigger value="sla">SLAs</TabsTrigger>
                 <TabsTrigger value="projects">
@@ -546,6 +550,22 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                 />
               </TabsContent>
 
+              {mode === "edit" && client && (
+                <TabsContent value="users" className="space-y-4">
+                  <TenantUsersManager
+                    tenantId={client.id}
+                    tenantDomain={client.domain}
+                    maxUsers={client.max_users}
+                  />
+                </TabsContent>
+              )}
+
+              {mode === "edit" && client && (
+                <TabsContent value="report" className="space-y-4">
+                  <TenantUserReport tenantId={client.id} tenantName={client.name} />
+                </TabsContent>
+              )}
+
               <TabsContent value="contract" className="space-y-4">
                 <FormField
                   control={form.control}
@@ -692,7 +712,7 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
               </TabsContent>
             </Tabs>
 
-            {activeTab !== "projects" && (
+            {activeTab !== "projects" && activeTab !== "users" && activeTab !== "report" && (
               <div className="flex justify-end gap-2">
                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                   Cancelar
