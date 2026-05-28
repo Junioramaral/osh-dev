@@ -13,6 +13,7 @@ import MyTickets from "./pages/MyTickets";
 import TicketDetail from "./pages/TicketDetail";
 import TicketFeedback from "./pages/TicketFeedback";
 import Clients from "./pages/Clients";
+import ClientDetail from "./pages/ClientDetail";
 import Databases from "./pages/Databases";
 import Applications from "./pages/Applications";
 import Machines from "./pages/Machines";
@@ -52,6 +53,7 @@ const App = () => (
             <Route path="/sla-acknowledge/:notificationId/:token" element={<SLAAcknowledge />} />
             <Route path="/csat" element={<CSATDashboard />} />
             <Route path="/clients" element={<Clients />} />
+            <Route path="/clients/:clientId" element={<ClientDetail />} />
             <Route path="/databases" element={<Databases />} />
             <Route path="/applications" element={<Applications />} />
             <Route path="/machines" element={<Machines />} />
