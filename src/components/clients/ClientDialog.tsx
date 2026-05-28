@@ -550,6 +550,22 @@ export default function ClientDialog({ open, onOpenChange, mode, client }: Clien
                 />
               </TabsContent>
 
+              {mode === "edit" && client && (
+                <TabsContent value="users" className="space-y-4">
+                  <TenantUsersManager
+                    tenantId={client.id}
+                    tenantDomain={client.domain}
+                    maxUsers={client.max_users}
+                  />
+                </TabsContent>
+              )}
+
+              {mode === "edit" && client && (
+                <TabsContent value="report" className="space-y-4">
+                  <TenantUserReport tenantId={client.id} tenantName={client.name} />
+                </TabsContent>
+              )}
+
               <TabsContent value="contract" className="space-y-4">
                 <FormField
                   control={form.control}
