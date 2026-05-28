@@ -786,6 +786,17 @@ const Index = () => {
               <Server className="w-5 h-5 text-primary" />
               <span className="font-semibold">Otimizzo Service Hub</span>
             </div>
+            <p className="text-sm text-muted-foreground text-center">
+              Uma solução do{" "}
+              <a
+                href="https://otimizzo.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary font-medium hover:underline"
+              >
+                Grupo Otimizzo
+              </a>
+            </p>
             <p className="text-sm text-muted-foreground">
               © {new Date().getFullYear()} Otimizzo. Todos os direitos reservados.
             </p>

@@ -1,15 +1,10 @@
-## Mudar prioridade padrão de novos tickets para P4
+## Objetivo
+Adicionar na landing page (`src/pages/Index.tsx`) uma indicação de que o Otimizzo Service Hub faz parte do grupo Otimizzo, com link para `https://otimizzo.com/`.
 
-Alterar o default do formulário "Novo Ticket" de `P3` para `P4`. O usuário continua podendo escolher qualquer prioridade no Select.
+## Onde
+No rodapé (footer) da landing page, junto ao copyright existente.
 
-### Arquivo
-
-`src/components/tickets/NewTicketDialog.tsx` — duas ocorrências:
-- linha 109: `defaultValues` do `useForm` → `priority: "P4"`.
-- linha 238: bloco de `form.reset(...)` ao fechar/abrir → `priority: "P4"`.
-
-### Fora do escopo
-
-- `RFCFormSection.tsx` mantém `P3` (RFC não é ticket de suporte e está fora do fluxo de SLA).
-- Sem mudanças em backend, RLS, ou tickets já existentes (apenas o default no momento da criação).
-- Sem mudanças em filtros, relatórios ou listagens.
+## Como
+- Incluir um texto do tipo "Uma solução do Grupo Otimizzo" com link clicável para `https://otimizzo.com/`.
+- Abrir o link em nova aba (`target="_blank" rel="noopener noreferrer"`).
+- Manter o estilo visual consistente com o footer atual (cores muted, alinhamento responsivo).
