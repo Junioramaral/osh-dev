@@ -15,6 +15,8 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Database, Package, Mail, FolderKanban } from "lucide-react";
 import ClientProjectsTab from "./ClientProjectsTab";
 import { formatCnpj } from "@/lib/cnpjUtils";
+import { TenantUsersManager } from "@/components/tenants/TenantUsersManager";
+import { TenantUserReport } from "@/components/tenants/TenantUserReport";
 
 // Ícones SVG específicos para cada engine de banco de dados
 const DatabaseEngineIcon = ({ engine }: { engine: string }) => {
