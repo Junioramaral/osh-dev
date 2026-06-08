@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
@@ -119,12 +119,6 @@ export default function DatabaseDialog({
     enabled: open && !!selectedClientId,
   });
 
-  useEffect(() => {
-    if (!isSuperAdmin && profile?.client_id) {
-      form.setValue("client_id", profile.client_id);
-    }
-  }, [isSuperAdmin, profile, form]);
-
   // Reset engine when selected client no longer supports it
   useEffect(() => {
     if (!selectedClientId || !clients) return;
@@ -139,33 +133,41 @@ export default function DatabaseDialog({
     }
   }, [selectedClientId, clients, currentEngine, availableEngines, database, form]);
 
+  // Only reset the form on the open transition (false -> true), never when
+  // `profile` reference changes (e.g. on tab focus / session revalidation),
+  // otherwise user input is wiped out.
+  const wasOpenRef = useRef(false);
   useEffect(() => {
-    if (database && open) {
-      form.reset({
-        client_id: database.client_id,
-        machine_id: database.machine_id || "",
-        engine: database.engine as any,
-        version: database.version,
-        instance_name: database.instance_name,
-        endpoint: database.endpoint || "",
-        port: database.port || ("" as any),
-        environment: database.environment as any,
-        criticality: database.criticality || "media",
-      });
-    } else if (!database && open) {
-      form.reset({
-        client_id: profile?.client_id || "",
-        machine_id: "",
-        engine: "PostgreSQL",
-        version: "",
-        instance_name: "",
-        endpoint: "",
-        port: "" as any,
-        environment: "prod",
-        criticality: "media",
-      });
+    if (open && !wasOpenRef.current) {
+      if (database) {
+        form.reset({
+          client_id: database.client_id,
+          machine_id: database.machine_id || "",
+          engine: database.engine as any,
+          version: database.version,
+          instance_name: database.instance_name,
+          endpoint: database.endpoint || "",
+          port: database.port || ("" as any),
+          environment: database.environment as any,
+          criticality: database.criticality || "media",
+        });
+      } else {
+        form.reset({
+          client_id: profile?.client_id || "",
+          machine_id: "",
+          engine: "PostgreSQL",
+          version: "",
+          instance_name: "",
+          endpoint: "",
+          port: "" as any,
+          environment: "prod",
+          criticality: "media",
+        });
+      }
     }
-  }, [database, open, profile, form]);
+    wasOpenRef.current = open;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, database?.id]);
 
   const onSubmit = (data: DatabaseFormData) => {
     const submitData = {
