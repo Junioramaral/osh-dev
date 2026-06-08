@@ -1,9 +1,14 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileX, FileText, Download, Eye, Loader2 } from "lucide-react";
+import { FileX, FileText, Download, Eye, Loader2, Upload } from "lucide-react";
 import { useTicketComments } from "@/hooks/useTicketDetail";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/contexts/AuthContext";
+import { useQueryClient } from "@tanstack/react-query";
+import { FileUploadZone, type FileWithPreview } from "./FileUploadZone";
+import { uploadCommentAttachments } from "@/lib/ticketAttachmentUpload";
+import { toast } from "@/hooks/use-toast";
 
 interface AttachmentCardProps {
   attachment: any;
@@ -88,8 +93,12 @@ interface TicketAttachmentsProps {
 
 export default function TicketAttachments({ ticket, ticketId }: TicketAttachmentsProps) {
   const { data: comments } = useTicketComments(ticketId);
+  const { user, profile, isViewer } = useAuth();
+  const queryClient = useQueryClient();
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loadingUrls, setLoadingUrls] = useState<Record<string, boolean>>({});
+  const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const [uploading, setUploading] = useState(false);
   
   const allAttachments = [
     ...(ticket.evidences || []).map((e: any) => ({ ...e, source: 'ticket' })),
@@ -133,9 +142,67 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
       generateSignedUrls();
     }
   }, [allAttachments.length, ticket.evidences, comments]);
+
+  const isClosed = ticket.status === 'resolvido' || ticket.status === 'fechado';
+  const canUpload = !isViewer && !isClosed;
+
+  const handleUpload = async () => {
+    if (files.length === 0) return;
+    setUploading(true);
+    try {
+      const attachments = await uploadCommentAttachments(ticket.client_id, ticketId, files);
+      const { error } = await supabase.from('ticket_comments').insert({
+        ticket_id: ticketId,
+        author_id: user?.id,
+        sender_name: profile?.full_name,
+        sender_email: user?.email,
+        content: `📎 ${attachments.length} anexo(s) adicionado(s)`,
+        is_internal: false,
+        attachments,
+      });
+      if (error) throw error;
+      setFiles([]);
+      queryClient.invalidateQueries({ queryKey: ['ticket-comments', ticketId] });
+      queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
+      toast({ title: 'Anexos enviados', description: `${attachments.length} arquivo(s) adicionado(s) ao ticket.` });
+    } catch (err: any) {
+      console.error('Upload error:', err);
+      toast({ title: 'Erro ao enviar anexos', description: err.message, variant: 'destructive', duration: 8000 });
+    } finally {
+      setUploading(false);
+    }
+  };
   
   return (
     <div className="p-6">
+      {canUpload && (
+        <Card className="mb-6">
+          <CardContent className="p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-sm font-semibold">Adicionar anexos</h3>
+                <p className="text-xs text-muted-foreground">
+                  Os arquivos ficarão registrados como um novo comentário neste ticket.
+                </p>
+              </div>
+              <Button
+                onClick={handleUpload}
+                disabled={files.length === 0 || uploading || files.some(f => f.isCompressing)}
+              >
+                {uploading ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Upload className="h-4 w-4 mr-2" />}
+                Enviar ({files.length})
+              </Button>
+            </div>
+            <FileUploadZone
+              files={files}
+              onFilesChange={setFiles}
+              maxFiles={10}
+              maxSizeMB={20}
+            />
+          </CardContent>
+        </Card>
+      )}
+
       {allAttachments.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <FileX className="h-12 w-12 mb-4" />
