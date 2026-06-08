@@ -1,4 +1,4 @@
-import { useState, useCallback } from "react";
+import { useState, useCallback, useRef, useEffect } from "react";
 import { Upload, X, FileText, Loader2, CheckCircle2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -39,6 +39,20 @@ export function FileUploadZone({
   },
 }: FileUploadZoneProps) {
   const [isDragging, setIsDragging] = useState(false);
+  // Keep latest files in a ref to avoid stale closures inside async callbacks
+  const filesRef = useRef<FileWithPreview[]>(files);
+  useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
+  const updateFiles = useCallback(
+    (updater: (prev: FileWithPreview[]) => FileWithPreview[]) => {
+      const next = updater(filesRef.current);
+      filesRef.current = next;
+      onFilesChange(next);
+    },
+    [onFilesChange]
+  );
 
   const compressImageFile = async (file: File): Promise<File> => {
     if (!compressionOptions.enabled) return file;
@@ -100,8 +114,6 @@ export function FileUploadZone({
 
   const processFiles = useCallback(
     async (fileList: FileList) => {
-      const newFiles: FileWithPreview[] = [];
-
       for (const file of Array.from(fileList)) {
         const error = validateFile(file);
         if (error) {
@@ -110,7 +122,6 @@ export function FileUploadZone({
         }
 
         const fileId = `${Date.now()}-${Math.random()}`;
-        let processedFile = file;
         const originalSize = file.size;
 
         if (file.type.startsWith("image/")) {
@@ -120,43 +131,50 @@ export function FileUploadZone({
             originalSize,
             isCompressing: true,
           };
-          
-          onFilesChange([...files, tempFileWithPreview]);
 
-          processedFile = await compressImageFile(file);
+          updateFiles((prev) => [...prev, tempFileWithPreview]);
 
-          const reader = new FileReader();
-          reader.onload = (e) => {
+          try {
+            const processedFile = await compressImageFile(file);
+            const preview = await new Promise<string>((resolve, reject) => {
+              const reader = new FileReader();
+              reader.onload = (e) => resolve((e.target?.result as string) ?? "");
+              reader.onerror = () => reject(reader.error);
+              reader.readAsDataURL(processedFile);
+            });
+
             const updatedFile: FileWithPreview = {
               file: processedFile,
-              preview: e.target?.result as string,
+              preview,
               id: fileId,
               originalSize,
               compressedSize: processedFile.size,
               isCompressing: false,
             };
 
-            const currentFiles = files.slice();
-            const updatedFiles = currentFiles.map((f) => 
-              f.id === fileId ? updatedFile : f
+            updateFiles((prev) =>
+              prev.map((f) => (f.id === fileId ? updatedFile : f))
             );
-            onFilesChange(updatedFiles);
-          };
-          reader.readAsDataURL(processedFile);
+          } catch (err) {
+            console.error(`❌ Falha ao processar imagem ${file.name}:`, err);
+            // Keep the original file so the user doesn't silently lose it
+            updateFiles((prev) =>
+              prev.map((f) =>
+                f.id === fileId
+                  ? { file, id: fileId, originalSize, isCompressing: false }
+                  : f
+              )
+            );
+          }
         } else {
-          newFiles.push({
-            file: processedFile,
-            id: fileId,
-            originalSize,
-          });
+          updateFiles((prev) => [
+            ...prev,
+            { file, id: fileId, originalSize },
+          ]);
         }
       }
-
-      if (newFiles.length > 0) {
-        onFilesChange([...files, ...newFiles]);
-      }
     },
-    [files, onFilesChange, compressImageFile]
+    [updateFiles, compressImageFile]
   );
 
   const handleDrop = useCallback(
@@ -164,14 +182,14 @@ export function FileUploadZone({
       e.preventDefault();
       setIsDragging(false);
 
-      if (files.length >= maxFiles) {
+      if (filesRef.current.length >= maxFiles) {
         console.error(`❌ Máximo de ${maxFiles} arquivos atingido`);
         return;
       }
 
       processFiles(e.dataTransfer.files);
     },
-    [files, maxFiles, processFiles]
+    [maxFiles, processFiles]
   );
 
   const handleFileInput = useCallback(
