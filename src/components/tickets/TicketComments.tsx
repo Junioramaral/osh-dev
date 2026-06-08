@@ -17,6 +17,9 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/component
 import { Send, Paperclip, Info, Lock, Mail, Reply, Plus, ChevronDown, Users } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
+import { FileUploadZone, type FileWithPreview } from "./FileUploadZone";
+import { uploadCommentAttachments } from "@/lib/ticketAttachmentUpload";
+import CommentAttachmentList from "./CommentAttachmentList";
 
 interface CommentCardProps {
   comment: any;
@@ -77,6 +80,9 @@ function CommentCard({ comment }: CommentCardProps) {
       </CardHeader>
       <CardContent>
         <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+        {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
+          <CommentAttachmentList attachments={comment.attachments} />
+        )}
       </CardContent>
     </Card>
   );
@@ -84,6 +90,7 @@ function CommentCard({ comment }: CommentCardProps) {
 
 interface TicketCommentsProps {
   ticketId: string;
+  clientId?: string;
   ticket?: {
     analyst_id?: string | null;
     ticket_number?: string;
@@ -96,7 +103,7 @@ interface TicketCommentsProps {
 // Otimizzo client/tenant ID for client detection
 const OTIMIZZO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
 
-export default function TicketComments({ ticketId, ticket }: TicketCommentsProps) {
+export default function TicketComments({ ticketId, clientId, ticket }: TicketCommentsProps) {
   const { user, profile, isOtimizzoUser, isSuperAdmin, isViewer, hasRole, tenantId } = useAuth();
   const queryClient = useQueryClient();
   const { data: comments, isLoading } = useTicketComments(ticketId);
@@ -105,6 +112,8 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
   const [showCcField, setShowCcField] = useState(false);
   const [ccEmails, setCcEmails] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [files, setFiles] = useState<FileWithPreview[]>([]);
+  const [showAttachments, setShowAttachments] = useState(false);
   
   // Validate and parse CC emails
   const validateEmails = (emailString: string): string[] => {
@@ -142,16 +151,24 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
   });
 
   const addCommentMutation = useMutation({
-    mutationFn: async ({ content, is_internal, ccEmails }: { content: string; is_internal: boolean; ccEmails: string[] }) => {
+    mutationFn: async ({ content, is_internal, ccEmails, files }: { content: string; is_internal: boolean; ccEmails: string[]; files: FileWithPreview[] }) => {
       // Fetch ticket details first
       const { data: ticketData, error: ticketError } = await supabase
         .from('tickets')
-        .select('contact_email, contact_name, ticket_number, title, first_response_at, analyst_id')
+        .select('contact_email, contact_name, ticket_number, title, first_response_at, analyst_id, client_id')
         .eq('id', ticketId)
         .single();
       
       if (ticketError) throw ticketError;
       
+      // Upload attachments first (so we can persist them in the same insert,
+      // since clients have no UPDATE policy on ticket_comments).
+      let attachments: any[] = [];
+      if (files.length > 0) {
+        const targetClientId = clientId || ticketData.client_id;
+        attachments = await uploadCommentAttachments(targetClientId, ticketId, files);
+      }
+
       // Insert comment with sender_name for client visibility
       const { data: commentData, error: commentError } = await supabase
         .from('ticket_comments')
@@ -161,7 +178,8 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           sender_name: profile?.full_name,
           sender_email: user?.email,
           content,
-          is_internal
+          is_internal,
+          attachments: (attachments.length > 0 ? attachments : null) as any,
         })
         .select('*, profiles(full_name)')
         .single();
@@ -252,13 +270,15 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
           .eq('id', ticketId);
       }
       
-      return { commentData, isExternal: !is_internal, isClientComment: isClientUser, hasCc: ccEmails.length > 0 };
+      return { commentData, isExternal: !is_internal, isClientComment: isClientUser, hasCc: ccEmails.length > 0, attachmentCount: attachments.length };
     },
     onSuccess: (data) => {
       setNewComment('');
       setIsInternal(false);
       setCcEmails('');
       setShowCcField(false);
+      setFiles([]);
+      setShowAttachments(false);
       queryClient.invalidateQueries({ queryKey: ['ticket-comments', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-detail', ticketId] });
       queryClient.invalidateQueries({ queryKey: ['ticket-history', ticketId] });
@@ -289,7 +309,11 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
   });
   
   const handleSubmit = () => {
-    if (!newComment.trim()) return;
+    if (!newComment.trim() && files.length === 0) return;
+    if (!newComment.trim() && files.length > 0) {
+      // Allow attachment-only comments with a default content
+      setNewComment("📎 Anexos enviados");
+    }
     
     if (newComment.length > 10000) {
       toast({ 
@@ -301,7 +325,8 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
     }
     
     const validatedCcEmails = validateEmails(ccEmails);
-    addCommentMutation.mutate({ content: newComment, is_internal: isInternal, ccEmails: validatedCcEmails });
+    const content = newComment.trim() || "📎 Anexos enviados";
+    addCommentMutation.mutate({ content, is_internal: isInternal, ccEmails: validatedCcEmails, files });
   };
   
   return (
@@ -331,6 +356,28 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
               {newComment.length} / 10.000 caracteres
             </p>
           </div>
+
+          {/* Attachments - Collapsible */}
+          <Collapsible open={showAttachments} onOpenChange={setShowAttachments} className="mb-3 mt-2">
+            <CollapsibleTrigger asChild>
+              <Button variant="ghost" size="sm" className="text-muted-foreground h-8 px-2">
+                <Paperclip className="h-4 w-4 mr-1" />
+                {showAttachments
+                  ? 'Ocultar anexos'
+                  : files.length > 0
+                    ? `Anexos (${files.length})`
+                    : 'Anexar arquivos'}
+              </Button>
+            </CollapsibleTrigger>
+            <CollapsibleContent className="pt-2">
+              <FileUploadZone
+                files={files}
+                onFilesChange={setFiles}
+                maxFiles={10}
+                maxSizeMB={20}
+              />
+            </CollapsibleContent>
+          </Collapsible>
           
           {/* CC Field - Collapsible */}
           {!isInternal && (
@@ -393,7 +440,7 @@ export default function TicketComments({ ticketId, ticket }: TicketCommentsProps
               )}
               <Button 
                 onClick={handleSubmit} 
-                disabled={!newComment.trim() || addCommentMutation.isPending}
+                disabled={(!newComment.trim() && files.length === 0) || addCommentMutation.isPending || files.some(f => f.isCompressing)}
               >
                 <Send className="h-4 w-4 mr-2" />
                 Enviar
