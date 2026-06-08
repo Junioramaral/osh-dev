@@ -1,52 +1,47 @@
-## Objetivo
+# Bancos de Dados — duplicatas e nova coluna Máquina
 
-Permitir que o cliente (e também analistas) adicione anexos a um ticket existente — tanto na aba **Anexos** quanto junto a um **comentário**, com link clicável que leva ao anexo.
+## Diagnóstico das "duplicatas"
 
-## Análise: qual a melhor abordagem?
+Consultei o banco para o cliente **ATPPOA** (ambiente Produção). Resultado:
 
-Recomendo **fazer as duas coisas, com o comentário como caminho principal**:
+| Nome      | Máquina       | IP             | Criticidade | ID                       |
+|-----------|---------------|----------------|-------------|--------------------------|
+| tripoa1   | atplxdb04     | 192.168.3.86   | crítica     | ee017dd2…                |
+| tripoa1   | atplxdb06     | 192.168.3.90   | alta        | df8296f9…  ← duplicata real |
+| tripoa1   | atplxdb06     | 192.168.3.90   | alta        | a218173e…  ← duplicata real |
+| tripoa2   | atplxdb05     | 192.168.3.88   | crítica     | …                        |
+| tripoahist| atplxdb06     | 192.168.3.90   | alta        | …                        |
+| tripoahist| atplxdb06     | 192.168.3.90   | crítica     | …                        |
 
-1. **Anexos no comentário (primário)** — é o fluxo natural quando o cliente está respondendo ("segue o print do erro"). Mantém contexto: o anexo fica vinculado à mensagem que o explica, e o analista é notificado por email com o link.
-2. **Upload direto na aba Anexos (secundário)** — útil quando o cliente só quer adicionar um documento sem precisar comentar (ex.: contrato, planilha de apoio). Cria internamente um comentário "📎 Anexo adicionado" para manter rastreabilidade na timeline.
+Conclusões:
+- **Só 1 duplicata real e exata** (mesmo nome + máquina + ambiente + engine + criticidade): os dois `tripoa1` em `atplxdb06 / alta`, criados com ~19 min de diferença. Provável duplo clique em "Criar".
+- Os demais registros que parecem duplicados são, na verdade, instâncias diferentes (máquinas distintas ou criticidades distintas). A tela só exibe `Nome da Instância`, então o usuário não consegue diferenciar.
 
-Assim cobrimos os dois cenários sem duplicar infra de upload.
+## Mudanças propostas
 
-## Mudanças
+### 1. Nova primeira coluna "Máquina (IP)" em `src/pages/Databases.tsx`
+- Adicionar coluna como primeira da tabela em cada grupo de ambiente.
+- Conteúdo: `hostname (ip_address)`; se não houver máquina vinculada, mostrar `—`.
+- Ajustar o `select` da query `databases` para trazer `machines(hostname, ip_address)`.
+- Adicionar ordenação por esse campo (mesmo padrão dos outros cabeçalhos).
 
-### 1. `TicketComments.tsx` — anexos no comentário
-- Reutilizar `FileUploadZone` (já usado em `NewTicketDialog`) abaixo do textarea, recolhido por padrão atrás de um botão "📎 Anexar arquivos" (ícone Paperclip já importado).
-- No `addCommentMutation`:
-  - Após inserir o comentário, fazer upload de cada arquivo para o bucket `tickets/` no path `{tenant_id}/{ticket_id}/comments/{comment_id}/{timestamp}_{safeName}` (mesma sanitização de nome já aplicada no `NewTicketDialog`).
-  - Atualizar `ticket_comments.attachments` (jsonb) com `[{ name, path, size, type }]`.
-- Renderizar anexos dentro do `CommentCard`:
-  - Lista de "pílulas" clicáveis com ícone + nome + tamanho.
-  - Ao clicar, gerar `createSignedUrl` (1h) e abrir em nova aba / iniciar download — mesmo padrão de `TicketAttachments.tsx`.
-- Passar os anexos do comentário para `send-comment-notification` / `send-analyst-notification` para que o email inclua a lista (texto + link assinado de validade maior, ex. 7 dias) — incremento opcional, posso fazer em segundo passo se preferir.
+### 2. Remover a duplicata real
+- Excluir a instância `a218173e-b650-43fe-8c87-6ad15c8ca380` (a mais recente das duas idênticas) via migration `DELETE`.
 
-### 2. `TicketAttachments.tsx` — upload direto na aba
-- Adicionar um cartão/zona de upload no topo (acima do grid), oculto para `isViewer` e quando o ticket estiver `resolvido`/`fechado`.
-- Ao soltar/enviar arquivos:
-  - Criar um `ticket_comment` automático com `content = "📎 Anexos adicionados via aba Anexos"`, `is_internal = false` (cliente) / configurável (analista).
-  - Subir arquivos no mesmo path-padrão e gravar em `attachments` do comentário criado.
-  - Invalidar queries `ticket-comments` e `ticket-detail` para os anexos aparecerem imediatamente no grid (que já agrega `comments.attachments`).
-- Não criamos coluna nova em `tickets.evidences` — manter `evidences` apenas para o ticket original.
+### 3. Prevenir duplicatas futuras
+- Adicionar índice único parcial em `database_instances`:
+  ```sql
+  CREATE UNIQUE INDEX uniq_db_instance_per_machine
+    ON public.database_instances (client_id, machine_id, instance_name, environment)
+    WHERE machine_id IS NOT NULL;
+  ```
+  (Usa índice parcial para não bloquear instâncias sem máquina.)
+- Em `useCreateDatabase`, capturar o erro `23505` (violação de unicidade) e mostrar toast amigável: "Já existe uma instância com este nome nesta máquina/ambiente."
 
-### 3. Permissões / RLS
-- O bucket `tickets` é privado. As policies já permitem upload pelo tenant dono (via `validate_ticket_upload_path`) e `is_otimizzo_user`. Vou conferir as policies de `storage.objects` para o bucket `tickets` antes de implementar; se necessário, abro uma migração só para garantir INSERT do cliente dentro do path `{client_tenant_id}/{ticket_id}/...`.
-- `ticket_comments.attachments` já é jsonb — sem migração de schema.
+### Fora de escopo
+- Não vou apagar os pares `tripoahist` (alta vs crítica) nem os `tripoa1` em máquinas diferentes — são registros legítimos. Se você confirmar que algum deve sumir, removo depois.
 
-### 4. UX
-- Limites: 10 arquivos / 20MB por arquivo (mesmo do `NewTicketDialog`).
-- Imagens passam pela compressão existente do `FileUploadZone`.
-- Indicador visual no `CommentCard` mostrando contagem ("📎 2 anexos") + lista expandida.
-- Spinner durante upload; toast de erro detalhado se algum arquivo falhar (não bloqueia o comentário).
-
-## Fora de escopo (posso fazer depois se quiser)
-- Anexar imagens inline dentro do texto do comentário (rich text).
-- Preview embutido de PDFs/imagens grandes.
-- Versionamento / substituição de anexos.
-
-## Confirmações antes de implementar
-1. OK com a abordagem dupla (comentário + upload direto na aba)?
-2. Quando o cliente sobe anexo direto pela aba, criar comentário automático visível para a equipe (sugerido) ou silencioso sem notificação?
-3. Anexos devem ser incluídos como link nos emails de notificação ao analista/cliente?
+## Arquivos afetados
+- `src/pages/Databases.tsx` (nova coluna + ordenação + query)
+- `src/hooks/useDatabaseMutations.ts` (tratamento do erro 23505)
+- Nova migration: índice único + DELETE da linha duplicada
