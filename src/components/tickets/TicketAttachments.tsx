@@ -158,7 +158,7 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
         sender_email: user?.email,
         content: `📎 ${attachments.length} anexo(s) adicionado(s)`,
         is_internal: false,
-        attachments,
+        attachments: attachments as any,
       });
       if (error) throw error;
       setFiles([]);
