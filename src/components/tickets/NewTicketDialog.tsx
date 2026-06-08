@@ -1194,10 +1194,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   <Select
                     value={watch("db_machine_id") ?? ""}
                     onValueChange={(value) => setValue("db_machine_id", value)}
-                    disabled={!selectedDbEngine}
+                    disabled={!selectedDbEngine || !selectedDbEnvironment}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedDbEngine ? "Selecione a máquina (opcional)" : "Selecione a engine primeiro"} />
+                      <SelectValue
+                        placeholder={
+                          !selectedDbEngine
+                            ? "Selecione a engine primeiro"
+                            : !selectedDbEnvironment
+                            ? "Selecione o ambiente primeiro"
+                            : "Selecione a máquina"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {machines?.map((machine) => (
@@ -1214,10 +1222,20 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   <Select
                     value={watch("db_instance_id") ?? ""}
                     onValueChange={(value) => setValue("db_instance_id", value)}
-                    disabled={!selectedDbEngine}
+                    disabled={!selectedDbEngine || !selectedDbEnvironment || !selectedDbMachineId}
                   >
                     <SelectTrigger>
-                      <SelectValue placeholder={selectedDbEngine ? "Selecione a instância" : "Selecione a engine primeiro"} />
+                      <SelectValue
+                        placeholder={
+                          !selectedDbEngine
+                            ? "Selecione a engine primeiro"
+                            : !selectedDbEnvironment
+                            ? "Selecione o ambiente primeiro"
+                            : !selectedDbMachineId
+                            ? "Selecione a máquina primeiro"
+                            : "Selecione a instância"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {dbInstances?.map((instance) => (
@@ -1331,9 +1349,21 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               <div className="grid grid-cols-3 gap-4">
                 <div className="space-y-2">
                   <Label htmlFor="app_machine_id">Máquina</Label>
-                  <Select value={watch("app_machine_id")} onValueChange={(value) => setValue("app_machine_id", value)}>
+                  <Select
+                    value={watch("app_machine_id") ?? ""}
+                    onValueChange={(value) => setValue("app_machine_id", value)}
+                    disabled={!selectedAppProductId || !selectedAppEnvironment}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Opcional" />
+                      <SelectValue
+                        placeholder={
+                          !selectedAppProductId
+                            ? "Selecione o produto primeiro"
+                            : !selectedAppEnvironment
+                            ? "Selecione o ambiente primeiro"
+                            : "Selecione a máquina"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {machines?.map((machine) => (
@@ -1347,9 +1377,23 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
                 <div className="space-y-2">
                   <Label htmlFor="app_instance_id">Instância APP *</Label>
-                  <Select value={watch("app_instance_id")} onValueChange={(value) => setValue("app_instance_id", value)}>
+                  <Select
+                    value={watch("app_instance_id") ?? ""}
+                    onValueChange={(value) => setValue("app_instance_id", value)}
+                    disabled={!selectedAppProductId || !selectedAppEnvironment || !selectedAppMachineId}
+                  >
                     <SelectTrigger>
-                      <SelectValue placeholder="Selecione a instância" />
+                      <SelectValue
+                        placeholder={
+                          !selectedAppProductId
+                            ? "Selecione o produto primeiro"
+                            : !selectedAppEnvironment
+                            ? "Selecione o ambiente primeiro"
+                            : !selectedAppMachineId
+                            ? "Selecione a máquina primeiro"
+                            : "Selecione a instância"
+                        }
+                      />
                     </SelectTrigger>
                     <SelectContent>
                       {appInstances?.map((instance) => (
