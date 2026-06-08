@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { FileX, FileText, Download, Eye, Loader2, Upload } from "lucide-react";
+import { FileX, FileText, Download, Eye, Loader2, Upload, Image as ImageIcon } from "lucide-react";
 import { useTicketComments } from "@/hooks/useTicketDetail";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
@@ -9,25 +9,37 @@ import { useQueryClient } from "@tanstack/react-query";
 import { FileUploadZone, type FileWithPreview } from "./FileUploadZone";
 import { uploadCommentAttachments } from "@/lib/ticketAttachmentUpload";
 import { toast } from "@/hooks/use-toast";
+import { format } from "date-fns";
+import { ptBR } from "date-fns/locale";
 
-interface AttachmentCardProps {
+function formatFileSize(bytes: number) {
+  if (!bytes) return "";
+  if (bytes < 1024) return bytes + " B";
+  if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + " KB";
+  return (bytes / (1024 * 1024)).toFixed(1) + " MB";
+}
+
+function formatDateTime(date?: string | null) {
+  if (!date) return "—";
+  try {
+    return format(new Date(date), "dd/MM/yyyy HH:mm", { locale: ptBR });
+  } catch {
+    return "—";
+  }
+}
+
+interface AttachmentRowProps {
   attachment: any;
   signedUrl: string | null;
   isLoading: boolean;
 }
 
-function AttachmentCard({ attachment, signedUrl, isLoading }: AttachmentCardProps) {
-  const isImage = attachment.type?.startsWith('image/');
-  
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return bytes + ' B';
-    if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
-    return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
-  };
+function AttachmentRow({ attachment, signedUrl, isLoading }: AttachmentRowProps) {
+  const isImage = attachment.type?.startsWith("image/");
+  const uploadedAt = attachment.uploaded_at || attachment.created_at || null;
 
   const handleDownload = async () => {
     if (!signedUrl) return;
-    
     try {
       const response = await fetch(signedUrl);
       const blob = await response.blob();
@@ -43,46 +55,49 @@ function AttachmentCard({ attachment, signedUrl, isLoading }: AttachmentCardProp
       console.error("Erro ao baixar arquivo:", error);
     }
   };
-  
+
   return (
-    <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-      <CardContent className="p-4">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-32 bg-muted rounded-md">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground" />
-          </div>
-        ) : isImage && signedUrl ? (
-          <img src={signedUrl} alt={attachment.name} className="w-full h-32 object-cover rounded-md" />
+    <div className="flex items-center gap-3 px-4 py-3 border-b last:border-b-0 hover:bg-muted/40 transition-colors">
+      <div className="flex items-center justify-center w-10 h-10 rounded-md bg-muted shrink-0">
+        {isImage ? (
+          <ImageIcon className="h-5 w-5 text-muted-foreground" />
         ) : (
-          <div className="flex items-center justify-center h-32 bg-muted rounded-md">
-            <FileText className="h-12 w-12 text-muted-foreground" />
-          </div>
+          <FileText className="h-5 w-5 text-muted-foreground" />
         )}
-        <p className="mt-2 text-sm font-medium truncate">{attachment.name}</p>
-        <p className="text-xs text-muted-foreground">{formatFileSize(attachment.size || 0)}</p>
-        <div className="flex gap-2 mt-2">
-          <Button 
-            size="sm" 
-            variant="outline" 
-            className="flex-1"
-            onClick={handleDownload}
-            disabled={isLoading || !signedUrl}
-          >
-            <Download className="h-3 w-3 mr-1" />
-            Download
-          </Button>
-          {isImage && signedUrl && (
-            <Button 
-              size="sm" 
-              variant="outline"
-              onClick={() => window.open(signedUrl, '_blank')}
-            >
-              <Eye className="h-3 w-3" />
-            </Button>
-          )}
+      </div>
+      <div className="flex-1 min-w-0">
+        <button
+          type="button"
+          onClick={handleDownload}
+          disabled={isLoading || !signedUrl}
+          className="text-sm font-medium truncate text-left hover:underline disabled:cursor-not-allowed disabled:opacity-60 block max-w-full"
+          title={attachment.name}
+        >
+          {attachment.name}
+        </button>
+        <div className="flex flex-wrap gap-x-3 text-xs text-muted-foreground">
+          <span>{formatDateTime(uploadedAt)}</span>
+          {attachment.size ? <span>{formatFileSize(attachment.size)}</span> : null}
         </div>
-      </CardContent>
-    </Card>
+      </div>
+      <div className="flex items-center gap-2 shrink-0">
+        {isLoading ? (
+          <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+        ) : (
+          <>
+            {isImage && signedUrl && (
+              <Button size="sm" variant="ghost" onClick={() => window.open(signedUrl, "_blank")}>
+                <Eye className="h-4 w-4" />
+              </Button>
+            )}
+            <Button size="sm" variant="outline" onClick={handleDownload} disabled={!signedUrl}>
+              <Download className="h-4 w-4 mr-1" />
+              Download
+            </Button>
+          </>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -102,7 +117,13 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
   
   const allAttachments = [
     ...(ticket.evidences || []).map((e: any) => ({ ...e, source: 'ticket' })),
-    ...(comments?.flatMap(c => c.attachments || []).map((a: any) => ({ ...a, source: 'comment' })) || [])
+    ...(comments?.flatMap((c: any) =>
+      (c.attachments || []).map((a: any) => ({
+        ...a,
+        source: 'comment',
+        created_at: a.uploaded_at || c.created_at,
+      }))
+    ) || [])
   ];
 
   // Generate signed URLs for attachments that have a path
@@ -175,6 +196,29 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
   
   return (
     <div className="p-6">
+      {allAttachments.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
+          <FileX className="h-12 w-12 mb-4" />
+          <p>Nenhum anexo encontrado</p>
+        </div>
+      ) : (
+        <Card className="mb-6">
+          <CardContent className="p-0">
+            {allAttachments.map((attachment, idx) => {
+              const key = attachment.path || attachment.name;
+              return (
+                <AttachmentRow
+                  key={idx}
+                  attachment={attachment}
+                  signedUrl={signedUrls[key] || attachment.url || null}
+                  isLoading={loadingUrls[key] || false}
+                />
+              );
+            })}
+          </CardContent>
+        </Card>
+      )}
+
       {canUpload && (
         <Card className="mb-6">
           <CardContent className="p-4 space-y-3">
@@ -201,27 +245,6 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
             />
           </CardContent>
         </Card>
-      )}
-
-      {allAttachments.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
-          <FileX className="h-12 w-12 mb-4" />
-          <p>Nenhum anexo encontrado</p>
-        </div>
-      ) : (
-        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
-          {allAttachments.map((attachment, idx) => {
-            const key = attachment.path || attachment.name;
-            return (
-              <AttachmentCard 
-                key={idx} 
-                attachment={attachment} 
-                signedUrl={signedUrls[key] || attachment.url || null}
-                isLoading={loadingUrls[key] || false}
-              />
-            );
-          })}
-        </div>
       )}
     </div>
   );
