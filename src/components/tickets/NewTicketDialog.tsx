@@ -736,7 +736,11 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       console.error("❌ Erro:", error);
       toast({
         title: "Erro ao criar ticket",
-        description: error.message,
+        description:
+          error?.message ||
+          error?.error ||
+          (typeof error === "string" ? error : JSON.stringify(error)),
+        duration: 8000,
         variant: "destructive",
       });
     } finally {
@@ -761,7 +765,15 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     const evidences: Evidence[] = [];
 
     for (const fileItem of files) {
-      const filePath = `${clientId}/${ticketNumber}/${fileItem.file.name}`;
+      const originalName = fileItem.file.name;
+      const sanitized = originalName
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/[^A-Za-z0-9._-]+/g, "_")
+        .replace(/_+/g, "_")
+        .replace(/^_+|_+$/g, "");
+      const safeName = sanitized || "arquivo";
+      const filePath = `${clientId}/${ticketNumber}/${Date.now()}_${safeName}`;
 
       const { data, error } = await supabase.storage
         .from("tickets")
@@ -771,7 +783,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         });
 
       if (error) {
-        console.error(`❌ Erro ao fazer upload de ${fileItem.file.name}:`, error);
+        console.error(`❌ Erro ao fazer upload de ${originalName}:`, error);
         throw error;
       }
 
@@ -781,12 +793,12 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         .createSignedUrl(filePath, 60 * 60 * 24 * 7); // 7 days
 
       if (signedUrlError) {
-        console.error(`❌ Erro ao gerar URL assinada para ${fileItem.file.name}:`, signedUrlError);
+        console.error(`❌ Erro ao gerar URL assinada para ${originalName}:`, signedUrlError);
         throw signedUrlError;
       }
 
       evidences.push({
-        name: fileItem.file.name,
+        name: originalName,
         path: filePath, // Store path for regenerating signed URLs
         url: signedUrlData.signedUrl,
         type: fileItem.file.type,

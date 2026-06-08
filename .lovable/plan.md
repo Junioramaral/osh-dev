@@ -1,45 +1,43 @@
-## Objetivo
+## Diagnóstico
 
-Ao clicar em um cliente na página `/clients`, abrir uma **página dedicada** (rota própria) em vez do modal apertado. A página terá espaço total da tela para as abas — em especial a aba **Usuários**, hoje espremida dentro do modal `max-w-3xl`. A criação de novo cliente continua como modal (rápida e leve).
+Encontrei dois problemas reais na anexação de arquivos durante a criação do ticket (`FileUploadZone.tsx` + `NewTicketDialog.tsx`). O erro "desaparece rápido" porque a falha acontece silenciosamente no fluxo de compressão de imagens — o arquivo some da lista antes do submit.
 
-## Abordagem
+### Problema 1 — Race condition no FileUploadZone (causa principal)
 
-### 1. Extrair o formulário do modal para um componente reutilizável
-Criar `src/components/clients/ClientForm.tsx` contendo toda a lógica e UI hoje dentro do `ClientDialog` (schema zod, `useForm`, `useEffect` de preenchimento, `onSubmit`, as abas Informações Básicas / Usuários / Relatório / Contrato / SLAs / Projetos).
+No `processFiles`, ao anexar uma imagem:
 
-- Props: `mode: "create" | "edit"`, `client`, e callbacks `onSaved`/`onCancel`.
-- O componente não conhece `Dialog` nem `página` — só renderiza o `<Form>` com as `<Tabs>`. Assim serve tanto ao modal de criação quanto à página de edição.
+1. Adiciona um item temporário: `onFilesChange([...files, tempFileWithPreview])`
+2. Aguarda compressão (`await compressImageFile`)
+3. No `reader.onload`, faz: `const currentFiles = files.slice()` — mas `files` aqui é o array **antigo** capturado no closure (vazio, sem o item temporário).
+4. Faz `currentFiles.map(f => f.id === fileId ? updated : f)` — como o id não existe no array antigo, nada é substituído.
+5. Chama `onFilesChange(updatedFiles)` com o array antigo, **apagando o arquivo recém-adicionado**.
 
-### 2. Nova página dedicada do cliente
-Criar `src/pages/ClientDetail.tsx` na rota `/clients/:clientId`:
-- Usa `AppLayout` (largura total da aplicação, com os overrides `-mx-6 px-2` já usados no projeto para telas amplas).
-- Busca o cliente por `id` (mesma query de `clients`).
-- Cabeçalho com botão "Voltar para Clientes" + nome do cliente.
-- Renderiza `<ClientForm mode="edit" client={client} />` ocupando toda a largura.
-- Controle de acesso igual ao da página de Clientes (super admin / viewer / tenant_admin / analistas).
+Resultado: ao anexar um print, ele aparece por um instante e some. Se o usuário envia o ticket antes da compressão terminar, vai sem evidência; se espera, a lista é zerada.
 
-Registrar a rota em `src/App.tsx`: `<Route path="/clients/:clientId" element={<ClientDetail />} />` (acima do catch-all).
+O mesmo padrão de closure stale afeta o bloco que adiciona arquivos não-imagem em lote.
 
-### 3. Ajustar a listagem de Clientes
-Em `src/pages/Clients.tsx`:
-- O clique no card passa a **navegar** para `/clients/:id` (`useNavigate`) em vez de abrir o modal em modo edição.
-- O `ClientDialog` permanece apenas para o botão "Novo Cliente" (modo create).
+### Problema 2 — Nome de arquivo não sanitizado
 
-### 4. Responsividade das abas (principalmente Usuários)
-Com o espaço da página inteira, ajustar para nunca espremer:
-- `TabsList`: permitir quebra/scroll horizontal em telas pequenas (flex com `overflow-x-auto`) em vez de `grid-cols-6` fixo, que é o que aperta os rótulos.
-- Aba **Usuários** (`TenantUsersManager`): tabela com `overflow-x-auto` e larguras mínimas por coluna para o telefone e e-mail não ficarem truncados; em telas estreitas, rolagem horizontal em vez de compressão.
-- Demais abas (grids de SLA, contrato) passam a aproveitar a largura, mantendo `grid-cols-1` no mobile e 2+ colunas no desktop.
+`uploadTicketFiles` monta o path como `${clientId}/${ticketNumber}/${fileItem.file.name}`. Prints de tela costumam ter nomes como `Captura de tela 2026-06-08 às 13.45.15.png` (espaços, acentos, `:`). O Supabase Storage rejeita vários desses caracteres com erro `InvalidKey`, e o catch só mostra um toast rápido — coerente com "erro muito rápido que não consegui observar".
 
-## Detalhes técnicos
+## Correções
 
-- `ClientDialog.tsx` é reduzido a um wrapper `Dialog` que renderiza `<ClientForm mode="create" ... />` — evita duplicação de lógica.
-- Após salvar na página de edição: toast de sucesso e permanecer na página (com dados atualizados via invalidação da query `clients`).
-- A aba Projetos (`ClientProjectsTab`) e os componentes `TenantUsersManager` / `TenantUserReport` continuam recebendo `client.id` normalmente.
-- Sem mudanças de banco de dados nem de lógica de negócio — apenas estrutura de UI e navegação.
+### 1. `src/components/tickets/FileUploadZone.tsx`
+- Trocar todas as chamadas `onFilesChange([...files, ...])` por uma forma que use o estado mais recente. Como `onFilesChange` é o setter do pai (`setUploadFiles`), passar uma função updater não funciona direto — então vou manter um `filesRef` interno (`useRef`) sincronizado via `useEffect`, e usar `filesRef.current` dentro de `processFiles` e do `reader.onload` em vez do `files` do closure.
+- Adicionar `try/catch` no bloco do `reader.onload` para nunca deixar o item "preso" em `isCompressing: true`.
+- Logar com `console.error` qualquer falha de compressão e manter o arquivo original ao invés de descartar.
 
-## Resultado
+### 2. `src/components/tickets/NewTicketDialog.tsx` (função `uploadTicketFiles`)
+- Sanitizar o nome do arquivo antes de montar o path: normalizar acentos (NFD + remover diacríticos), substituir qualquer caractere fora de `[A-Za-z0-9._-]` por `_`, e prefixar com timestamp para evitar colisão (`Date.now()_nome.ext`). Manter o nome original no campo `name` da Evidence (para exibir bonito), só o `path` é sanitizado.
+- Melhorar o `catch` do `onSubmit` para mostrar `error.message || error.error || JSON.stringify(error)` no toast, com `duration: 8000`, para que erros futuros fiquem visíveis.
 
-- Lista de clientes → clique abre página inteira `/clients/:id` com as abas folgadas.
-- Aba Usuários com tabela legível (telefone/e-mail sem aperto), com rolagem horizontal quando necessário.
-- "Novo Cliente" continua como modal simples.
+### 3. Verificação
+Após implementar, abrir o preview, criar um ticket anexando:
+- Um print com nome contendo espaços/acentos.
+- Um PDF normal.
+
+Confirmar pelos console logs (`📤 Fazendo upload...`, `✅ Evidências salvas`) e pela aba Anexos do ticket criado.
+
+## Escopo
+
+Mudanças apenas em 2 arquivos frontend. Sem alteração de schema, RLS, edge functions ou bucket — as políticas de storage e o bucket `tickets` já estão corretos.
