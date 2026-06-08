@@ -179,7 +179,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
           sender_email: user?.email,
           content,
           is_internal,
-          attachments: attachments.length > 0 ? attachments : null,
+          attachments: (attachments.length > 0 ? attachments : null) as any,
         })
         .select('*, profiles(full_name)')
         .single();
