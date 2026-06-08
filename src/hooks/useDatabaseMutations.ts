@@ -60,8 +60,11 @@ export const useCreateDatabase = () => {
       toast.success("Instância DB criada com sucesso!");
     },
     onError: (error: Error) => {
-      toast.error("Erro ao criar instância", {
-        description: error.message,
+      const isDup = (error as any)?.code === "23505" || error.message?.includes("uniq_db_instance_per_machine");
+      toast.error(isDup ? "Instância duplicada" : "Erro ao criar instância", {
+        description: isDup
+          ? "Já existe uma instância com esse nome nesta máquina, ambiente e criticidade."
+          : error.message,
       });
     },
   });
@@ -100,8 +103,11 @@ export const useUpdateDatabase = () => {
       toast.success("Instância DB atualizada com sucesso!");
     },
     onError: (error: Error) => {
-      toast.error("Erro ao atualizar instância", {
-        description: error.message,
+      const isDup = (error as any)?.code === "23505" || error.message?.includes("uniq_db_instance_per_machine");
+      toast.error(isDup ? "Instância duplicada" : "Erro ao atualizar instância", {
+        description: isDup
+          ? "Já existe uma instância com esse nome nesta máquina, ambiente e criticidade."
+          : error.message,
       });
     },
   });

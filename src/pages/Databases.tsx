@@ -35,7 +35,7 @@ import DatabaseDialog from "@/components/databases/DatabaseDialog";
 import { useDeleteDatabase } from "@/hooks/useDatabaseMutations";
 import type { Tables } from "@/integrations/supabase/types";
 
-type SortField = "instance_name" | "engine" | "version" | "environment" | "criticality";
+type SortField = "machine" | "instance_name" | "engine" | "version" | "environment" | "criticality";
 type SortDirection = "asc" | "desc" | null;
 
 interface SortConfig {
@@ -98,7 +98,8 @@ export default function Databases() {
         .from("database_instances")
         .select(`
           *,
-          clients(name)
+          clients(name),
+          machines(hostname, ip_address)
         `)
         .order("instance_name");
       
@@ -179,6 +180,10 @@ export default function Databases() {
   // Função para obter valor de ordenação customizado
   const getSortValue = (db: Tables<"database_instances">, field: SortField) => {
     switch (field) {
+      case "machine": {
+        const m = (db as any).machines;
+        return m?.hostname ? `${m.hostname} ${m.ip_address || ""}`.toLowerCase() : "zzz";
+      }
       case "instance_name":
         return db.instance_name.toLowerCase();
       case "engine":
@@ -442,6 +447,21 @@ export default function Databases() {
                                           variant="ghost"
                                           size="sm"
                                           className="h-8 px-2 hover:bg-accent font-semibold"
+                                          onClick={() => handleSort(clientName, environment, "machine")}
+                                        >
+                                          Máquina (IP)
+                                          <SortIcon
+                                            clientName={clientName}
+                                            environment={environment}
+                                            field="machine"
+                                          />
+                                        </Button>
+                                      </TableHead>
+                                      <TableHead>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="h-8 px-2 hover:bg-accent font-semibold"
                                           onClick={() => handleSort(clientName, environment, "instance_name")}
                                         >
                                           Nome da Instância
@@ -502,12 +522,24 @@ export default function Databases() {
                                   </TableHeader>
                                   
                                   <TableBody>
-                                    {getPaginatedDatabases(clientName, environment, envDatabases).map((db) => (
+                                    {getPaginatedDatabases(clientName, environment, envDatabases).map((db: any) => (
                                       <TableRow 
                                         key={db.id}
                                         className="cursor-pointer hover:bg-accent"
                                         onClick={() => handleEditDatabase(db)}
                                       >
+                                        <TableCell className="font-medium">
+                                          {db.machines?.hostname ? (
+                                            <span>
+                                              {db.machines.hostname}
+                                              {db.machines.ip_address && (
+                                                <span className="text-muted-foreground"> ({db.machines.ip_address})</span>
+                                              )}
+                                            </span>
+                                          ) : (
+                                            <span className="text-muted-foreground">—</span>
+                                          )}
+                                        </TableCell>
                                         <TableCell className="font-medium">{db.instance_name}</TableCell>
                                         <TableCell>
                                           <Badge variant="outline">{db.engine}</Badge>
