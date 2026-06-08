@@ -736,7 +736,11 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       console.error("❌ Erro:", error);
       toast({
         title: "Erro ao criar ticket",
-        description: error.message,
+        description:
+          error?.message ||
+          error?.error ||
+          (typeof error === "string" ? error : JSON.stringify(error)),
+        duration: 8000,
         variant: "destructive",
       });
     } finally {
