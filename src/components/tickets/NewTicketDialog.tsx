@@ -47,7 +47,7 @@ const ticketSchema = z.object({
   started_at: z.string().min(1, "Data de início é obrigatória"),
   frequency: z.enum(["pontual", "intermitente", "continuo"]),
   business_impact: z.enum(["nenhum", "baixo", "medio", "alto", "critico"]),
-  reproduction_steps: z.string().min(1, "Passos para reprodução são obrigatórios"),
+  reproduction_steps: z.string().optional(),
   workaround: z.string().optional(),
   faq_article_id: z.string().uuid().optional().nullable(),
   db_engine: z.enum(["Oracle", "PostgreSQL", "MySQL", "MongoDB", "SQL Server"]).optional(),
@@ -1493,7 +1493,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="reproduction_steps">Passos para Reprodução *</Label>
+                <Label htmlFor="reproduction_steps">Passos para Reprodução</Label>
                 <Textarea {...register("reproduction_steps")} placeholder="1. Acesse a tela X&#10;2. Clique no botão Y&#10;3. Observe o erro Z" />
                 {errors.reproduction_steps && <p className="text-sm text-destructive">{errors.reproduction_steps.message}</p>}
               </div>
