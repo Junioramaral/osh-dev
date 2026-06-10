@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, Trash2, Search } from "lucide-react";
+import { Plus, Package, AlertCircle, ArrowUpDown, ArrowUp, ArrowDown, Trash2, Search, ArrowLeft } from "lucide-react";
 import {
   Accordion,
   AccordionContent,
@@ -34,6 +34,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import ApplicationInstanceDialog from "@/components/applications/ApplicationInstanceDialog";
+import ClientEnvironmentCards, { type ClientCardData } from "@/components/common/ClientEnvironmentCards";
 
 type SortField = "version" | "product_name" | "criticality" | "active_modules_count";
 type SortDirection = "asc" | "desc" | null;
@@ -84,6 +85,7 @@ export default function Applications() {
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedInstance, setSelectedInstance] = useState<any>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
 
   const { data: products, isLoading: productsLoading } = useQuery({
     queryKey: ["application-products"],
@@ -157,6 +159,26 @@ export default function Applications() {
   };
 
   const groupedInstances = groupInstancesByClientAndEnvironment();
+  const visibleGrouped = selectedClient
+    ? (groupedInstances[selectedClient.name] ? { [selectedClient.name]: groupedInstances[selectedClient.name] } : {})
+    : {};
+
+  const clientCards: ClientCardData[] = (() => {
+    if (!instances) return [];
+    const map = new Map<string, ClientCardData>();
+    instances.forEach((i: any) => {
+      const id = i.client_id || "no-client";
+      const name = i.clients?.name || "Sem Cliente";
+      const env = i.environment || "dev";
+      if (!map.has(id)) map.set(id, { clientId: id, clientName: name, total: 0, byEnvironment: {} });
+      const entry = map.get(id)!;
+      entry.total += 1;
+      entry.byEnvironment[env] = (entry.byEnvironment[env] || 0) + 1;
+    });
+    return Array.from(map.values())
+      .filter((c) => !searchTerm || c.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => a.clientName.localeCompare(b.clientName));
+  })();
 
   const getSortValue = (instance: any, field: SortField) => {
     switch (field) {
@@ -311,10 +333,19 @@ export default function Applications() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Aplicativos</h1>
+            <div className="flex items-center gap-3">
+              {selectedClient && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedClient(null)}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+                </Button>
+              )}
+              <h1 className="text-3xl font-bold text-foreground">
+                {selectedClient ? `Aplicativos · ${selectedClient.name}` : "Aplicativos"}
+              </h1>
+            </div>
             <p className="text-muted-foreground">Catálogo de produtos e implantações</p>
           </div>
-          {!isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
+          {selectedClient && !isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
             <Button onClick={() => {
               setSelectedInstance(null);
               setDialogOpen(true);
@@ -389,7 +420,7 @@ export default function Applications() {
             <div className="relative max-w-sm">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Buscar por produto, cliente, versão..."
+                placeholder={selectedClient ? "Buscar por produto, versão..." : "Buscar por cliente..."}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -409,9 +440,16 @@ export default function Applications() {
                   </Card>
                 ))}
               </div>
-            ) : Object.keys(groupedInstances).length > 0 ? (
+            ) : !selectedClient ? (
+              <ClientEnvironmentCards
+                items={clientCards}
+                icon={Package}
+                onSelect={setSelectedClient}
+                emptyLabel="Nenhuma implantação cadastrada"
+              />
+            ) : Object.keys(visibleGrouped).length > 0 ? (
               <Accordion type="multiple" className="space-y-4">
-                {Object.entries(groupedInstances).map(([clientName, environmentGroups]) => {
+                {Object.entries(visibleGrouped).map(([clientName, environmentGroups]) => {
                   const totalClientInstances = Object.values(environmentGroups).reduce(
                     (sum, envInstances) => sum + envInstances.length, 
                     0
