@@ -658,6 +658,7 @@ export default function Machines() {
           if (!open) setSelectedMachine(null);
         }}
         machine={selectedMachine}
+        lockedClientId={!selectedMachine ? selectedClient?.id : undefined}
       />
     </AppLayout>
   );
