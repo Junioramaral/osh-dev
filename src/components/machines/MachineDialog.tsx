@@ -69,12 +69,14 @@ interface MachineDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   machine?: Tables<"machines"> | null;
+  lockedClientId?: string | null;
 }
 
 export default function MachineDialog({
   open,
   onOpenChange,
   machine,
+  lockedClientId,
 }: MachineDialogProps) {
   const { isSuperAdmin, profile } = useAuth();
   const createMachine = useCreateMachine();
@@ -99,7 +101,7 @@ export default function MachineDialog({
   const form = useForm<MachineFormData>({
     resolver: zodResolver(machineSchema),
     defaultValues: {
-      client_id: profile?.client_id || "",
+      client_id: lockedClientId || profile?.client_id || "",
       environment: "prod",
       operating_system: "Linux",
       hostname: "",
@@ -118,6 +120,12 @@ export default function MachineDialog({
       form.setValue("client_id", profile.client_id);
     }
   }, [isSuperAdmin, profile, form]);
+
+  useEffect(() => {
+    if (lockedClientId && open && !machine) {
+      form.setValue("client_id", lockedClientId);
+    }
+  }, [lockedClientId, open, machine, form]);
 
   useEffect(() => {
     if (machine && open) {
@@ -301,7 +309,7 @@ export default function MachineDialog({
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!isSuperAdmin || !!machine}
+                    disabled={!isSuperAdmin || !!machine || !!lockedClientId}
                   >
                     <FormControl>
                       <SelectTrigger>
