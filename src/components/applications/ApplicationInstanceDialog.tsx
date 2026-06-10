@@ -53,6 +53,7 @@ interface ApplicationInstanceDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   instance?: any;
+  lockedClientId?: string | null;
 }
 
 const ENVIRONMENT_OPTIONS = [
@@ -73,6 +74,7 @@ export default function ApplicationInstanceDialog({
   open,
   onOpenChange,
   instance,
+  lockedClientId,
 }: ApplicationInstanceDialogProps) {
   const queryClient = useQueryClient();
   const isEditing = !!instance;
@@ -80,7 +82,7 @@ export default function ApplicationInstanceDialog({
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
-      client_id: "",
+      client_id: lockedClientId || "",
       product_id: "",
       version: "",
       environment: "dev",
@@ -157,7 +159,7 @@ export default function ApplicationInstanceDialog({
         });
       } else {
         form.reset({
-          client_id: "",
+          client_id: lockedClientId || "",
           product_id: "",
           version: "",
           environment: "dev",
@@ -167,7 +169,7 @@ export default function ApplicationInstanceDialog({
         });
       }
     }
-  }, [open, instance, form]);
+  }, [open, instance, form, lockedClientId]);
 
   const createMutation = useMutation({
     mutationFn: async (data: FormData) => {
@@ -247,7 +249,7 @@ export default function ApplicationInstanceDialog({
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Cliente *</FormLabel>
-                  <Select onValueChange={field.onChange} value={field.value}>
+                  <Select onValueChange={field.onChange} value={field.value} disabled={!!lockedClientId}>
                     <FormControl>
                       <SelectTrigger>
                         <SelectValue placeholder="Selecione um cliente" />
