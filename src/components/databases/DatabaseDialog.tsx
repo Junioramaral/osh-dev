@@ -61,6 +61,7 @@ export default function DatabaseDialog({
   open,
   onOpenChange,
   database,
+  lockedClientId,
 }: DatabaseDialogProps) {
   const { isSuperAdmin, profile } = useAuth();
   const createDatabase = useCreateDatabase();
