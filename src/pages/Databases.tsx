@@ -10,7 +10,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { Card, CardContent } from "@/components/ui/card";
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from "@/components/ui/accordion";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Plus, Database, AlertCircle, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown } from "lucide-react";
+import { Plus, Database, AlertCircle, Search, Trash2, ArrowUpDown, ArrowUp, ArrowDown, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   AlertDialog,
@@ -34,6 +34,7 @@ import { cn } from "@/lib/utils";
 import DatabaseDialog from "@/components/databases/DatabaseDialog";
 import { useDeleteDatabase } from "@/hooks/useDatabaseMutations";
 import type { Tables } from "@/integrations/supabase/types";
+import ClientEnvironmentCards, { type ClientCardData } from "@/components/common/ClientEnvironmentCards";
 
 type SortField = "machine" | "instance_name" | "engine" | "version" | "environment" | "criticality";
 type SortDirection = "asc" | "desc" | null;
@@ -88,6 +89,7 @@ export default function Databases() {
   // Chave composta: "ClientName::Environment"
   const [environmentPages, setEnvironmentPages] = useState<Record<string, number>>({});
   const [environmentSorts, setEnvironmentSorts] = useState<Record<string, SortConfig>>({});
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
   
   const deleteDatabase = useDeleteDatabase();
 
@@ -115,6 +117,23 @@ export default function Databases() {
       db.instance_name.toLowerCase().includes(searchQuery.toLowerCase());
     return matchesEngine && matchesEnvironment && matchesSearch;
   });
+
+  const clientCards: ClientCardData[] = (() => {
+    if (!databases) return [];
+    const map = new Map<string, ClientCardData>();
+    databases.forEach((d: any) => {
+      const id = d.client_id || "no-client";
+      const name = d.clients?.name || "Sem Cliente";
+      const env = d.environment || "dev";
+      if (!map.has(id)) map.set(id, { clientId: id, clientName: name, total: 0, byEnvironment: {} });
+      const entry = map.get(id)!;
+      entry.total += 1;
+      entry.byEnvironment[env] = (entry.byEnvironment[env] || 0) + 1;
+    });
+    return Array.from(map.values())
+      .filter((c) => !searchQuery || c.clientName.toLowerCase().includes(searchQuery.toLowerCase()))
+      .sort((a, b) => a.clientName.localeCompare(b.clientName));
+  })();
 
   // Função auxiliar para criar chave única por cliente+ambiente
   const getEnvironmentKey = (clientName: string, environment: string) => {
@@ -145,6 +164,9 @@ export default function Databases() {
   };
 
   const groupedDatabases = groupDatabasesByClientAndEnvironment();
+  const visibleGrouped = selectedClient
+    ? (groupedDatabases[selectedClient.name] ? { [selectedClient.name]: groupedDatabases[selectedClient.name] } : {})
+    : {};
 
   const handleEditDatabase = (db: Tables<"database_instances">) => {
     setSelectedDatabase(db);
@@ -322,10 +344,19 @@ export default function Databases() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Bancos de Dados</h1>
+            <div className="flex items-center gap-3">
+              {selectedClient && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedClient(null)}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+                </Button>
+              )}
+              <h1 className="text-3xl font-bold text-foreground">
+                {selectedClient ? `Bancos de Dados · ${selectedClient.name}` : "Bancos de Dados"}
+              </h1>
+            </div>
             <p className="text-muted-foreground">Catálogo de instâncias de banco de dados</p>
           </div>
-          {!isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
+          {selectedClient && !isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
             <Button onClick={handleNewDatabase}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Instância
@@ -337,13 +368,15 @@ export default function Databases() {
           <div className="relative flex-1 min-w-[300px] max-w-md">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por nome da instância..."
+              placeholder={selectedClient ? "Buscar por nome da instância..." : "Buscar por cliente..."}
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
             />
           </div>
 
+          {selectedClient && (
+          <>
           <Select value={engineFilter} onValueChange={setEngineFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Engine" />
@@ -369,6 +402,8 @@ export default function Databases() {
               <SelectItem value="dev">Desenvolvimento</SelectItem>
             </SelectContent>
           </Select>
+          </>
+          )}
         </div>
 
         {isLoading ? (
@@ -381,9 +416,16 @@ export default function Databases() {
               </Card>
             ))}
           </div>
-        ) : filteredDatabases && filteredDatabases.length > 0 ? (
+        ) : !selectedClient ? (
+          <ClientEnvironmentCards
+            items={clientCards}
+            icon={Database}
+            onSelect={setSelectedClient}
+            emptyLabel="Nenhuma instância cadastrada"
+          />
+        ) : Object.keys(visibleGrouped).length > 0 ? (
           <Accordion type="multiple" className="space-y-4">
-            {Object.entries(groupedDatabases).map(([clientName, environmentGroups]) => {
+            {Object.entries(visibleGrouped).map(([clientName, environmentGroups]) => {
               const totalClientInstances = Object.values(environmentGroups).reduce(
                 (sum, envDbs) => sum + envDbs.length, 
                 0
