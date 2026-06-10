@@ -55,6 +55,7 @@ interface DatabaseDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   database?: Tables<"database_instances"> | null;
+  lockedClientId?: string | null;
 }
 
 export default function DatabaseDialog({
@@ -86,7 +87,7 @@ export default function DatabaseDialog({
   const form = useForm<DatabaseFormData>({
     resolver: zodResolver(databaseSchema),
     defaultValues: {
-      client_id: profile?.client_id || "",
+      client_id: lockedClientId || profile?.client_id || "",
       machine_id: "",
       engine: "PostgreSQL",
       version: "",
@@ -154,7 +155,7 @@ export default function DatabaseDialog({
         });
       } else {
         form.reset({
-          client_id: profile?.client_id || "",
+          client_id: lockedClientId || profile?.client_id || "",
           machine_id: "",
           engine: "PostgreSQL",
           version: "",
@@ -223,7 +224,7 @@ export default function DatabaseDialog({
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!isSuperAdmin}
+                    disabled={!isSuperAdmin || !!lockedClientId}
                   >
                     <FormControl>
                       <SelectTrigger>
