@@ -699,6 +699,7 @@ export default function Databases() {
         open={isDialogOpen} 
         onOpenChange={handleDialogClose}
         database={selectedDatabase}
+        lockedClientId={!selectedDatabase ? selectedClient?.id : undefined}
       />
 
       <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
