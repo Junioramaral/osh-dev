@@ -1,75 +1,54 @@
-## Causa raiz
+## Objetivo
 
-A função `public.generate_ticket_number()` (trigger BEFORE INSERT em `tickets`) gera o número assim:
+Transformar as telas **Máquinas**, **Banco de Dados** e **Aplicativos** em uma navegação em duas etapas (drill-down por cliente), com contagem por ambiente no card e criação contextualizada.
 
-```sql
-SELECT COUNT(*) + 1 + 101000 INTO counter FROM public.tickets;
-NEW.ticket_number := LPAD(counter::TEXT, 8, '0');
-```
+## Comportamento atual vs. proposto
 
-Diagnóstico no banco:
-- `COUNT(*) = 11`, `MAX(ticket_number::bigint) = 101012`, `MIN = 1`.
-- Existem 2 tickets antigos com numeração baixa (sem offset) e 9 com offset `101000+`.
-- Próximo número calculado = `11 + 1 + 101000 = 101012` → **já existe** → viola `tickets_ticket_number_key`.
+**Hoje (Máquinas / Databases / Applications):** lista plana agrupada por cliente em accordion, com botão "Nova X" sempre visível no topo, e o formulário exige seleção do cliente.
 
-Além disso, `COUNT(*)+1` é inerentemente frágil: qualquer ticket deletado no futuro vai recriar a colisão, e dois INSERTs concorrentes geram o mesmo número.
+**Proposto:**
 
-## Correção proposta
+### 1. Tela inicial (lista de clientes)
+- Mostra um **card por cliente** que possui registros daquele tipo (máquina/banco/aplicativo).
+- Cada card exibe:
+  - Nome do cliente
+  - Total de registros
+  - Quebra por ambiente, ex.:
+    ```text
+    ATPPOA
+    Produção: 3
+    Homologação: 2
+    QA: 1
+    ```
+- **Sem botão "Nova Máquina/Banco/Aplicativo"** nesta tela.
+- Mantém busca por cliente.
+- Clicar no card abre a **visão do cliente** (sem mudar de rota — estado interno `selectedClientId`, com botão "← Voltar").
 
-Substituir a função por uma versão baseada no **maior número já existente** (com piso no offset), e adicionar retry em caso de colisão concorrente:
+### 2. Visão do cliente (lista de ativos)
+- Cabeçalho: nome do cliente + botão "Voltar".
+- Botão **"Nova Máquina/Banco/Aplicativo"** aparece **somente aqui** (respeitando permissão atual: `isSuperAdmin && !isViewer`).
+- Lista os ativos do cliente, mantendo o agrupamento por ambiente, busca, paginação, ordenação e ações de editar/excluir já existentes.
+- Ao abrir o dialog de criação, o `client_id` já vem **pré-preenchido e travado** (campo cliente oculto/somente-leitura) com o cliente do card.
 
-```sql
-CREATE OR REPLACE FUNCTION public.generate_ticket_number()
-RETURNS trigger
-LANGUAGE plpgsql
-SECURITY DEFINER
-SET search_path TO 'public'
-AS $$
-DECLARE
-  next_num BIGINT;
-  ticket_offset BIGINT := 101000;
-  attempts INT := 0;
-BEGIN
-  LOOP
-    SELECT GREATEST(
-             COALESCE(MAX(ticket_number::BIGINT), ticket_offset),
-             ticket_offset
-           ) + 1
-      INTO next_num
-      FROM public.tickets
-     WHERE ticket_number ~ '^[0-9]+$';
+## Arquivos afetados
 
-    NEW.ticket_number := LPAD(next_num::TEXT, 8, '0');
+- `src/pages/Machines.tsx` — adicionar estado `selectedClientId`, render condicional (cards de clientes ↔ detalhe do cliente), mover botão "Nova Máquina" para a visão de detalhe.
+- `src/pages/Databases.tsx` — mesma transformação.
+- `src/pages/Applications.tsx` — mesma transformação.
+- `src/components/machines/MachineDialog.tsx` — aceitar prop opcional `lockedClientId`; quando presente, ocultar o select de cliente e enviar esse id.
+- `src/components/databases/DatabaseDialog.tsx` — mesmo ajuste (`lockedClientId`).
+- `src/components/applications/ApplicationInstanceDialog.tsx` — mesmo ajuste.
 
-    -- valida unicidade antes de devolver
-    IF NOT EXISTS (
-      SELECT 1 FROM public.tickets WHERE ticket_number = NEW.ticket_number
-    ) THEN
-      RETURN NEW;
-    END IF;
+## Detalhes técnicos
 
-    attempts := attempts + 1;
-    EXIT WHEN attempts >= 5;
-  END LOOP;
+- **Agrupamento para os cards:** reduzir os dados já carregados (`machines`/`databases`/`applications`) por `client_id` e por `environment`, usando o mapeamento de labels existente (`ENVIRONMENT_CONFIG` em `Machines.tsx` — reaproveitar nos outros para consistência: Produção, Homologação, QA, Desenvolvimento). Ambientes sem registros não aparecem.
+- **Sem mudanças de schema** no Supabase — apenas UI/UX.
+- **Sem mudanças de rota** — a navegação cliente→detalhe é via estado local para preservar filtros e cache do React Query.
+- **Permissões:** mantêm-se as regras atuais; o botão de criação só renderiza para quem já tinha permissão.
+- **Filtro de tipo/busca:** continuam disponíveis na visão de detalhe do cliente. Na visão de cards, mantemos apenas busca por nome de cliente (mais simples e útil nesse nível).
 
-  RAISE EXCEPTION 'Não foi possível gerar ticket_number único após % tentativas', attempts;
-END;
-$$;
-```
+## Fora de escopo
 
-Por que essa abordagem:
-- Usa `MAX(...)+1` → imune a deleções e ao estado atual (11 tickets vs. max 101012).
-- `GREATEST(..., offset)` preserva o piso de `101000`.
-- Filtro `~ '^[0-9]+$'` ignora qualquer número não-numérico legado.
-- Loop com até 5 tentativas evita falha em INSERTs concorrentes (a constraint `UNIQUE` continua sendo a fonte de verdade).
-
-## Escopo
-
-- 1 migração SQL apenas (substituição da função). Trigger e tabela não mudam.
-- Sem alterações em código frontend.
-- Sem backfill dos tickets existentes (numeração legada preservada).
-
-## Validação após aplicar
-
-1. Criar um ticket novo para ATPPOA → deve sair com `00101013`.
-2. Criar um segundo ticket → `00101014`.
+- Não altera Tickets, Clientes ou demais telas.
+- Não cria novas rotas.
+- Não toca em lógica de negócio (RLS, edge functions, validações).
