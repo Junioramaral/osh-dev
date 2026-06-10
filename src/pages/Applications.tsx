@@ -715,6 +715,7 @@ export default function Applications() {
         open={dialogOpen}
         onOpenChange={setDialogOpen}
         instance={selectedInstance}
+        lockedClientId={!selectedInstance ? selectedClient?.id : undefined}
       />
     </AppLayout>
   );
