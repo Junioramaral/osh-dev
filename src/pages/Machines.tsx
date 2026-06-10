@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
-import { Plus, Server, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2 } from "lucide-react";
+import { Plus, Server, AlertCircle, Search, ArrowUpDown, ArrowUp, ArrowDown, Trash2, ArrowLeft } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import {
   Accordion,
@@ -36,6 +36,7 @@ import { cn } from "@/lib/utils";
 import { Tables } from "@/integrations/supabase/types";
 import MachineDialog from "@/components/machines/MachineDialog";
 import { useQueryClient } from "@tanstack/react-query";
+import ClientEnvironmentCards, { type ClientCardData } from "@/components/common/ClientEnvironmentCards";
 
 type SortField = "hostname" | "machine_type" | "operating_system" | "criticality";
 type SortDirection = "asc" | "desc" | null;
@@ -87,6 +88,7 @@ export default function Machines() {
   const [environmentSorts, setEnvironmentSorts] = useState<Record<string, SortConfig>>({});
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedMachine, setSelectedMachine] = useState<Tables<"machines"> | null>(null);
+  const [selectedClient, setSelectedClient] = useState<{ id: string; name: string } | null>(null);
 
   const { data: machines, isLoading } = useQuery({
     queryKey: ["machines"],
@@ -114,6 +116,24 @@ export default function Machines() {
     
     return matchesType && matchesSearch;
   });
+
+  // Build per-client cards from ALL machines (not filtered by search/type)
+  const clientCards: ClientCardData[] = (() => {
+    if (!machines) return [];
+    const map = new Map<string, ClientCardData>();
+    machines.forEach((m: any) => {
+      const id = m.client_id || "no-client";
+      const name = m.clients?.name || "Sem Cliente";
+      const env = m.environment || "dev";
+      if (!map.has(id)) map.set(id, { clientId: id, clientName: name, total: 0, byEnvironment: {} });
+      const entry = map.get(id)!;
+      entry.total += 1;
+      entry.byEnvironment[env] = (entry.byEnvironment[env] || 0) + 1;
+    });
+    return Array.from(map.values())
+      .filter((c) => !searchTerm || c.clientName.toLowerCase().includes(searchTerm.toLowerCase()))
+      .sort((a, b) => a.clientName.localeCompare(b.clientName));
+  })();
 
   // Chave composta para paginação e ordenação por ambiente
   const getEnvironmentKey = (clientName: string, environment: string) => {
@@ -145,6 +165,11 @@ export default function Machines() {
   };
 
   const groupedMachines = groupMachinesByClientAndEnvironment();
+
+  // When a client is selected, scope grouped data to just that client
+  const visibleGrouped = selectedClient
+    ? (groupedMachines[selectedClient.name] ? { [selectedClient.name]: groupedMachines[selectedClient.name] } : {})
+    : {};
 
   // Função para obter valor de ordenação
   const getSortValue = (machine: any, field: SortField) => {
@@ -308,10 +333,19 @@ export default function Machines() {
       <div className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h1 className="text-3xl font-bold text-foreground">Máquinas</h1>
+            <div className="flex items-center gap-3">
+              {selectedClient && (
+                <Button variant="ghost" size="sm" onClick={() => setSelectedClient(null)}>
+                  <ArrowLeft className="h-4 w-4 mr-1" /> Voltar
+                </Button>
+              )}
+              <h1 className="text-3xl font-bold text-foreground">
+                {selectedClient ? `Máquinas · ${selectedClient.name}` : "Máquinas"}
+              </h1>
+            </div>
             <p className="text-muted-foreground">Catálogo de ativos de infraestrutura</p>
           </div>
-          {isSuperAdmin && !isViewer && (
+          {selectedClient && isSuperAdmin && !isViewer && (
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Máquina
@@ -323,13 +357,14 @@ export default function Machines() {
           <div className="relative flex-1 max-w-sm">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
-              placeholder="Buscar por hostname, cliente, SO..."
+              placeholder={selectedClient ? "Buscar por hostname, SO..." : "Buscar por cliente..."}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="pl-10"
             />
           </div>
-          
+
+          {selectedClient && (
           <Select value={typeFilter} onValueChange={setTypeFilter}>
             <SelectTrigger className="w-[180px]">
               <SelectValue placeholder="Tipo" />
@@ -342,6 +377,7 @@ export default function Machines() {
               <SelectItem value="cloud">Cloud</SelectItem>
             </SelectContent>
           </Select>
+          )}
         </div>
 
         {isLoading ? (
@@ -357,9 +393,16 @@ export default function Machines() {
               </Card>
             ))}
           </div>
-        ) : Object.keys(groupedMachines).length > 0 ? (
+        ) : !selectedClient ? (
+          <ClientEnvironmentCards
+            items={clientCards}
+            icon={Server}
+            onSelect={setSelectedClient}
+            emptyLabel="Nenhuma máquina cadastrada"
+          />
+        ) : Object.keys(visibleGrouped).length > 0 ? (
           <Accordion type="multiple" className="space-y-4">
-            {Object.entries(groupedMachines).map(([clientName, environmentGroups]) => {
+            {Object.entries(visibleGrouped).map(([clientName, environmentGroups]) => {
               const totalClientMachines = Object.values(environmentGroups).reduce(
                 (sum, envMachines) => sum + envMachines.length, 
                 0
@@ -615,6 +658,7 @@ export default function Machines() {
           if (!open) setSelectedMachine(null);
         }}
         machine={selectedMachine}
+        lockedClientId={!selectedMachine ? selectedClient?.id : undefined}
       />
     </AppLayout>
   );
