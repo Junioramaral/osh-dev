@@ -1095,6 +1095,55 @@ export type Database = {
           },
         ]
       }
+      ticket_links: {
+        Row: {
+          created_at: string
+          id: string
+          linked_at: string
+          linked_by: string | null
+          linked_ticket_id: string
+          ticket_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          linked_ticket_id: string
+          ticket_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          linked_at?: string
+          linked_by?: string | null
+          linked_ticket_id?: string
+          ticket_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "ticket_links_linked_by_fkey"
+            columns: ["linked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_links_linked_ticket_id_fkey"
+            columns: ["linked_ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "ticket_links_ticket_id_fkey"
+            columns: ["ticket_id"]
+            isOneToOne: false
+            referencedRelation: "tickets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ticket_sla_pauses: {
         Row: {
           created_at: string
