@@ -1,19 +1,51 @@
-Plano para corrigir definitivamente o problema:
+## Objetivo
 
-1. **Trocar a regra da fila geral para espelhar “Meus Tickets”**
-   - Em vez de esconder apenas “tickets de outro analista”, a tela **Tickets** deve esconder qualquer ticket que se encaixe na mesma regra da tela **Meus Tickets**:
-     - `analyst_id` preenchido; ou
-     - `lock_owner_id` preenchido.
-   - Assim, os tickets 00000009, 00101012 e 00101013 deixam de aparecer na fila geral porque já pertencem à fila pessoal do Junior Amaral.
+Permitir, ao resolver um ticket, selecionar outros tickets do mesmo cliente para vincular ao ticket atual (apenas referência, sem alterar status dos vinculados).
 
-2. **Manter a exceção de pesquisa/filtro por cliente**
-   - Quando o filtro de cliente estiver em **Todos os clientes**, esses tickets assumidos ficam ocultos.
-   - Quando um cliente específico for selecionado, eles voltam a aparecer para consulta, junto com os filtros de status existentes.
+## Backend
 
-3. **Ajustar a contagem/aviso de tickets ocultos**
-   - Atualizar o aviso da tela para contar tickets ocultos pela nova regra: `analyst_id` ou `lock_owner_id` preenchido.
-   - O texto deve explicar que tickets assumidos ficam fora da fila geral e podem ser consultados filtrando por cliente.
+**Nova tabela `public.ticket_links`** (migração):
+- `ticket_id` (uuid, FK tickets, on delete cascade) — ticket "origem" (o que está sendo resolvido)
+- `linked_ticket_id` (uuid, FK tickets, on delete cascade) — ticket vinculado
+- `linked_by` (uuid, FK profiles)
+- `linked_at` (timestamptz default now())
+- `id`, `created_at` padrão
+- Constraint `UNIQUE (ticket_id, linked_ticket_id)` + CHECK impedindo self-link
+- GRANTs para `authenticated` e `service_role` (sem anon)
+- RLS:
+  - SELECT: usuários internos (analyst/super_admin/viewer/otimizzo) OU cliente do tenant dono do `ticket_id`
+  - INSERT/DELETE: apenas usuários internos (analistas, super_admin, otimizzo)
+- Índices em `ticket_id` e `linked_ticket_id`
 
-4. **Validar o caso dos prints**
-   - Conferir no código que, com “Todos os clientes” ativo, tickets 00000009, 00101012 e 00101013 não passam mais no filtro da fila geral.
-   - Conferir que eles continuam aparecendo em **Meus Tickets** para o usuário responsável.
+## Frontend
+
+**`TicketResolveDialog.tsx`** — adicionar seção "Vincular outros tickets do cliente" acima do botão de confirmar:
+- Campo de busca (Input) que filtra por número OU título
+- Lista de tickets do mesmo `client_id` (excluindo o ticket atual), com escopo:
+  - Status abertos (qualquer status exceto `resolvido`/`cancelado`) **OU**
+  - Resolvidos nos últimos 30 dias (`resolved_at >= now() - 30 days`)
+  - Excluir RFCs (`record_type != 'rfc'`)
+- Cada linha: checkbox + `#numero` + título + badge de status + data
+- Mostrar contador "X ticket(s) selecionado(s)"
+- Scroll interno (max-height ~240px) para listas grandes
+- Estado inicial: vazio (nenhum selecionado)
+
+**`useTicketActions.ts`** — estender `resolveTicketWithReason`:
+- Aceitar parâmetro opcional `linkedTicketIds: string[]`
+- Após o UPDATE do ticket, inserir em `ticket_links` (ignorar conflitos com `onConflict`)
+- Adicionar registro no `ticket_history` listando os números vinculados (visibilidade no histórico)
+- Invalidar query `ticket-links`
+
+**Novo hook `useClientLinkableTickets(clientId, currentTicketId)`** — busca os tickets candidatos com o escopo definido.
+
+**Exibição do vínculo no ticket** — adicionar pequena seção "Tickets vinculados" em `TicketDetails.tsx` (lista somente leitura com links navegáveis), exibindo registros de `ticket_links` onde `ticket_id = currentId` (e também onde `linked_ticket_id = currentId`, para mostrar vínculos reversos).
+
+## Onde NÃO mexer
+
+- `BulkStatusReasonDialog` (resolução em massa) — fora do escopo nesta iteração.
+- Status, SLA, emails e fluxo de auto-alocação atuais permanecem inalterados.
+- Tickets vinculados **não** mudam de status nem recebem email.
+
+## Memória
+
+Atualizar `mem://index.md` com nova entrada `mem://features/ticket-resolution-linking` descrevendo: tabela, escopo (abertos + resolvidos 30d), efeito (apenas referência), exibição reversa.
