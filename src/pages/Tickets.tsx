@@ -485,7 +485,12 @@ export default function Tickets() {
       (queueFilter === "none" && !ticket.queue_id) || 
       ticket.queue_id === queueFilter;
     const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
-    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType;
+    const isLockedByOther =
+      ticket.lock_status === "locked" &&
+      ticket.lock_owner_id &&
+      ticket.lock_owner_id !== profile?.id;
+    const hideLockedByOther = !isClient && clientFilter === "all" && isLockedByOther;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType && !hideLockedByOther;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
@@ -511,6 +516,31 @@ export default function Tickets() {
     const numB = parseInt(b.ticket_number, 10) || 0;
     return numB - numA; // Decrescente: mais novo primeiro
   });
+
+  // Contagem de tickets ocultos por estarem assumidos por outros analistas
+  const hiddenLockedCount = !isClient && clientFilter === "all"
+    ? (tickets?.filter((ticket) => {
+        const matchesSearch =
+          ticket.ticket_number.toLowerCase().includes(searchTerm.toLowerCase()) ||
+          ticket.title.toLowerCase().includes(searchTerm.toLowerCase());
+        const matchesStatus = statusFilters.length === 0 ? false : statusFilters.includes(ticket.status);
+        const matchesSegment = segmentFilter === "all" || ticket.segment === segmentFilter;
+        const matchesTeam =
+          teamFilter === "all" ||
+          (teamFilter === "none" && !ticket.team_id) ||
+          ticket.team_id === teamFilter;
+        const matchesQueue =
+          queueFilter === "all" ||
+          (queueFilter === "none" && !ticket.queue_id) ||
+          ticket.queue_id === queueFilter;
+        const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
+        const isLockedByOther =
+          ticket.lock_status === "locked" &&
+          ticket.lock_owner_id &&
+          ticket.lock_owner_id !== profile?.id;
+        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isLockedByOther;
+      }).length ?? 0)
+    : 0;
 
   return (
     <AppLayout>
@@ -714,6 +744,15 @@ export default function Tickets() {
           </div>
           ) : null;
         })()}
+
+        {hiddenLockedCount > 0 && (
+          <Alert className="border-slate-400 bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {hiddenLockedCount} ticket(s) assumido(s) por outros analistas estão ocultos. Selecione um cliente específico no filtro para visualizá-los.
+            </AlertDescription>
+          </Alert>
+        )}
 
         {isLoading ? (
           <Card>

@@ -1,54 +1,50 @@
 ## Objetivo
 
-Transformar as telas **Máquinas**, **Banco de Dados** e **Aplicativos** em uma navegação em duas etapas (drill-down por cliente), com contagem por ambiente no card e criação contextualizada.
+Reduzir o ruído na lista geral de Tickets escondendo, por padrão, os tickets já bloqueados por algum analista (que aparecem em "Meus Tickets" dele). Esses tickets continuam existindo e podem ser trazidos de volta sempre que o usuário filtrar por um cliente específico.
 
-## Comportamento atual vs. proposto
+Multi-status já existe (os status são checkboxes), então não há mudança de filtros — só ajuste de comportamento de ocultação.
 
-**Hoje (Máquinas / Databases / Applications):** lista plana agrupada por cliente em accordion, com botão "Nova X" sempre visível no topo, e o formulário exige seleção do cliente.
+## Comportamento
 
-**Proposto:**
+Tela: `/tickets` (lista geral)
 
-### 1. Tela inicial (lista de clientes)
-- Mostra um **card por cliente** que possui registros daquele tipo (máquina/banco/aplicativo).
-- Cada card exibe:
-  - Nome do cliente
-  - Total de registros
-  - Quebra por ambiente, ex.:
-    ```text
-    ATPPOA
-    Produção: 3
-    Homologação: 2
-    QA: 1
-    ```
-- **Sem botão "Nova Máquina/Banco/Aplicativo"** nesta tela.
-- Mantém busca por cliente.
-- Clicar no card abre a **visão do cliente** (sem mudar de rota — estado interno `selectedClientId`, com botão "← Voltar").
+Regra de ocultação padrão:
+- Esconder tickets com `lock_status = 'locked'` quando o `lock_owner_id` for de outro usuário interno (não o próprio).
+- Tickets do próprio usuário (que ele mesmo bloqueou) continuam aparecendo normalmente.
+- Tickets não bloqueados (novos, liberados, sem dono) continuam aparecendo.
 
-### 2. Visão do cliente (lista de ativos)
-- Cabeçalho: nome do cliente + botão "Voltar".
-- Botão **"Nova Máquina/Banco/Aplicativo"** aparece **somente aqui** (respeitando permissão atual: `isSuperAdmin && !isViewer`).
-- Lista os ativos do cliente, mantendo o agrupamento por ambiente, busca, paginação, ordenação e ações de editar/excluir já existentes.
-- Ao abrir o dialog de criação, o `client_id` já vem **pré-preenchido e travado** (campo cliente oculto/somente-leitura) com o cliente do card.
+Quando reexibir os ocultos:
+- Quando o filtro de Cliente estiver diferente de "Todos", a lista volta a mostrar todos os tickets daquele cliente, inclusive os bloqueados por outros analistas.
 
-## Arquivos afetados
+Escopo:
+- Aplica para todos os usuários internos: analistas, super_admin, viewer e usuários do tenant Otimizzo.
+- Clientes (`isClient`) não são afetados — eles já não veem a fila interna de analistas.
 
-- `src/pages/Machines.tsx` — adicionar estado `selectedClientId`, render condicional (cards de clientes ↔ detalhe do cliente), mover botão "Nova Máquina" para a visão de detalhe.
-- `src/pages/Databases.tsx` — mesma transformação.
-- `src/pages/Applications.tsx` — mesma transformação.
-- `src/components/machines/MachineDialog.tsx` — aceitar prop opcional `lockedClientId`; quando presente, ocultar o select de cliente e enviar esse id.
-- `src/components/databases/DatabaseDialog.tsx` — mesmo ajuste (`lockedClientId`).
-- `src/components/applications/ApplicationInstanceDialog.tsx` — mesmo ajuste.
+Indicação visual:
+- Adicionar um aviso discreto acima da tabela quando houver tickets ocultos:
+  `"X ticket(s) assumido(s) por outros analistas estão ocultos. Selecione um cliente para visualizá-los."`
+  (só aparece quando `clientFilter === 'all'` e existe pelo menos 1 ticket oculto pela regra)
 
 ## Detalhes técnicos
 
-- **Agrupamento para os cards:** reduzir os dados já carregados (`machines`/`databases`/`applications`) por `client_id` e por `environment`, usando o mapeamento de labels existente (`ENVIRONMENT_CONFIG` em `Machines.tsx` — reaproveitar nos outros para consistência: Produção, Homologação, QA, Desenvolvimento). Ambientes sem registros não aparecem.
-- **Sem mudanças de schema** no Supabase — apenas UI/UX.
-- **Sem mudanças de rota** — a navegação cliente→detalhe é via estado local para preservar filtros e cache do React Query.
-- **Permissões:** mantêm-se as regras atuais; o botão de criação só renderiza para quem já tinha permissão.
-- **Filtro de tipo/busca:** continuam disponíveis na visão de detalhe do cliente. Na visão de cards, mantemos apenas busca por nome de cliente (mais simples e útil nesse nível).
+Arquivo único: `src/pages/Tickets.tsx`
 
-## Fora de escopo
+1. No `filteredTickets` (linha ~472), adicionar uma nova condição antes do `return`:
+   ```ts
+   const isLockedByOther =
+     ticket.lock_status === "locked" &&
+     ticket.lock_owner_id &&
+     ticket.lock_owner_id !== profile?.id;
+   const hideLockedByOther = !isClient && clientFilter === "all" && isLockedByOther;
+   ```
+   E incluir `!hideLockedByOther` no `return` final.
 
-- Não altera Tickets, Clientes ou demais telas.
-- Não cria novas rotas.
-- Não toca em lógica de negócio (RLS, edge functions, validações).
+2. Calcular `hiddenLockedCount` (tickets que seriam mostrados se não fosse essa regra) para o aviso.
+
+3. Renderizar o aviso (componente `Alert` já importado) logo acima da `<Table>` quando `hiddenLockedCount > 0`.
+
+Sem mudanças em backend, RLS, migrations ou em "Meus Tickets" — apenas filtragem no frontend.
+
+## Memória
+
+Atualizar `mem://index.md` com referência a uma nova memória `mem://features/ticket-list-hide-locked-by-others` documentando a regra (ocultação padrão + reexibição via filtro de cliente).
