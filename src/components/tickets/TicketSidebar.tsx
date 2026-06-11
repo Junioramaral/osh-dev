@@ -230,12 +230,13 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
     }
   };
 
-  const handleResolveConfirm = async (reason: string) => {
+  const handleResolveConfirm = async (reason: string, linkedTicketIds: string[]) => {
     if (!profile?.id) return;
     await resolveTicketWithReason.mutateAsync({
       ticketId: ticket.id,
       reason,
       userId: profile.id,
+      linkedTicketIds,
     });
     setShowResolveDialog(false);
   };
@@ -450,6 +451,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
           ticket_number: ticket.ticket_number,
           title: ticket.title,
           contact_name: ticket.contact_name,
+          client_id: ticket.client_id,
         }}
         onConfirm={handleResolveConfirm}
         isLoading={resolveTicketWithReason.isPending}

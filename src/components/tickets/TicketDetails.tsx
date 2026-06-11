@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
+import TicketLinkedTicketsCard from "./TicketLinkedTicketsCard";
 
 interface TicketDetailsProps {
   ticket: any;
@@ -284,6 +285,9 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
 
       {/* Card 3: Detalhes do Incidente */}
       <TicketIncidentCard ticket={ticket} />
+
+      {/* Card: Tickets Vinculados */}
+      <TicketLinkedTicketsCard ticketId={ticket.id} />
 
       {/* Card 4: Análise */}
       <Card>
