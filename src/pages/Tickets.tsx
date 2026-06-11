@@ -745,6 +745,15 @@ export default function Tickets() {
           ) : null;
         })()}
 
+        {hiddenLockedCount > 0 && (
+          <Alert className="border-slate-400 bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              {hiddenLockedCount} ticket(s) assumido(s) por outros analistas estão ocultos. Selecione um cliente específico no filtro para visualizá-los.
+            </AlertDescription>
+          </Alert>
+        )}
+
         {isLoading ? (
           <Card>
             <div className="p-8 space-y-4">
