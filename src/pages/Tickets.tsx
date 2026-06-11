@@ -485,12 +485,11 @@ export default function Tickets() {
       (queueFilter === "none" && !ticket.queue_id) || 
       ticket.queue_id === queueFilter;
     const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
-    const isLockedByOther =
-      ticket.lock_status === "locked" &&
-      ticket.lock_owner_id &&
-      ticket.lock_owner_id !== profile?.id;
-    const hideLockedByOther = !isClient && clientFilter === "all" && isLockedByOther;
-    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType && !hideLockedByOther;
+    const isOwnedByOther =
+      (ticket.analyst_id && ticket.analyst_id !== profile?.id) ||
+      (ticket.lock_status === "locked" && ticket.lock_owner_id && ticket.lock_owner_id !== profile?.id);
+    const hideOwnedByOther = !isClient && clientFilter === "all" && isOwnedByOther;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType && !hideOwnedByOther;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
@@ -534,11 +533,10 @@ export default function Tickets() {
           (queueFilter === "none" && !ticket.queue_id) ||
           ticket.queue_id === queueFilter;
         const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
-        const isLockedByOther =
-          ticket.lock_status === "locked" &&
-          ticket.lock_owner_id &&
-          ticket.lock_owner_id !== profile?.id;
-        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isLockedByOther;
+        const isOwnedByOther =
+          (ticket.analyst_id && ticket.analyst_id !== profile?.id) ||
+          (ticket.lock_status === "locked" && ticket.lock_owner_id && ticket.lock_owner_id !== profile?.id);
+        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isOwnedByOther;
       }).length ?? 0)
     : 0;
 
