@@ -743,7 +743,7 @@ export default function Tickets() {
           <Alert className="border-slate-400 bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {hiddenLockedCount} ticket(s) assumido(s) por outros analistas estão ocultos. Selecione um cliente específico no filtro para visualizá-los.
+              {hiddenLockedCount} ticket(s) já assumido(s) por algum analista estão ocultos desta fila geral. Selecione um cliente específico no filtro para visualizá-los.
             </AlertDescription>
           </Alert>
         )}
