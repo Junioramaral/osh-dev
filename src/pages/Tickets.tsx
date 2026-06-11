@@ -485,11 +485,9 @@ export default function Tickets() {
       (queueFilter === "none" && !ticket.queue_id) || 
       ticket.queue_id === queueFilter;
     const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
-    const isOwnedByOther =
-      (ticket.analyst_id && ticket.analyst_id !== profile?.id) ||
-      (ticket.lock_status === "locked" && ticket.lock_owner_id && ticket.lock_owner_id !== profile?.id);
-    const hideOwnedByOther = !isClient && clientFilter === "all" && isOwnedByOther;
-    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType && !hideOwnedByOther;
+    const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
+    const hideAssumed = !isClient && clientFilter === "all" && isAssumed;
+    return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType && !hideAssumed;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
     const statusPriority: Record<string, number> = {
@@ -533,10 +531,8 @@ export default function Tickets() {
           (queueFilter === "none" && !ticket.queue_id) ||
           ticket.queue_id === queueFilter;
         const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
-        const isOwnedByOther =
-          (ticket.analyst_id && ticket.analyst_id !== profile?.id) ||
-          (ticket.lock_status === "locked" && ticket.lock_owner_id && ticket.lock_owner_id !== profile?.id);
-        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isOwnedByOther;
+        const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
+        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isAssumed;
       }).length ?? 0)
     : 0;
 
@@ -747,7 +743,7 @@ export default function Tickets() {
           <Alert className="border-slate-400 bg-slate-50 text-slate-800 dark:bg-slate-900 dark:text-slate-100">
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
-              {hiddenLockedCount} ticket(s) assumido(s) por outros analistas estão ocultos. Selecione um cliente específico no filtro para visualizá-los.
+              {hiddenLockedCount} ticket(s) já assumido(s) por algum analista estão ocultos desta fila geral. Selecione um cliente específico no filtro para visualizá-los.
             </AlertDescription>
           </Alert>
         )}
