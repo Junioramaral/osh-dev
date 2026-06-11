@@ -14,10 +14,12 @@ export function useTicketActions() {
       ticketId,
       reason,
       userId,
+      linkedTicketIds,
     }: {
       ticketId: string;
       reason: string;
       userId: string;
+      linkedTicketIds?: string[];
     }) => {
       // 1. Get analyst profile
       const { data: authorProfile } = await supabase
@@ -83,7 +85,38 @@ export function useTicketActions() {
         console.error("Erro ao inserir comentário:", commentError);
       }
 
-      // 5. Send resolution email
+      // 5. Insert ticket links (related tickets selected during resolution)
+      if (linkedTicketIds && linkedTicketIds.length > 0) {
+        const rows = linkedTicketIds.map((linkedId) => ({
+          ticket_id: ticketId,
+          linked_ticket_id: linkedId,
+          linked_by: userId,
+        }));
+        const { error: linkError } = await supabase
+          .from("ticket_links")
+          .upsert(rows, { onConflict: "ticket_id,linked_ticket_id", ignoreDuplicates: true });
+        if (linkError) {
+          console.error("Erro ao vincular tickets:", linkError);
+        } else {
+          // Log a history entry listing the linked ticket numbers
+          const { data: linkedTickets } = await supabase
+            .from("tickets")
+            .select("ticket_number")
+            .in("id", linkedTicketIds);
+          const numbers =
+            linkedTickets?.map((t: any) => `#${t.ticket_number}`).join(", ") ?? "";
+          if (numbers) {
+            await supabase.from("ticket_history").insert({
+              ticket_id: ticketId,
+              user_id: userId,
+              action_type: "linked_tickets",
+              new_value: numbers,
+            });
+          }
+        }
+      }
+
+      // 6. Send resolution email
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.access_token && ticket.contact_email) {
@@ -124,6 +157,7 @@ export function useTicketActions() {
       queryClient.invalidateQueries({ queryKey: ["ticket-detail"] });
       queryClient.invalidateQueries({ queryKey: ["ticket-comments"] });
       queryClient.invalidateQueries({ queryKey: ["ticket-history"] });
+      queryClient.invalidateQueries({ queryKey: ["ticket-links"] });
     },
     onError: (error: any) => {
       toast.error("Erro ao resolver ticket: " + error.message);
