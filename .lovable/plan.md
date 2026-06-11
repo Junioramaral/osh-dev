@@ -1,50 +1,38 @@
-## Objetivo
+## Problema
 
-Reduzir o ruído na lista geral de Tickets escondendo, por padrão, os tickets já bloqueados por algum analista (que aparecem em "Meus Tickets" dele). Esses tickets continuam existindo e podem ser trazidos de volta sempre que o usuário filtrar por um cliente específico.
+A regra anterior escondia apenas `lock_status='locked'`. O ticket 00101012 está com `analyst_id = Junior Amaral` e `lock_status='unlocked'`, mas aparece em "Meus Tickets" do Junior porque a query lá usa `analyst_id.eq OR lock_owner_id.eq`. Resultado: ele continua na fila geral indevidamente.
 
-Multi-status já existe (os status são checkboxes), então não há mudança de filtros — só ajuste de comportamento de ocultação.
+## Correção
 
-## Comportamento
+Alinhar o critério de ocultação na lista geral (`/tickets`) ao mesmo critério de "Meus Tickets":
 
-Tela: `/tickets` (lista geral)
+Esconder por padrão qualquer ticket onde **outro usuário** seja `analyst_id` OU `lock_owner_id`. Continuar mostrando:
+- Tickets do próprio usuário (analyst_id ou lock_owner_id = ele mesmo)
+- Tickets sem analista e sem lock (novos / liberados / sem dono)
 
-Regra de ocultação padrão:
-- Esconder tickets com `lock_status = 'locked'` quando o `lock_owner_id` for de outro usuário interno (não o próprio).
-- Tickets do próprio usuário (que ele mesmo bloqueou) continuam aparecendo normalmente.
-- Tickets não bloqueados (novos, liberados, sem dono) continuam aparecendo.
+Reexibição (mantida): quando `clientFilter !== 'all'`, mostra tudo do cliente, inclusive os assumidos por outros.
 
-Quando reexibir os ocultos:
-- Quando o filtro de Cliente estiver diferente de "Todos", a lista volta a mostrar todos os tickets daquele cliente, inclusive os bloqueados por outros analistas.
+Escopo (mantido): todos os usuários internos (analistas, super_admin, viewer, Otimizzo). Clientes não afetados.
 
-Escopo:
-- Aplica para todos os usuários internos: analistas, super_admin, viewer e usuários do tenant Otimizzo.
-- Clientes (`isClient`) não são afetados — eles já não veem a fila interna de analistas.
-
-Indicação visual:
-- Adicionar um aviso discreto acima da tabela quando houver tickets ocultos:
-  `"X ticket(s) assumido(s) por outros analistas estão ocultos. Selecione um cliente para visualizá-los."`
-  (só aparece quando `clientFilter === 'all'` e existe pelo menos 1 ticket oculto pela regra)
+Aviso visual (mantido): o `Alert` acima da tabela continua, recalculado pela nova regra.
 
 ## Detalhes técnicos
 
 Arquivo único: `src/pages/Tickets.tsx`
 
-1. No `filteredTickets` (linha ~472), adicionar uma nova condição antes do `return`:
-   ```ts
-   const isLockedByOther =
-     ticket.lock_status === "locked" &&
-     ticket.lock_owner_id &&
-     ticket.lock_owner_id !== profile?.id;
-   const hideLockedByOther = !isClient && clientFilter === "all" && isLockedByOther;
-   ```
-   E incluir `!hideLockedByOther` no `return` final.
+Trocar nos dois blocos (filteredTickets ~488 e hiddenLockedCount ~537) a definição:
 
-2. Calcular `hiddenLockedCount` (tickets que seriam mostrados se não fosse essa regra) para o aviso.
+```ts
+const isOwnedByOther =
+  (
+    (ticket.analyst_id && ticket.analyst_id !== profile?.id) ||
+    (ticket.lock_status === "locked" && ticket.lock_owner_id && ticket.lock_owner_id !== profile?.id)
+  );
+const hideOwnedByOther = !isClient && clientFilter === "all" && isOwnedByOther;
+```
 
-3. Renderizar o aviso (componente `Alert` já importado) logo acima da `<Table>` quando `hiddenLockedCount > 0`.
+Substituir `isLockedByOther`/`hideLockedByOther` por essas variáveis (renomear). Texto do Alert ajustado para "X ticket(s) já assumido(s) por outros analistas estão ocultos. Selecione um cliente para visualizá-los."
 
-Sem mudanças em backend, RLS, migrations ou em "Meus Tickets" — apenas filtragem no frontend.
+Atualizar `mem/features/ticket-list-hide-locked-by-others.md` (renomear conceito para "assumido por outro" = analyst_id OU lock locked por outro), e atualizar a entrada no `mem/index.md`.
 
-## Memória
-
-Atualizar `mem://index.md` com referência a uma nova memória `mem://features/ticket-list-hide-locked-by-others` documentando a regra (ocultação padrão + reexibição via filtro de cliente).
+Sem mudanças em backend, RLS ou em "Meus Tickets".
