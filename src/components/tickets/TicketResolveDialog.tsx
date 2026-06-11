@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import {
   Dialog,
   DialogContent,
@@ -11,7 +11,11 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
-import { CheckCircle, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Checkbox } from "@/components/ui/checkbox";
+import { CheckCircle, Loader2, Link2, Search } from "lucide-react";
+import { useClientLinkableTickets } from "@/hooks/useClientLinkableTickets";
+import { format } from "date-fns";
 
 interface TicketResolveDialogProps {
   open: boolean;
@@ -21,8 +25,9 @@ interface TicketResolveDialogProps {
     ticket_number: string;
     title: string;
     contact_name: string;
+    client_id?: string | null;
   };
-  onConfirm: (reason: string) => Promise<void>;
+  onConfirm: (reason: string, linkedTicketIds: string[]) => Promise<void>;
   isLoading?: boolean;
 }
 
@@ -34,23 +39,48 @@ export function TicketResolveDialog({
   isLoading,
 }: TicketResolveDialogProps) {
   const [reason, setReason] = useState("");
+  const [linkedIds, setLinkedIds] = useState<string[]>([]);
+  const [search, setSearch] = useState("");
+
+  const { data: linkable = [], isLoading: linkableLoading } =
+    useClientLinkableTickets(ticket.client_id ?? undefined, ticket.id, open);
+
+  const filtered = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    if (!q) return linkable;
+    return linkable.filter(
+      (t) =>
+        t.ticket_number.toLowerCase().includes(q) ||
+        (t.title ?? "").toLowerCase().includes(q),
+    );
+  }, [linkable, search]);
+
+  const toggleLink = (id: string) => {
+    setLinkedIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id],
+    );
+  };
 
   const handleConfirm = async () => {
     if (reason.trim().length < 10) return;
-    await onConfirm(reason);
+    await onConfirm(reason, linkedIds);
     setReason("");
+    setLinkedIds([]);
+    setSearch("");
   };
 
   const handleOpenChange = (isOpen: boolean) => {
     if (!isOpen) {
       setReason("");
+      setLinkedIds([]);
+      setSearch("");
     }
     onOpenChange(isOpen);
   };
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[500px]">
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
@@ -90,6 +120,79 @@ export function TicketResolveDialog({
               Mínimo de 10 caracteres ({reason.trim().length}/10)
             </p>
           </div>
+
+          {/* Linked tickets */}
+          {ticket.client_id && (
+            <div className="space-y-2">
+              <Label className="flex items-center gap-2">
+                <Link2 className="h-4 w-4" />
+                Vincular outros tickets do cliente
+                <span className="text-xs font-normal text-muted-foreground">
+                  (opcional)
+                </span>
+              </Label>
+              <div className="relative">
+                <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar por número ou título..."
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  className="pl-8"
+                />
+              </div>
+              <div className="border rounded-md max-h-[240px] overflow-y-auto divide-y">
+                {linkableLoading ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    Carregando tickets...
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    {search
+                      ? "Nenhum ticket encontrado"
+                      : "Sem tickets disponíveis para vincular"}
+                  </div>
+                ) : (
+                  filtered.map((t) => {
+                    const checked = linkedIds.includes(t.id);
+                    return (
+                      <label
+                        key={t.id}
+                        className="flex items-start gap-3 p-2 hover:bg-muted/40 cursor-pointer"
+                      >
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={() => toggleLink(t.id)}
+                          className="mt-1"
+                        />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <Badge variant="outline" className="text-xs">
+                              #{t.ticket_number}
+                            </Badge>
+                            <Badge
+                              variant="secondary"
+                              className="text-xs capitalize"
+                            >
+                              {t.status.replace(/_/g, " ")}
+                            </Badge>
+                            <span className="text-xs text-muted-foreground">
+                              {format(new Date(t.created_at), "dd/MM/yyyy")}
+                            </span>
+                          </div>
+                          <p className="text-sm truncate mt-0.5">{t.title}</p>
+                        </div>
+                      </label>
+                    );
+                  })
+                )}
+              </div>
+              {linkedIds.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  {linkedIds.length} ticket(s) selecionado(s) para vincular
+                </p>
+              )}
+            </div>
+          )}
         </div>
 
         <DialogFooter>
