@@ -1,38 +1,19 @@
-## Problema
+Plano para corrigir definitivamente o problema:
 
-A regra anterior escondia apenas `lock_status='locked'`. O ticket 00101012 está com `analyst_id = Junior Amaral` e `lock_status='unlocked'`, mas aparece em "Meus Tickets" do Junior porque a query lá usa `analyst_id.eq OR lock_owner_id.eq`. Resultado: ele continua na fila geral indevidamente.
+1. **Trocar a regra da fila geral para espelhar “Meus Tickets”**
+   - Em vez de esconder apenas “tickets de outro analista”, a tela **Tickets** deve esconder qualquer ticket que se encaixe na mesma regra da tela **Meus Tickets**:
+     - `analyst_id` preenchido; ou
+     - `lock_owner_id` preenchido.
+   - Assim, os tickets 00000009, 00101012 e 00101013 deixam de aparecer na fila geral porque já pertencem à fila pessoal do Junior Amaral.
 
-## Correção
+2. **Manter a exceção de pesquisa/filtro por cliente**
+   - Quando o filtro de cliente estiver em **Todos os clientes**, esses tickets assumidos ficam ocultos.
+   - Quando um cliente específico for selecionado, eles voltam a aparecer para consulta, junto com os filtros de status existentes.
 
-Alinhar o critério de ocultação na lista geral (`/tickets`) ao mesmo critério de "Meus Tickets":
+3. **Ajustar a contagem/aviso de tickets ocultos**
+   - Atualizar o aviso da tela para contar tickets ocultos pela nova regra: `analyst_id` ou `lock_owner_id` preenchido.
+   - O texto deve explicar que tickets assumidos ficam fora da fila geral e podem ser consultados filtrando por cliente.
 
-Esconder por padrão qualquer ticket onde **outro usuário** seja `analyst_id` OU `lock_owner_id`. Continuar mostrando:
-- Tickets do próprio usuário (analyst_id ou lock_owner_id = ele mesmo)
-- Tickets sem analista e sem lock (novos / liberados / sem dono)
-
-Reexibição (mantida): quando `clientFilter !== 'all'`, mostra tudo do cliente, inclusive os assumidos por outros.
-
-Escopo (mantido): todos os usuários internos (analistas, super_admin, viewer, Otimizzo). Clientes não afetados.
-
-Aviso visual (mantido): o `Alert` acima da tabela continua, recalculado pela nova regra.
-
-## Detalhes técnicos
-
-Arquivo único: `src/pages/Tickets.tsx`
-
-Trocar nos dois blocos (filteredTickets ~488 e hiddenLockedCount ~537) a definição:
-
-```ts
-const isOwnedByOther =
-  (
-    (ticket.analyst_id && ticket.analyst_id !== profile?.id) ||
-    (ticket.lock_status === "locked" && ticket.lock_owner_id && ticket.lock_owner_id !== profile?.id)
-  );
-const hideOwnedByOther = !isClient && clientFilter === "all" && isOwnedByOther;
-```
-
-Substituir `isLockedByOther`/`hideLockedByOther` por essas variáveis (renomear). Texto do Alert ajustado para "X ticket(s) já assumido(s) por outros analistas estão ocultos. Selecione um cliente para visualizá-los."
-
-Atualizar `mem/features/ticket-list-hide-locked-by-others.md` (renomear conceito para "assumido por outro" = analyst_id OU lock locked por outro), e atualizar a entrada no `mem/index.md`.
-
-Sem mudanças em backend, RLS ou em "Meus Tickets".
+4. **Validar o caso dos prints**
+   - Conferir no código que, com “Todos os clientes” ativo, tickets 00000009, 00101012 e 00101013 não passam mais no filtro da fila geral.
+   - Conferir que eles continuam aparecendo em **Meus Tickets** para o usuário responsável.
