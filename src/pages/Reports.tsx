@@ -74,6 +74,13 @@ const reportTypes = [
     highlight: false,
   },
   {
+    id: "my-time-logs" as const,
+    title: "Meus Lançamentos de Horas",
+    description: "Veja seus lançamentos por cliente, projeto e período. Super Admin pode filtrar por analista.",
+    icon: UserCheck,
+    highlight: false,
+  },
+  {
     id: "queue-workload" as const,
     title: "Distribuição por Filas",
     description: "Análise de carga de trabalho por fila de atendimento",
