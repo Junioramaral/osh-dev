@@ -11,6 +11,7 @@ import { uploadCommentAttachments } from "@/lib/ticketAttachmentUpload";
 import { toast } from "@/hooks/use-toast";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
+import TicketLinkedTicketsCard from "./TicketLinkedTicketsCard";
 
 function formatFileSize(bytes: number) {
   if (!bytes) return "";
@@ -196,6 +197,9 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
   
   return (
     <div className="p-6">
+      <div className="mb-6">
+        <TicketLinkedTicketsCard ticketId={ticketId} />
+      </div>
       {allAttachments.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-muted-foreground">
           <FileX className="h-12 w-12 mb-4" />

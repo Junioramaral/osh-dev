@@ -27,6 +27,7 @@ import { RequiredFieldsBeforeResolveDialog, type RequiredFieldsValues } from "./
 import { TimeLogDialog } from "./TimeLogDialog";
 import { SLAAdjustDialog } from "./SLAAdjustDialog";
 import { SLARecalculatePromptDialog } from "./SLARecalculatePromptDialog";
+import TicketLinkedTicketsCard from "./TicketLinkedTicketsCard";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
@@ -801,6 +802,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
           </div>
         </CardContent>
       </Card>
+
+      <TicketLinkedTicketsCard ticketId={ticket.id} />
     </div>
   );
 }
