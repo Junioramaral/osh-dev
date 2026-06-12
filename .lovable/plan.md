@@ -1,51 +1,30 @@
-## Objetivo
+# Corrigir busca de tickets vinculáveis no diálogo "Resolver Ticket"
 
-Permitir, ao resolver um ticket, selecionar outros tickets do mesmo cliente para vincular ao ticket atual (apenas referência, sem alterar status dos vinculados).
+## Problema
 
-## Backend
+No diálogo de resolução, na seção "Vincular outros tickets do cliente":
 
-**Nova tabela `public.ticket_links`** (migração):
-- `ticket_id` (uuid, FK tickets, on delete cascade) — ticket "origem" (o que está sendo resolvido)
-- `linked_ticket_id` (uuid, FK tickets, on delete cascade) — ticket vinculado
-- `linked_by` (uuid, FK profiles)
-- `linked_at` (timestamptz default now())
-- `id`, `created_at` padrão
-- Constraint `UNIQUE (ticket_id, linked_ticket_id)` + CHECK impedindo self-link
-- GRANTs para `authenticated` e `service_role` (sem anon)
-- RLS:
-  - SELECT: usuários internos (analyst/super_admin/viewer/otimizzo) OU cliente do tenant dono do `ticket_id`
-  - INSERT/DELETE: apenas usuários internos (analistas, super_admin, otimizzo)
-- Índices em `ticket_id` e `linked_ticket_id`
+1. O ícone de lupa é **apenas decorativo** (dentro do Input), mas o usuário tenta clicá-lo esperando abrir/expandir a busca.
+2. O filtro só aceita substring literal — caracteres curinga como `*` não funcionam e retornam "Nenhum ticket encontrado", dando a impressão de que a busca está quebrada.
+3. Quando o cliente não tem tickets no escopo (abertos ou resolvidos nos últimos 30 dias), a lista aparece vazia sem explicação clara do motivo.
 
-## Frontend
+## Solução
 
-**`TicketResolveDialog.tsx`** — adicionar seção "Vincular outros tickets do cliente" acima do botão de confirmar:
-- Campo de busca (Input) que filtra por número OU título
-- Lista de tickets do mesmo `client_id` (excluindo o ticket atual), com escopo:
-  - Status abertos (qualquer status exceto `resolvido`/`cancelado`) **OU**
-  - Resolvidos nos últimos 30 dias (`resolved_at >= now() - 30 days`)
-  - Excluir RFCs (`record_type != 'rfc'`)
-- Cada linha: checkbox + `#numero` + título + badge de status + data
-- Mostrar contador "X ticket(s) selecionado(s)"
-- Scroll interno (max-height ~240px) para listas grandes
-- Estado inicial: vazio (nenhum selecionado)
+### 1. `TicketResolveDialog.tsx`
+- Remover a expectativa de clique na lupa: manter ícone decorativo mas adicionar **botão "X" para limpar** a busca quando houver texto (mais útil que um botão de lupa).
+- Tratar `*` (e variantes `**`, `?`) como "mostrar tudo": se a query após trim for só asteriscos/curingas, ignorar o filtro.
+- Normalizar a busca: remover `#` inicial (usuário costuma digitar `#00101012`) e comparar tanto contra `ticket_number` quanto contra `title` case-insensitive (já feito, mas adicionar normalização de número).
+- Melhorar mensagens vazias:
+  - Se `linkable.length === 0` (sem candidatos no escopo): "Este cliente não tem outros tickets abertos ou resolvidos nos últimos 30 dias."
+  - Se filtro não retorna nada: "Nenhum ticket corresponde a \"{query}\". Use * para listar todos."
+- Mostrar contador total: "Mostrando X de Y tickets" acima da lista.
+- Adicionar `placeholder` mais explicativo: `"Buscar por número (ex: 00101012) ou título — use * para ver todos"`.
 
-**`useTicketActions.ts`** — estender `resolveTicketWithReason`:
-- Aceitar parâmetro opcional `linkedTicketIds: string[]`
-- Após o UPDATE do ticket, inserir em `ticket_links` (ignorar conflitos com `onConflict`)
-- Adicionar registro no `ticket_history` listando os números vinculados (visibilidade no histórico)
-- Invalidar query `ticket-links`
+### 2. `useClientLinkableTickets.ts`
+- Sem mudança de escopo, mas adicionar log de debug temporário só em dev caso a lista venha vazia (para diagnóstico futuro) — opcional, pode pular.
 
-**Novo hook `useClientLinkableTickets(clientId, currentTicketId)`** — busca os tickets candidatos com o escopo definido.
+## Fora de escopo
 
-**Exibição do vínculo no ticket** — adicionar pequena seção "Tickets vinculados" em `TicketDetails.tsx` (lista somente leitura com links navegáveis), exibindo registros de `ticket_links` onde `ticket_id = currentId` (e também onde `linked_ticket_id = currentId`, para mostrar vínculos reversos).
-
-## Onde NÃO mexer
-
-- `BulkStatusReasonDialog` (resolução em massa) — fora do escopo nesta iteração.
-- Status, SLA, emails e fluxo de auto-alocação atuais permanecem inalterados.
-- Tickets vinculados **não** mudam de status nem recebem email.
-
-## Memória
-
-Atualizar `mem://index.md` com nova entrada `mem://features/ticket-resolution-linking` descrevendo: tabela, escopo (abertos + resolvidos 30d), efeito (apenas referência), exibição reversa.
+- Não alterar o escopo (abertos + resolvidos 30d) — já confirmado pelo usuário anteriormente.
+- Não alterar `BulkStatusReasonDialog`.
+- Não mudar a persistência nem o efeito do vínculo.
