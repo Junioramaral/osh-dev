@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
-import { CheckCircle, Loader2, Link2, Search } from "lucide-react";
+import { CheckCircle, Loader2, Link2, Search, X } from "lucide-react";
 import { useClientLinkableTickets } from "@/hooks/useClientLinkableTickets";
 import { format } from "date-fns";
 
@@ -46,13 +46,23 @@ export function TicketResolveDialog({
     useClientLinkableTickets(ticket.client_id ?? undefined, ticket.id, open);
 
   const filtered = useMemo(() => {
-    const q = search.trim().toLowerCase();
-    if (!q) return linkable;
-    return linkable.filter(
-      (t) =>
-        t.ticket_number.toLowerCase().includes(q) ||
-        (t.title ?? "").toLowerCase().includes(q),
-    );
+    const raw = search.trim().toLowerCase();
+    // Treat wildcard-only input (*, **, ?, etc.) as "show all"
+    const isWildcard = raw.length > 0 && /^[*?\s]+$/.test(raw);
+    if (!raw || isWildcard) return linkable;
+    // Normalize: strip leading # and zero-padding so "#101012" or "101012" match "00101012"
+    const q = raw.replace(/^#+/, "");
+    const qDigits = q.replace(/\D/g, "");
+    return linkable.filter((t) => {
+      const num = t.ticket_number.toLowerCase();
+      const numDigits = num.replace(/\D/g, "");
+      const title = (t.title ?? "").toLowerCase();
+      return (
+        num.includes(q) ||
+        title.includes(q) ||
+        (qDigits.length > 0 && numDigits.includes(qDigits))
+      );
+    });
   }, [linkable, search]);
 
   const toggleLink = (id: string) => {
@@ -134,22 +144,39 @@ export function TicketResolveDialog({
               <div className="relative">
                 <Search className="absolute left-2 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                 <Input
-                  placeholder="Buscar por número ou título..."
+                  placeholder="Buscar por número (ex: 00101012) ou título — use * para ver todos"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  className="pl-8"
+                  className="pl-8 pr-8"
                 />
+                {search && (
+                  <button
+                    type="button"
+                    onClick={() => setSearch("")}
+                    className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    aria-label="Limpar busca"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
               </div>
+              {!linkableLoading && linkable.length > 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Mostrando {filtered.length} de {linkable.length} ticket(s)
+                </p>
+              )}
               <div className="border rounded-md max-h-[240px] overflow-y-auto divide-y">
                 {linkableLoading ? (
                   <div className="p-3 text-sm text-muted-foreground text-center">
                     Carregando tickets...
                   </div>
+                ) : linkable.length === 0 ? (
+                  <div className="p-3 text-sm text-muted-foreground text-center">
+                    Este cliente não tem outros tickets abertos ou resolvidos nos últimos 30 dias.
+                  </div>
                 ) : filtered.length === 0 ? (
                   <div className="p-3 text-sm text-muted-foreground text-center">
-                    {search
-                      ? "Nenhum ticket encontrado"
-                      : "Sem tickets disponíveis para vincular"}
+                    Nenhum ticket corresponde a "{search}". Use * para listar todos.
                   </div>
                 ) : (
                   filtered.map((t) => {
