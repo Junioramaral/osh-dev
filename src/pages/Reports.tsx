@@ -3,7 +3,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered, Clock, ClipboardCheck, Star } from "lucide-react";
+import { FileBarChart, TrendingUp, PieChart, GitCompare, History, Timer, Trophy, ListOrdered, Clock, ClipboardCheck, Star, UserClock } from "lucide-react";
 import MonthlyClientReport from "@/components/reports/MonthlyClientReport";
 import AnalystPerformanceReport from "@/components/reports/AnalystPerformanceReport";
 import CategoriesReport from "@/components/reports/CategoriesReport";
@@ -14,13 +14,14 @@ import QueueWorkloadReport from "@/components/reports/QueueWorkloadReport";
 import ClientHoursReport from "@/components/reports/ClientHoursReport";
 import AnalystHoursManagementReport from "@/components/reports/AnalystHoursManagementReport";
 import CSATSatisfactionReport from "@/components/reports/CSATSatisfactionReport";
+import MyTimeLogsReport from "@/components/reports/MyTimeLogsReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
 import { useAuth } from "@/contexts/AuthContext";
 
 const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
-type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | "analyst-hours-management" | "csat-satisfaction" | null;
+type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | "analyst-hours-management" | "csat-satisfaction" | "my-time-logs" | null;
 
 const reportTypes = [
   {
