@@ -63,6 +63,15 @@ export function useMyTimeLogsData(filters: MyTimeLogsFilters) {
         query = query.eq("analyst_id", filters.currentUserId!);
       } else if (filters.analystId !== "all") {
         query = query.eq("analyst_id", filters.analystId);
+      } else {
+        // Super Admin + "Todos": restrict to internal analysts (tenant owner)
+        const { data: internal } = await supabase
+          .from("profiles")
+          .select("id")
+          .is("client_id", null);
+        const internalIds = (internal ?? []).map((p: any) => p.id);
+        if (internalIds.length === 0) return [] as MyTimeLogRow[];
+        query = query.in("analyst_id", internalIds);
       }
 
       if (filters.clientId !== "all") {
