@@ -74,9 +74,15 @@ export function useTimeLogMutations() {
       queryClient.invalidateQueries({ queryKey: ["ticket-history", variables.ticketId] });
       queryClient.invalidateQueries({ queryKey: ["ticket-timeline", variables.ticketId] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Erro ao registrar horas:", error);
-      toast.error("Erro ao registrar horas. Tente novamente.");
+      const msg = String(error?.message ?? "");
+      if (msg.includes("TIME_LOG_OVERLAP")) {
+        const clean = msg.replace(/.*TIME_LOG_OVERLAP:\s*/, "");
+        toast.error(clean || "Já existe um lançamento que se sobrepõe a este horário.");
+      } else {
+        toast.error("Erro ao registrar horas. Tente novamente.");
+      }
     },
   });
 
@@ -120,9 +126,15 @@ export function useTimeLogMutations() {
       queryClient.invalidateQueries({ queryKey: ["ticket-history", variables.ticketId] });
       queryClient.invalidateQueries({ queryKey: ["ticket-timeline", variables.ticketId] });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       console.error("Erro ao atualizar horas:", error);
-      toast.error("Erro ao atualizar horas. Tente novamente.");
+      const msg = String(error?.message ?? "");
+      if (msg.includes("TIME_LOG_OVERLAP")) {
+        const clean = msg.replace(/.*TIME_LOG_OVERLAP:\s*/, "");
+        toast.error(clean || "Já existe um lançamento que se sobrepõe a este horário.");
+      } else {
+        toast.error("Erro ao atualizar horas. Tente novamente.");
+      }
     },
   });
 
