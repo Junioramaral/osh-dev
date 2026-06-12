@@ -93,6 +93,8 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name")
+        .is("client_id", null)
+        .eq("is_active", true)
         .order("full_name");
       if (error) throw error;
       return data ?? [];
