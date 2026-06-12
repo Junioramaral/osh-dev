@@ -164,6 +164,10 @@ const Reports = () => {
     return <CSATSatisfactionReport onBack={() => setSelectedReport(null)} />;
   }
 
+  if (selectedReport === "my-time-logs") {
+    return <MyTimeLogsReport onBack={() => setSelectedReport(null)} />;
+  }
+
   return (
     <AppLayout>
       <div className="space-y-6">
