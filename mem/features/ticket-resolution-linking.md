@@ -7,7 +7,7 @@ Tabela `public.ticket_links` (ticket_id, linked_ticket_id, linked_by, linked_at)
 
 No `TicketResolveDialog` (resolução individual via `TicketSidebar`), seção opcional "Vincular outros tickets do cliente":
 - Lista tickets do mesmo `client_id`, excluindo o atual e RFCs
-- Escopo: status != resolvido E != cancelado, OU `resolved_at` nos últimos 30 dias
+- Escopo: status != resolvido E != fechado, OU `resolved_at` nos últimos 30 dias
 - Busca por número ou título; múltipla seleção via checkbox
 - Persistência em `ticket_links` via `useTicketActions.resolveTicketWithReason` (upsert ignoreDuplicates)
 - Registra entrada `ticket_history` com action_type `linked_tickets` listando os números

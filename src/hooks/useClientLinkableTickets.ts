@@ -28,7 +28,7 @@ export function useClientLinkableTickets(
         .neq("id", currentTicketId!)
         .neq("record_type", "rfc")
         .or(
-          `and(status.neq.resolvido,status.neq.cancelado),resolved_at.gte.${thirtyDaysAgo}`,
+          `and(status.neq.resolvido,status.neq.fechado),resolved_at.gte.${thirtyDaysAgo}`,
         )
         .order("created_at", { ascending: false })
         .limit(200);
