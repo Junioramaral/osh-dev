@@ -79,6 +79,7 @@ const reportTypes = [
     description: "Veja seus lançamentos por cliente, projeto e período. Super Admin pode filtrar por analista.",
     icon: UserCheck,
     highlight: false,
+    internalOnly: true,
   },
   {
     id: "queue-workload" as const,
