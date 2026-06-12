@@ -1,34 +1,33 @@
-## Problema
+## Objetivo
 
-Ao tentar vincular tickets no diálogo "Resolver Ticket" do cliente ATPPOA, a lista vem vazia mesmo existindo o ticket `00101013` (status `novo`) do mesmo cliente. A busca por máscara (`0010*`) também não funciona porque depende da mesma lista.
+Tornar a lista de tickets vinculados mais visível para o analista, sem depender de abrir a aba "Detalhes". O card já existe (`TicketLinkedTicketsCard`) e só aparece quando há vínculos — vamos exibi-lo também na aba "Anexos" e na barra lateral.
 
-## Causa raiz
+## Onde aparecer
 
-O hook `useClientLinkableTickets` usa o filtro PostgREST:
+1. **Aba "Anexos"** (`TicketAttachments`) — adicionar o card `TicketLinkedTicketsCard` acima/ao lado da lista de anexos. Como o card já retorna `null` sem vínculos, ele só aparece quando relevante.
+2. **Sidebar do ticket** (`TicketSidebar`) — adicionar uma versão compacta do card no final da sidebar, visível em todas as abas (Detalhes, SLA, Timeline, Comentários, Anexos, Relatório). Assim o analista enxerga os vínculos esteja onde estiver.
+3. **Manter** o card na aba Detalhes (já existe), pois é o lugar natural para o contexto completo.
 
-```ts
-.or(`and(status.neq.resolvido,status.neq.cancelado),resolved_at.gte.${thirtyDaysAgo}`)
+## Como ficará
+
+```text
++----------------------- Aba Anexos -----------------------+   +---- Sidebar ----+
+| [Tickets Vinculados (N)]   (só aparece se houver)        |   | SLA / Status    |
+|   #00101013  em_atendimento  Título do ticket            |   | Analista        |
+|   #00101010  resolvido       Outro ticket                |   | Tempo           |
+|                                                          |   | ...             |
+| [Anexos]                                                 |   | [Vinculados (N)]|
+|   arquivo1.pdf                                           |   |  #00101013      |
++----------------------------------------------------------+   +-----------------+
 ```
 
-O enum `ticket_status` **não possui o valor `cancelado`** (os valores válidos são `novo`, `em_atendimento`, `aguardando_cliente`, `resolvido`, `fechado`, `aguardando_aprovacao`, `aprovado`, `liberado`). Confirmado via SQL: o Postgres retorna `invalid input value for enum ticket_status: "cancelado"`. Resultado: a query falha silenciosamente no Supabase e o hook devolve lista vazia para todos os clientes — não só ATPPOA.
+## Detalhes técnicos
 
-## Correção
+- **`src/components/tickets/TicketAttachments.tsx`**: importar `TicketLinkedTicketsCard` e renderizá-lo antes do bloco de anexos, dentro de um `<div className="space-y-6">`. Passar `ticketId={ticket.id}`.
+- **`src/components/tickets/TicketSidebar.tsx`**: importar `TicketLinkedTicketsCard` e renderizar ao final do `aside` (após o último card existente). Como o componente já retorna `null` quando `links.length === 0`, nada muda visualmente para tickets sem vínculo.
+- **Sem mudanças** em hooks, banco, RLS ou no `TicketLinkedTicketsCard` em si — ele já tem a query, dedup e o early-return.
+- **Sem mudanças** na aba "Detalhes" — o card continua lá.
 
-Em `src/hooks/useClientLinkableTickets.ts`, trocar o filtro para refletir os status reais. Como o enum tem `resolvido` e `fechado` representando "encerrado", o filtro correto fica:
+## Atualização de memória
 
-```ts
-.or(
-  `and(status.neq.resolvido,status.neq.fechado),resolved_at.gte.${thirtyDaysAgo}`,
-)
-```
-
-Isso passa a listar:
-- Tickets ainda em andamento (qualquer status diferente de `resolvido` e `fechado`), incluindo `novo`, `em_atendimento`, `aguardando_cliente`, `aguardando_aprovacao`, `aprovado`, `liberado`
-- Tickets já resolvidos/fechados cujo `resolved_at` esteja nos últimos 30 dias
-
-## Arquivos afetados
-
-- `src/hooks/useClientLinkableTickets.ts` — corrigir o filtro `.or(...)`
-- `mem/features/ticket-resolution-linking.md` — atualizar descrição do escopo (trocar "cancelado" por "fechado")
-
-Nenhuma alteração de UI ou de banco de dados é necessária. A busca por número/título e o wildcard `*` já funcionam — passarão a exibir resultados assim que o hook retornar os tickets corretamente.
+Atualizar `mem/features/ticket-resolution-linking.md` registrando que o card de vínculos é exibido em três lugares: aba Detalhes, aba Anexos e sidebar (sempre condicional à existência de vínculos).
