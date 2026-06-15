@@ -157,6 +157,11 @@ serve(async (req) => {
     const alerts: TicketAlert[] = [];
 
     for (const ticket of tickets || []) {
+      // P4 tickets are excluded from SLA alerts (no warnings, no overdue, no emails)
+      if (ticket.priority === 'P4') {
+        continue;
+      }
+
       const clientName = Array.isArray((ticket as any).clients) 
         ? (ticket as any).clients[0]?.name || 'N/A'
         : (ticket as any).clients?.name || 'N/A';
