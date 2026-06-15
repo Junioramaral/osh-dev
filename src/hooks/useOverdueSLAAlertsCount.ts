@@ -5,14 +5,15 @@ export const useOverdueSLAAlertsCount = () => {
   return useQuery({
     queryKey: ["overdue-sla-alerts-count"],
     queryFn: async () => {
-      const { count, error } = await supabase
+      const { data, error } = await supabase
         .from("sla_notifications")
-        .select("*", { count: "exact", head: true })
+        .select("id, tickets!inner(priority)")
         .eq("alert_type", "overdue")
-        .is("acknowledged_at", null);
+        .is("acknowledged_at", null)
+        .neq("tickets.priority", "P4");
 
       if (error) throw error;
-      return count || 0;
+      return data?.length || 0;
     },
     refetchInterval: 30000, // Refresh every 30 seconds
   });
@@ -39,14 +40,15 @@ export const useOverdueSLAAlerts = () => {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("sla_notifications")
-        .select("id, ticket_id, sla_type, sent_at, notification_level, acknowledgment_token, email_content")
+        .select("id, ticket_id, sla_type, sent_at, notification_level, acknowledgment_token, email_content, tickets!inner(priority)")
         .eq("alert_type", "overdue")
         .is("acknowledged_at", null)
+        .neq("tickets.priority", "P4")
         .order("sent_at", { ascending: false })
         .limit(10);
 
       if (error) throw error;
-      return (data || []) as OverdueSLAAlert[];
+      return (data || []) as unknown as OverdueSLAAlert[];
     },
     refetchInterval: 30000,
   });
