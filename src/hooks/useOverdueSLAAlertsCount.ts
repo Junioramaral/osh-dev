@@ -48,7 +48,7 @@ export const useOverdueSLAAlerts = () => {
         .limit(10);
 
       if (error) throw error;
-      return (data || []) as OverdueSLAAlert[];
+      return (data || []) as unknown as OverdueSLAAlert[];
     },
     refetchInterval: 30000,
   });
