@@ -14,7 +14,7 @@ import { Input } from "@/components/ui/input";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Send, Paperclip, Info, Lock, Mail, Reply, Plus, ChevronDown, Users } from "lucide-react";
+import { Send, Paperclip, Info, Lock, Mail, Reply, Plus, ChevronDown, ChevronRight, Users } from "lucide-react";
 import { format } from "date-fns";
 import { toast } from "@/hooks/use-toast";
 import { FileUploadZone, type FileWithPreview } from "./FileUploadZone";
@@ -23,9 +23,11 @@ import CommentAttachmentList from "./CommentAttachmentList";
 
 interface CommentCardProps {
   comment: any;
+  fallbackRecipient?: string | null;
 }
 
-function CommentCard({ comment }: CommentCardProps) {
+function CommentCard({ comment, fallbackRecipient }: CommentCardProps) {
+  const [open, setOpen] = useState(false);
   // Determinar a origem do comentário
   const isEmailReply = comment.source === 'email';
   const isInternal = comment.is_internal;
@@ -39,51 +41,86 @@ function CommentCard({ comment }: CommentCardProps) {
   const avatarInitial = isEmailReply
     ? (comment.sender_name?.[0] || comment.sender_email?.[0] || 'C')
     : (comment.profiles?.full_name?.[0] || 'U');
-  
+
+  // Destinatários (TO + CC) — para comentários enviados ao cliente
+  const storedRecipients: string[] = Array.isArray(comment.recipients)
+    ? comment.recipients.filter((e: any) => typeof e === 'string' && e.trim().length > 0)
+    : [];
+  const showRecipients = !isInternal && !isEmailReply;
+  const recipientsList = storedRecipients.length > 0
+    ? storedRecipients
+    : (showRecipients && fallbackRecipient ? [fallbackRecipient] : []);
+
+  // Prévia em uma linha para o estado colapsado
+  const previewText = (comment.content || '').replace(/\s+/g, ' ').trim();
+
   return (
     <Card className={`mb-4 ${
       isInternal ? 'border-yellow-200 bg-yellow-50/50' : 
       isEmailReply ? 'border-green-200 bg-green-50/50' : ''
     }`}>
-      <CardHeader className="pb-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Avatar className="h-8 w-8">
-              <AvatarFallback className="text-xs">
-                {avatarInitial}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <p className="font-medium text-sm">{authorName}</p>
-              <p className="text-xs text-muted-foreground">{format(new Date(comment.created_at), 'dd/MM/yyyy HH:mm')}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2">
-            {isInternal ? (
-              <Badge variant="outline" className="bg-yellow-100 border-yellow-300 text-yellow-800">
-                <Lock className="h-3 w-3 mr-1" />
-                Interno
-              </Badge>
-            ) : isEmailReply ? (
-              <Badge variant="outline" className="bg-green-100 border-green-300 text-green-800">
-                <Reply className="h-3 w-3 mr-1" />
-                Resposta do cliente
-              </Badge>
-            ) : (
-              <Badge variant="outline" className="bg-blue-100 border-blue-300 text-blue-800">
-                <Mail className="h-3 w-3 mr-1" />
-                Enviado ao cliente
-              </Badge>
+      <Collapsible open={open} onOpenChange={setOpen}>
+        <CollapsibleTrigger asChild>
+          <button type="button" className="w-full text-left">
+            <CardHeader className="pb-3 hover:bg-muted/40 transition-colors cursor-pointer rounded-t-lg">
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex items-start gap-2 min-w-0 flex-1">
+                  {open ? (
+                    <ChevronDown className="h-4 w-4 mt-2 text-muted-foreground shrink-0" />
+                  ) : (
+                    <ChevronRight className="h-4 w-4 mt-2 text-muted-foreground shrink-0" />
+                  )}
+                  <Avatar className="h-8 w-8 shrink-0">
+                    <AvatarFallback className="text-xs">{avatarInitial}</AvatarFallback>
+                  </Avatar>
+                  <div className="min-w-0 flex-1">
+                    <p className="font-medium text-sm truncate">{authorName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {format(new Date(comment.created_at), 'dd/MM/yyyy HH:mm')}
+                    </p>
+                    {!open && previewText && (
+                      <p className="text-xs text-muted-foreground mt-1 truncate">
+                        {previewText}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                <div className="flex flex-col items-end gap-1 shrink-0 max-w-[55%]">
+                  {isInternal ? (
+                    <Badge variant="outline" className="bg-yellow-100 border-yellow-300 text-yellow-800">
+                      <Lock className="h-3 w-3 mr-1" />
+                      Interno
+                    </Badge>
+                  ) : isEmailReply ? (
+                    <Badge variant="outline" className="bg-green-100 border-green-300 text-green-800">
+                      <Reply className="h-3 w-3 mr-1" />
+                      Resposta do cliente
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="bg-blue-100 border-blue-300 text-blue-800">
+                      <Mail className="h-3 w-3 mr-1" />
+                      Enviado ao cliente
+                    </Badge>
+                  )}
+                  {recipientsList.length > 0 && (
+                    <p className="text-[11px] text-muted-foreground text-right break-all leading-tight">
+                      Para: {recipientsList.join(', ')}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </CardHeader>
+          </button>
+        </CollapsibleTrigger>
+        <CollapsibleContent>
+          <CardContent>
+            <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+            {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
+              <CommentAttachmentList attachments={comment.attachments} />
             )}
-          </div>
-        </div>
-      </CardHeader>
-      <CardContent>
-        <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
-        {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
-          <CommentAttachmentList attachments={comment.attachments} />
-        )}
-      </CardContent>
+          </CardContent>
+        </CollapsibleContent>
+      </Collapsible>
     </Card>
   );
 }
