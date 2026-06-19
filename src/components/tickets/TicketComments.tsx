@@ -55,15 +55,15 @@ function CommentCard({ comment, fallbackRecipient }: CommentCardProps) {
   const previewText = (comment.content || '').replace(/\s+/g, ' ').trim();
 
   return (
-    <Card className={`mb-4 ${
+    <Card className={`mb-4 w-full overflow-hidden ${
       isInternal ? 'border-yellow-200 bg-yellow-50/50' : 
       isEmailReply ? 'border-green-200 bg-green-50/50' : ''
     }`}>
       <Collapsible open={open} onOpenChange={setOpen}>
         <CollapsibleTrigger asChild>
-          <button type="button" className="w-full text-left">
+          <button type="button" className="block w-full min-w-0 text-left">
             <CardHeader className="pb-3 hover:bg-muted/40 transition-colors cursor-pointer rounded-t-lg">
-              <div className="flex items-start justify-between gap-3">
+              <div className="flex flex-col sm:flex-row items-start sm:justify-between gap-2 sm:gap-3 w-full min-w-0">
                 <div className="flex items-start gap-2 min-w-0 flex-1">
                   {open ? (
                     <ChevronDown className="h-4 w-4 mt-2 text-muted-foreground shrink-0" />
@@ -79,13 +79,13 @@ function CommentCard({ comment, fallbackRecipient }: CommentCardProps) {
                       {format(new Date(comment.created_at), 'dd/MM/yyyy HH:mm')}
                     </p>
                     {!open && previewText && (
-                      <p className="text-xs text-muted-foreground mt-1 truncate">
+                      <p className="block text-xs text-muted-foreground mt-1 truncate">
                         {previewText}
                       </p>
                     )}
                   </div>
                 </div>
-                <div className="flex flex-col items-end gap-1 shrink-0 max-w-[55%]">
+                <div className="flex flex-col items-start sm:items-end gap-1 shrink-0 w-full sm:w-auto sm:max-w-[45%] min-w-0">
                   {isInternal ? (
                     <Badge variant="outline" className="bg-yellow-100 border-yellow-300 text-yellow-800">
                       <Lock className="h-3 w-3 mr-1" />
@@ -103,7 +103,7 @@ function CommentCard({ comment, fallbackRecipient }: CommentCardProps) {
                     </Badge>
                   )}
                   {recipientsList.length > 0 && (
-                    <p className="text-[11px] text-muted-foreground text-right break-all leading-tight">
+                    <p className="text-[11px] text-muted-foreground text-left sm:text-right break-all leading-tight max-w-full">
                       Para: {recipientsList.join(', ')}
                     </p>
                   )}
@@ -113,8 +113,8 @@ function CommentCard({ comment, fallbackRecipient }: CommentCardProps) {
           </button>
         </CollapsibleTrigger>
         <CollapsibleContent>
-          <CardContent>
-            <p className="text-sm whitespace-pre-wrap">{comment.content}</p>
+          <CardContent className="overflow-hidden min-w-0">
+            <p className="text-sm whitespace-pre-wrap break-words [overflow-wrap:anywhere]">{comment.content}</p>
             {Array.isArray(comment.attachments) && comment.attachments.length > 0 && (
               <CommentAttachmentList attachments={comment.attachments} />
             )}
@@ -372,20 +372,22 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
   
   return (
     <div className="space-y-4">
-      <ScrollArea className="h-[400px]">
-        {isLoading ? (
-          <p className="text-center text-muted-foreground py-8">Carregando comentários...</p>
-        ) : comments && comments.length > 0 ? (
-          comments.map((comment) => (
-            <CommentCard
-              key={comment.id}
-              comment={comment}
-              fallbackRecipient={ticket?.contact_email ?? null}
-            />
-          ))
-        ) : (
-          <p className="text-center text-muted-foreground py-8">Nenhum comentário ainda</p>
-        )}
+      <ScrollArea className="h-[500px] w-full max-w-full overflow-x-hidden">
+        <div className="pr-2 w-full min-w-0">
+          {isLoading ? (
+            <p className="text-center text-muted-foreground py-8">Carregando comentários...</p>
+          ) : comments && comments.length > 0 ? (
+            comments.map((comment) => (
+              <CommentCard
+                key={comment.id}
+                comment={comment}
+                fallbackRecipient={ticket?.contact_email ?? null}
+              />
+            ))
+          ) : (
+            <p className="text-center text-muted-foreground py-8">Nenhum comentário ainda</p>
+          )}
+        </div>
       </ScrollArea>
       
       {/* Comment Form - Hidden for viewers */}
