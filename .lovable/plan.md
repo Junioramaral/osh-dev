@@ -1,28 +1,48 @@
-## Mudanças na aba "Comentários" do ticket
+## Diagnóstico — por que o ticket 00101013 não aparece na lista
 
-### 1. Comentários colapsados por padrão
-- Cada `CommentCard` em `src/components/tickets/TicketComments.tsx` passa a ser um `Collapsible`.
-- Estado fechado mostra apenas o cabeçalho (avatar, nome, data/hora, badge de tipo e — quando aplicável — destinatários). Um chevron à direita indica que pode abrir.
-- Clicar em qualquer lugar do cabeçalho expande/recolhe, revelando `content` + `attachments`.
-- Uma prévia curta (primeira linha truncada) aparece no cabeçalho quando colapsado, para dar contexto sem abrir.
+Consultei o banco: o ticket existe normalmente, está como `resolvido`, `record_type='suporte'`, sem deleção. O `analyst_id` e o `lock_owner_id` apontam para o seu próprio usuário (Junior Amaral).
 
-### 2. Ordenação: mais novo no topo
-- Em `src/hooks/useTicketDetail.ts` → `useTicketComments`, trocar `order('created_at', { ascending: true })` por `ascending: false`.
-- Verificar dependências: `TicketDetail.tsx` usa apenas `comments.length` (contador), e `TicketTimeline.tsx` reordena os eventos depois, então a inversão é segura.
+A causa do sumiço está em `src/pages/Tickets.tsx` (linhas 488-489), no filtro de tela:
 
-### 3. Mostrar destinatários abaixo do badge "Enviado ao cliente"
-Hoje os emails CC enviados não são persistidos — só passam pela edge function. Para exibi-los:
+```ts
+const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
+const hideAssumed = !isClient && clientFilter === "all" && isAssumed;
+```
 
-- **Migration**: adicionar coluna `recipients jsonb` em `public.ticket_comments` (array de strings com TO + CC). Sem alterações de RLS/grants — herda as policies existentes.
-- **Persistência**: na mutation `addCommentMutation` de `TicketComments.tsx`, quando o comentário for externo (não interno) e enviado por staff, gravar `recipients: [contact_email, ...ccEmails]` no insert.
-- **Exibição**: no `CommentCard`, logo abaixo do badge "Enviado ao cliente" (e também "Resposta do cliente" se houver `recipients`), renderizar lista compacta dos emails — ex.: `Para: fulano@x.com, beltrano@y.com`. Aparece tanto no estado colapsado quanto expandido para o usuário saber para quem foi.
-- Comentários antigos (sem `recipients`) caem em fallback: mostra apenas `ticket.contact_email` quando o badge for "Enviado ao cliente".
+Pela regra "Ticket List Hide Owned By Others", qualquer ticket que tenha analista atribuído **ou** esteja locado é escondido da fila geral quando `clientFilter === "all"`. Como 00101013 está atribuído a você e locado, ele cai exatamente nessa regra — independentemente do status selecionado nos filtros. Por isso ele não aparece nem marcando todos os status.
 
-### Arquivos afetados
-- `src/components/tickets/TicketComments.tsx` (colapsar, exibir recipients, gravar recipients no insert)
-- `src/hooks/useTicketDetail.ts` (ordem desc)
-- Nova migration: `ALTER TABLE public.ticket_comments ADD COLUMN recipients jsonb;`
+### Por que ainda assim parece errado
+
+A regra faz sentido para tickets em andamento (evita que apareçam na fila geral e em "Meus Tickets" ao mesmo tempo), mas tickets já **Resolvidos** ou **Fechados** não estão mais "em atendimento" por ninguém — esconder eles da lista geral surpreende, porque o usuário busca tickets encerrados para auditoria/consulta.
+
+## Correção proposta
+
+Ajustar a regra de ocultação para **não esconder tickets em status terminal** (`resolvido`, `fechado`). Tickets em andamento (novo, em_atendimento, aguardando_*, etc.) continuam ocultos da fila geral como hoje.
+
+### Mudança
+
+Em `src/pages/Tickets.tsx`, trocar:
+
+```ts
+const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
+const hideAssumed = !isClient && clientFilter === "all" && isAssumed;
+```
+
+por:
+
+```ts
+const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
+const isTerminalStatus = ticket.status === "resolvido" || ticket.status === "fechado";
+const hideAssumed = !isClient && clientFilter === "all" && isAssumed && !isTerminalStatus;
+```
+
+Também aplicar a mesma correção no segundo `filter` (linha ~523) que recalcula o badge de ocultos, para que o aviso de "tickets ocultos" reflita só os realmente em andamento.
+
+### Memória
+
+Atualizar `mem/features/ticket-list-hide-locked-by-others.md` para registrar a exceção: tickets `resolvido`/`fechado` não são ocultados.
 
 ### Fora de escopo
-- Não altero lógica de envio de email/edge functions, apenas adiciono o registro local dos destinatários.
-- Não mexo em outras abas (Timeline, Detalhes).
+
+- Não altero RLS nem queries do Supabase.
+- Não mexo em "Meus Tickets" — tickets resolvidos seus continuam aparecendo lá normalmente também.
