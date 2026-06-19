@@ -207,6 +207,9 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
       }
 
       // Insert comment with sender_name for client visibility
+      const recipientsList = !is_internal && !isClientUser
+        ? [ticketData.contact_email, ...ccEmails].filter((e): e is string => !!e && e.trim().length > 0)
+        : null;
       const { data: commentData, error: commentError } = await supabase
         .from('ticket_comments')
         .insert({
@@ -217,6 +220,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
           content,
           is_internal,
           attachments: (attachments.length > 0 ? attachments : null) as any,
+          recipients: recipientsList as any,
         })
         .select('*, profiles(full_name)')
         .single();
