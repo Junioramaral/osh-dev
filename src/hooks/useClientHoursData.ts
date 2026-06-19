@@ -35,12 +35,28 @@ export interface ClientHoursSummary {
   top_analyst: string | null;
 }
 
+export interface TicketStatusBreakdownEntry {
+  status: string;
+  hours: number;
+}
+
+export interface ClientTicketStatusBreakdown {
+  client_id: string;
+  client_name: string;
+  ticket_id: string;
+  ticket_number: string;
+  ticket_title: string;
+  total_hours: number;
+  status_breakdown: TicketStatusBreakdownEntry[];
+}
+
 export interface ClientHoursData {
   byAnalyst: AnalystHours[];
   byQueue: QueueHours[];
   byTeam: TeamHours[];
   byType: TypeHours[];
   byClient: ClientHoursSummary[];
+  byClientTickets: ClientTicketStatusBreakdown[];
   overall: {
     total_hours: number;
     total_entries: number;
