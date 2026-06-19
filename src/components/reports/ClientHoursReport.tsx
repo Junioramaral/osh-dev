@@ -45,6 +45,7 @@ import AppLayout from "@/components/layout/AppLayout";
 import ReportPeriodFilter from "./ReportPeriodFilter";
 import { ReportPeriodState, defaultReportPeriodState, rangeFromSingle } from "@/lib/reportPeriod";
 import { format } from "date-fns";
+import { getStatusLabel } from "@/lib/ticketUtils";
 
 interface ClientHoursReportProps {
   onBack: () => void;
@@ -404,7 +405,7 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
           </PrintPage>
 
           {/* Client Summary Table */}
-          {selectedClient === "all" && data.byClient.length > 0 && (
+          {data.byClient.length > 0 && (
             <PrintPage pageBreakBefore pageBreakAfter={false} fullHeight={false}>
               <Card>
                 <CardHeader>
@@ -442,6 +443,101 @@ const ClientHoursReport = ({ onBack }: ClientHoursReportProps) => {
                           <TableCell>{client.top_analyst || "-"}</TableCell>
                         </TableRow>
                       ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            </PrintPage>
+          )}
+
+          {/* Detailed breakdown: Client > Ticket > Status */}
+          {data.byClientTickets && data.byClientTickets.length > 0 && (
+            <PrintPage pageBreakBefore pageBreakAfter={false} fullHeight={false}>
+              <Card>
+                <CardHeader>
+                  <CardTitle className="text-base flex items-center gap-2">
+                    <Building2 className="h-4 w-4" />
+                    Resumo Detalhado por Cliente, Ticket e Status
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Cliente</TableHead>
+                        <TableHead>Ticket</TableHead>
+                        <TableHead>Título</TableHead>
+                        <TableHead>Status</TableHead>
+                        <TableHead className="text-right">Horas</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {(() => {
+                        const rows: JSX.Element[] = [];
+                        let prevClientId: string | null = null;
+
+                        // Group consecutive tickets by client for rowSpan
+                        const clientGroups = new Map<string, typeof data.byClientTickets>();
+                        data.byClientTickets.forEach((t) => {
+                          const arr = clientGroups.get(t.client_id) || [];
+                          arr.push(t);
+                          clientGroups.set(t.client_id, arr);
+                        });
+
+                        clientGroups.forEach((tickets, clientId) => {
+                          const clientRowSpan = tickets.reduce(
+                            (sum, t) => sum + Math.max(1, t.status_breakdown.length),
+                            0
+                          );
+                          let isFirstOfClient = true;
+
+                          tickets.forEach((ticket) => {
+                            const ticketRowSpan = Math.max(1, ticket.status_breakdown.length);
+                            const statuses =
+                              ticket.status_breakdown.length > 0
+                                ? ticket.status_breakdown
+                                : [{ status: "novo", hours: 0 }];
+
+                            statuses.forEach((entry, idx) => {
+                              rows.push(
+                                <TableRow key={`${ticket.ticket_id}-${entry.status}-${idx}`}>
+                                  {isFirstOfClient && idx === 0 && (
+                                    <TableCell
+                                      rowSpan={clientRowSpan}
+                                      className="font-medium align-top border-r"
+                                    >
+                                      {ticket.client_name}
+                                    </TableCell>
+                                  )}
+                                  {idx === 0 && (
+                                    <>
+                                      <TableCell rowSpan={ticketRowSpan} className="align-top">
+                                        #{ticket.ticket_number}
+                                      </TableCell>
+                                      <TableCell
+                                        rowSpan={ticketRowSpan}
+                                        className="align-top max-w-xs truncate"
+                                        title={ticket.ticket_title}
+                                      >
+                                        {ticket.ticket_title}
+                                      </TableCell>
+                                    </>
+                                  )}
+                                  <TableCell>{getStatusLabel(entry.status)}</TableCell>
+                                  <TableCell className="text-right">
+                                    {formatHours(entry.hours)}
+                                  </TableCell>
+                                </TableRow>
+                              );
+                              if (isFirstOfClient && idx === 0) {
+                                isFirstOfClient = false;
+                              }
+                            });
+                          });
+                        });
+
+                        return rows;
+                      })()}
                     </TableBody>
                   </Table>
                 </CardContent>
