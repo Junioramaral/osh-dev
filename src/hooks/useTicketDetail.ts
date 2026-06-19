@@ -52,7 +52,7 @@ export function useTicketComments(ticketId: string | undefined) {
           profiles!ticket_comments_author_id_fkey(full_name)
         `)
         .eq('ticket_id', ticketId)
-        .order('created_at', { ascending: true });
+        .order('created_at', { ascending: false });
       
       if (error) throw error;
       return data;

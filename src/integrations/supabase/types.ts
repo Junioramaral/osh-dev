@@ -1006,6 +1006,7 @@ export type Database = {
           email_message_id: string | null
           id: string
           is_internal: boolean | null
+          recipients: Json | null
           sender_email: string | null
           sender_name: string | null
           source: Database["public"]["Enums"]["comment_source"] | null
@@ -1019,6 +1020,7 @@ export type Database = {
           email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
+          recipients?: Json | null
           sender_email?: string | null
           sender_name?: string | null
           source?: Database["public"]["Enums"]["comment_source"] | null
@@ -1032,6 +1034,7 @@ export type Database = {
           email_message_id?: string | null
           id?: string
           is_internal?: boolean | null
+          recipients?: Json | null
           sender_email?: string | null
           sender_name?: string | null
           source?: Database["public"]["Enums"]["comment_source"] | null
