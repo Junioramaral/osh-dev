@@ -9,6 +9,8 @@ Critério alinhado ao de "Meus Tickets" (`analyst_id.eq OR lock_owner_id.eq`), g
 
 Reexibição: ao selecionar um cliente específico no filtro (`clientFilter !== 'all'`), os tickets ocultos voltam a aparecer.
 
+Exceção: tickets em status terminal (`resolvido` ou `fechado`) NÃO são ocultados — aparecem sempre na lista geral para auditoria/consulta, mesmo com analista atribuído ou lock.
+
 Aviso visual (Alert) acima da tabela mostra a contagem de tickets ocultos quando houver.
 
 Implementação: filtragem no frontend em `src/pages/Tickets.tsx` (não altera RLS nem queries).
