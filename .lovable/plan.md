@@ -1,43 +1,28 @@
-Foco apenas no relatório "Horas por Cliente".
+## Mudanças na aba "Comentários" do ticket
 
-## 1. Resumo detalhado por Ticket × Status
+### 1. Comentários colapsados por padrão
+- Cada `CommentCard` em `src/components/tickets/TicketComments.tsx` passa a ser um `Collapsible`.
+- Estado fechado mostra apenas o cabeçalho (avatar, nome, data/hora, badge de tipo e — quando aplicável — destinatários). Um chevron à direita indica que pode abrir.
+- Clicar em qualquer lugar do cabeçalho expande/recolhe, revelando `content` + `attachments`.
+- Uma prévia curta (primeira linha truncada) aparece no cabeçalho quando colapsado, para dar contexto sem abrir.
 
-Adicionar um novo bloco "Resumo Detalhado por Cliente, Ticket e Status" abaixo do "Resumo por Cliente". Para cada ticket do período, mostrar o tempo passado em cada status que ele teve.
+### 2. Ordenação: mais novo no topo
+- Em `src/hooks/useTicketDetail.ts` → `useTicketComments`, trocar `order('created_at', { ascending: true })` por `ascending: false`.
+- Verificar dependências: `TicketDetail.tsx` usa apenas `comments.length` (contador), e `TicketTimeline.tsx` reordena os eventos depois, então a inversão é segura.
 
-**Layout da tabela:**
+### 3. Mostrar destinatários abaixo do badge "Enviado ao cliente"
+Hoje os emails CC enviados não são persistidos — só passam pela edge function. Para exibi-los:
 
-```text
-Cliente | Ticket  | Título               | Status               | Horas
-ATPPOA  | #00012  | Erro no login        | Novo                 | 2h
-                                          Em Atendimento       | 5h
-                                          Aguardando Cliente   | 12h
-                                          Resolvido            | 1h
-        | #00015  | ...                  | ...                 | ...
-```
+- **Migration**: adicionar coluna `recipients jsonb` em `public.ticket_comments` (array de strings com TO + CC). Sem alterações de RLS/grants — herda as policies existentes.
+- **Persistência**: na mutation `addCommentMutation` de `TicketComments.tsx`, quando o comentário for externo (não interno) e enviado por staff, gravar `recipients: [contact_email, ...ccEmails]` no insert.
+- **Exibição**: no `CommentCard`, logo abaixo do badge "Enviado ao cliente" (e também "Resposta do cliente" se houver `recipients`), renderizar lista compacta dos emails — ex.: `Para: fulano@x.com, beltrano@y.com`. Aparece tanto no estado colapsado quanto expandido para o usuário saber para quem foi.
+- Comentários antigos (sem `recipients`) caem em fallback: mostra apenas `ticket.contact_email` quando o badge for "Enviado ao cliente".
 
-Cliente, Ticket e Título usam `rowSpan` para agrupar visualmente as linhas de status do mesmo ticket.
+### Arquivos afetados
+- `src/components/tickets/TicketComments.tsx` (colapsar, exibir recipients, gravar recipients no insert)
+- `src/hooks/useTicketDetail.ts` (ordem desc)
+- Nova migration: `ALTER TABLE public.ticket_comments ADD COLUMN recipients jsonb;`
 
-**Como calcular o tempo por status:**
-- Buscar `ticket_history` para os tickets do período, filtrando `action_type IN ('created', 'status_changed')`, ordenado por `created_at`.
-- Reconstruir a linha do tempo: cada evento marca início do `new_value` (status novo). O fim de um status é o `created_at` do próximo evento, ou `resolved_at`/`now()` para o último.
-- Somar a duração em horas (1 casa decimal) por status para cada ticket.
-- Tickets sem histórico (legado) caem em um único registro com o status atual e duração = `(resolved_at ?? now) - created_at`.
-
-Labels dos status em PT-BR via `getStatusLabel` (já existente em `src/lib/ticketUtils.tsx`).
-
-## 2. Correção: resumo some ao selecionar um cliente específico
-
-Em `ClientHoursReport.tsx` linha 407, o bloco "Resumo por Cliente" só renderiza quando `selectedClient === "all"`:
-
-```tsx
-{selectedClient === "all" && data.byClient.length > 0 && (
-```
-
-Remover a condição `selectedClient === "all"`. O resumo (e o novo detalhado por status) passam a aparecer também quando um cliente único é filtrado — nesse caso mostrarão apenas a linha/grupo desse cliente.
-
-## Arquivos afetados
-
-- `src/hooks/useClientHoursData.ts` — adicionar query de `ticket_history` dos tickets do período e expor `byClientTickets: { client_id, client_name, ticket_id, ticket_number, ticket_title, status_breakdown: { status, hours }[] }[]`.
-- `src/components/reports/ClientHoursReport.tsx` — remover gate de `selectedClient === "all"` e adicionar a nova tabela detalhada (com `rowSpan` por ticket).
-
-Sem alterações de schema/migrations.
+### Fora de escopo
+- Não altero lógica de envio de email/edge functions, apenas adiciono o registro local dos destinatários.
+- Não mexo em outras abas (Timeline, Detalhes).
