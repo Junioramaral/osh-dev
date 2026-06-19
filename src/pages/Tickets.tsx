@@ -486,7 +486,8 @@ export default function Tickets() {
       ticket.queue_id === queueFilter;
     const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
     const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
-    const hideAssumed = !isClient && clientFilter === "all" && isAssumed;
+    const isTerminalStatus = ticket.status === "resolvido" || ticket.status === "fechado";
+    const hideAssumed = !isClient && clientFilter === "all" && isAssumed && !isTerminalStatus;
     return matchesSearch && matchesStatus && matchesSegment && matchesClient && matchesTeam && matchesQueue && matchesType && !hideAssumed;
   }).sort((a, b) => {
     // Mapeamento de prioridade por status (ativos primeiro, fechados por último)
