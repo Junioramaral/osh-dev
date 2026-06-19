@@ -80,7 +80,7 @@ export default function TicketDetail() {
   
   return (
     <AppLayout>
-      <div className="space-y-6">
+      <div className="space-y-6 -mx-6 px-2 max-w-none">
         <TicketHeader ticket={ticket} />
         
         <div className="flex flex-col lg:flex-row gap-6 min-w-0">
@@ -132,7 +132,7 @@ export default function TicketDetail() {
             </Tabs>
           </main>
           
-          <aside className="w-full lg:w-80">
+          <aside className="w-full lg:w-96 shrink-0">
             <TicketSidebar ticket={ticket} />
           </aside>
         </div>
