@@ -1,0 +1,1 @@
+ALTER TABLE public.ticket_comments ADD COLUMN IF NOT EXISTS recipients jsonb;

@@ -124,7 +124,7 @@ export default function TicketDetail() {
                 <TicketTimeline ticketId={ticket.id} clientId={ticket.client_id} recordType={ticket.record_type} />
               </TabsContent>
               <TabsContent value="comments" className="mt-6">
-                <TicketComments ticketId={ticket.id} clientId={ticket.client_id} />
+                <TicketComments ticketId={ticket.id} clientId={ticket.client_id} ticket={ticket} />
               </TabsContent>
               <TabsContent value="attachments" className="mt-6">
                 <TicketAttachments ticket={ticket} ticketId={ticket.id} />
