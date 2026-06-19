@@ -371,9 +371,9 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
   };
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 w-full min-w-0 max-w-full overflow-x-hidden">
       <ScrollArea className="h-[500px] w-full max-w-full overflow-x-hidden">
-        <div className="pr-2 w-full min-w-0">
+        <div className="pr-2 w-full min-w-0 max-w-full">
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">Carregando comentários...</p>
           ) : comments && comments.length > 0 ? (

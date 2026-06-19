@@ -83,9 +83,9 @@ export default function TicketDetail() {
       <div className="space-y-6">
         <TicketHeader ticket={ticket} />
         
-        <div className="flex flex-col lg:flex-row gap-6">
-          <main className="flex-1">
-            <Tabs defaultValue="details" className="w-full">
+        <div className="flex flex-col lg:flex-row gap-6 min-w-0">
+          <main className="flex-1 min-w-0 max-w-full overflow-hidden">
+            <Tabs defaultValue="details" className="w-full min-w-0">
               <TabsList className={`grid w-full ${
                 showReportTab ? 'grid-cols-6' : 'grid-cols-5'
               }`}>
@@ -123,7 +123,7 @@ export default function TicketDetail() {
               <TabsContent value="timeline" className="mt-6">
                 <TicketTimeline ticketId={ticket.id} clientId={ticket.client_id} recordType={ticket.record_type} />
               </TabsContent>
-              <TabsContent value="comments" className="mt-6">
+              <TabsContent value="comments" className="mt-6 w-full min-w-0 max-w-full overflow-x-hidden">
                 <TicketComments ticketId={ticket.id} clientId={ticket.client_id} ticket={ticket} />
               </TabsContent>
               <TabsContent value="attachments" className="mt-6">

@@ -52,7 +52,7 @@ export default function CommentAttachmentList({ attachments }: { attachments: At
   if (!attachments?.length) return null;
 
   return (
-    <div className="mt-3 flex flex-wrap gap-2">
+    <div className="mt-3 flex flex-wrap gap-2 max-w-full min-w-0">
       {attachments.map((a, idx) => {
         const key = a.path || a.name;
         const url = urls[key];
@@ -66,7 +66,7 @@ export default function CommentAttachmentList({ attachments }: { attachments: At
             onClick={(e) => {
               if (!url) e.preventDefault();
             }}
-            className="inline-flex items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-xs hover:bg-accent transition-colors"
+            className="inline-flex max-w-full items-center gap-2 rounded-md border bg-background px-3 py-1.5 text-xs hover:bg-accent transition-colors"
             title={a.name}
           >
             {loading && !url ? (
