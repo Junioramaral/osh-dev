@@ -376,7 +376,13 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
         {isLoading ? (
           <p className="text-center text-muted-foreground py-8">Carregando comentários...</p>
         ) : comments && comments.length > 0 ? (
-          comments.map((comment) => <CommentCard key={comment.id} comment={comment} />)
+          comments.map((comment) => (
+            <CommentCard
+              key={comment.id}
+              comment={comment}
+              fallbackRecipient={ticket?.contact_email ?? null}
+            />
+          ))
         ) : (
           <p className="text-center text-muted-foreground py-8">Nenhum comentário ainda</p>
         )}
