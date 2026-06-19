@@ -3,7 +3,6 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { useTicketComments } from "@/hooks/useTicketDetail";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -372,8 +371,8 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
   
   return (
     <div className="space-y-4 w-full min-w-0 max-w-full overflow-x-hidden">
-      <ScrollArea className="h-[500px] w-full max-w-full overflow-x-hidden">
-        <div className="pr-2 w-full min-w-0 max-w-full">
+      <div className="max-h-[500px] overflow-y-auto overflow-x-hidden w-full min-w-0 max-w-full pr-2">
+        <div className="w-full min-w-0 max-w-full">
           {isLoading ? (
             <p className="text-center text-muted-foreground py-8">Carregando comentários...</p>
           ) : comments && comments.length > 0 ? (
@@ -388,7 +387,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
             <p className="text-center text-muted-foreground py-8">Nenhum comentário ainda</p>
           )}
         </div>
-      </ScrollArea>
+      </div>
       
       {/* Comment Form - Hidden for viewers */}
       {!isViewer && (
