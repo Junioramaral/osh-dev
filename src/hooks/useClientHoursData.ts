@@ -135,6 +135,8 @@ export function useClientHoursData(
           created_at,
           resolved_at,
           client_id,
+          ticket_number,
+          title,
           analyst_id,
           queue_id,
           team_id,
@@ -307,12 +309,96 @@ export function useClientHoursData(
           .filter((id: any) => id !== null)
       ).size;
 
+      // Per-ticket status breakdown using ticket_history
+      const ticketIds = ticketsWithHours.map((t: any) => t.id);
+      let history: any[] = [];
+      if (ticketIds.length > 0) {
+        const { data: histData, error: histError } = await supabase
+          .from("ticket_history")
+          .select("ticket_id, action_type, new_value, created_at")
+          .in("ticket_id", ticketIds)
+          .in("action_type", ["created", "status_changed"])
+          .order("created_at", { ascending: true });
+        if (histError) throw histError;
+        history = histData || [];
+      }
+
+      const historyByTicket = new Map<string, any[]>();
+      history.forEach((h) => {
+        const arr = historyByTicket.get(h.ticket_id) || [];
+        arr.push(h);
+        historyByTicket.set(h.ticket_id, arr);
+      });
+
+      const nowMs = Date.now();
+      const byClientTickets: ClientTicketStatusBreakdown[] = ticketsWithHours
+        .map((ticket: any) => {
+          const events = historyByTicket.get(ticket.id) || [];
+          const endTs = ticket.resolved_at
+            ? new Date(ticket.resolved_at).getTime()
+            : nowMs;
+
+          const statusMs = new Map<string, number>();
+
+          if (events.length === 0) {
+            // Legacy fallback
+            const ms = endTs - new Date(ticket.created_at).getTime();
+            statusMs.set(ticket.status || "novo", Math.max(0, ms));
+          } else {
+            for (let i = 0; i < events.length; i++) {
+              const ev = events[i];
+              const startTs = new Date(ev.created_at).getTime();
+              const nextTs =
+                i + 1 < events.length
+                  ? new Date(events[i + 1].created_at).getTime()
+                  : endTs;
+              const status =
+                ev.action_type === "created"
+                  ? ev.new_value || "novo"
+                  : ev.new_value || "novo";
+              const ms = Math.max(0, nextTs - startTs);
+              statusMs.set(status, (statusMs.get(status) || 0) + ms);
+            }
+          }
+
+          const status_breakdown: TicketStatusBreakdownEntry[] = Array.from(
+            statusMs.entries()
+          )
+            .map(([status, ms]) => ({
+              status,
+              hours: Math.round((ms / 3_600_000) * 10) / 10,
+            }))
+            .filter((e) => e.hours > 0)
+            .sort((a, b) => b.hours - a.hours);
+
+          const total_hours =
+            Math.round(
+              status_breakdown.reduce((s, e) => s + e.hours, 0) * 10
+            ) / 10;
+
+          return {
+            client_id: ticket.client_id,
+            client_name: ticket.clients?.name || "Desconhecido",
+            ticket_id: ticket.id,
+            ticket_number: ticket.ticket_number || "",
+            ticket_title: ticket.title || "",
+            total_hours,
+            status_breakdown,
+          };
+        })
+        .sort((a, b) => {
+          const c = a.client_name.localeCompare(b.client_name);
+          if (c !== 0) return c;
+          return b.total_hours - a.total_hours;
+        });
+
       return {
         byAnalyst,
         byQueue,
         byTeam,
         byType,
         byClient,
+        byClientTickets,
         overall: {
           total_hours: Math.round(totalHours * 10) / 10,
           total_entries: totalEntries,
