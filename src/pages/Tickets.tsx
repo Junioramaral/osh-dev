@@ -533,7 +533,8 @@ export default function Tickets() {
           ticket.queue_id === queueFilter;
         const matchesType = typeFilter === "all" || ticket.record_type === typeFilter;
         const isAssumed = Boolean(ticket.analyst_id) || Boolean(ticket.lock_owner_id);
-        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isAssumed;
+        const isTerminalStatus = ticket.status === "resolvido" || ticket.status === "fechado";
+        return matchesSearch && matchesStatus && matchesSegment && matchesTeam && matchesQueue && matchesType && isAssumed && !isTerminalStatus;
       }).length ?? 0)
     : 0;
 
