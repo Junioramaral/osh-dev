@@ -656,6 +656,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       // Limpar categoria/subcategoria
       setValue("category", "");
       setValue("subcategory", "");
+      // Limpar responsável (será re-selecionado quando a nova lista carregar)
+      setValue("responsible_user_id", null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId]);
