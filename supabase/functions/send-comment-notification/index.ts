@@ -213,6 +213,7 @@ const handler = async (req: Request): Promise<Response> => {
         </body>
         </html>
       `,
+      text: `Atualização de Ticket\n\nOlá ${contactName},\n\nVocê recebeu uma nova atualização no seu ticket:\nTicket: #${ticketNumber}\nTítulo: ${ticketTitle}\n\nComentário de: ${authorName}\nData: ${currentDate}\n\n${commentContent}\n\n---\nVocê pode responder diretamente este email.`,
     });
 
     console.log("Email sent successfully:", emailResponse);
