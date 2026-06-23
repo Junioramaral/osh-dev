@@ -13,6 +13,7 @@ export interface TicketTimeLogRow {
   project_is_overtime: boolean;
   analyst_id: string;
   analyst_name: string;
+  logged_at: string;
 }
 
 export function useTicketTimeLogs(ticketId: string | undefined, enabled = true) {
@@ -31,6 +32,7 @@ export function useTicketTimeLogs(ticketId: string | undefined, enabled = true) 
           description,
           project_id,
           analyst_id,
+          logged_at,
           client_projects ( name, is_overtime )
         `)
         .eq("ticket_id", ticketId!)
@@ -67,6 +69,7 @@ export function useTicketTimeLogs(ticketId: string | undefined, enabled = true) 
         project_is_overtime: !!r.client_projects?.is_overtime,
         analyst_id: r.analyst_id,
         analyst_name: analystMap[r.analyst_id] ?? "—",
+        logged_at: r.logged_at,
       }));
     },
   });
