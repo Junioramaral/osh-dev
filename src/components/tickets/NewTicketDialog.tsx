@@ -25,6 +25,8 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -60,6 +62,7 @@ const ticketSchema = z.object({
   app_machine_id: z.string().uuid().optional(),
   app_environment: z.enum(["prod", "hom", "qa", "dev"]).optional(),
   app_version: z.string().optional(),
+  responsible_user_id: z.string().uuid().optional().nullable(),
 }).refine(
   (data) => {
     if (data.segment === "DB") {
