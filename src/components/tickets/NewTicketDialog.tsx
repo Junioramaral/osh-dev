@@ -429,6 +429,43 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
+  // Fetch responsible users (Otimizzo team + selected client) — Otimizzo tenant only
+  const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+  const { data: responsibleUsers } = useQuery({
+    queryKey: ["responsible-users", selectedClientId, isOtimizzoTenant],
+    queryFn: async () => {
+      if (!isOtimizzoTenant || !selectedClientId) return [];
+      const clientIds = Array.from(new Set([OTIMIZZO_TENANT_ID, selectedClientId]));
+      const { data: profs, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, client_id")
+        .in("client_id", clientIds)
+        .order("full_name");
+      if (error) throw error;
+      const withEmails = await Promise.all(
+        (profs || []).map(async (p) => {
+          const { data: email } = await supabase.rpc("get_user_email", { _user_id: p.id });
+          return email ? { ...p, email: email as string } : null;
+        })
+      );
+      return withEmails.filter((u): u is { id: string; full_name: string; client_id: string | null; email: string } => !!u);
+    },
+    enabled: !!isOtimizzoTenant && !!selectedClientId,
+  });
+
+  const otimizzoResponsibles = responsibleUsers?.filter(u => u.client_id === OTIMIZZO_TENANT_ID) || [];
+  const clientResponsibles = responsibleUsers?.filter(u => u.client_id === selectedClientId) || [];
+  const selectedResponsible = responsibleUsers?.find(u => u.id === selectedResponsibleUserId);
+
+  // Pre-select current user as responsible when list loads
+  useEffect(() => {
+    if (!isOtimizzoTenant || !selectedClientId) return;
+    if (selectedResponsibleUserId) return;
+    if (!responsibleUsers || responsibleUsers.length === 0) return;
+    const me = responsibleUsers.find(u => u.id === profile?.id);
+    if (me) setValue("responsible_user_id", me.id);
+  }, [responsibleUsers, isOtimizzoTenant, selectedClientId, profile?.id, selectedResponsibleUserId, setValue]);
+
   // Fetch ticket categories filtered by segment
   const { data: categories } = useQuery({
     queryKey: ["ticket-categories", segment],
