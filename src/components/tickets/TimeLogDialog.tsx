@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Clock, AlertTriangle } from "lucide-react";
+import { CalendarIcon, Clock, AlertTriangle, FolderOpen, Inbox } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -29,9 +29,13 @@ import {
 } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Skeleton } from "@/components/ui/skeleton";
+import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
 import { useTimeLogMutations } from "@/hooks/useTimeLogMutations";
 import { useClientProjects } from "@/hooks/useClientProjects";
+import { useTicketTimeLogs, type TicketTimeLogRow } from "@/hooks/useTicketTimeLogs";
 
 interface TimeLogDialogProps {
   open: boolean;
@@ -66,6 +70,7 @@ function isWithinBusinessHours(startTime: string, endTime: string): boolean {
 }
 
 export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps) {
+  const [activeTab, setActiveTab] = useState<"new" | "history">("new");
   const [workDate, setWorkDate] = useState<Date>(new Date());
   const [startTime, setStartTime] = useState("08:00");
   const [endTime, setEndTime] = useState("18:00");
@@ -74,6 +79,10 @@ export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps
   
   const { addTimeLog } = useTimeLogMutations();
   const { data: projects, isLoading: loadingProjects } = useClientProjects(ticket.client_id);
+  const { data: timeLogs, isLoading: loadingLogs } = useTicketTimeLogs(
+    ticket.id,
+    open && activeTab === "history"
+  );
 
   // Calculate derived values
   const calculatedHours = useMemo(() => {
@@ -138,6 +147,7 @@ export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps
       setEndTime("18:00");
       setProjectId("");
       setDescription("");
+      setActiveTab("new");
     }
     onOpenChange(newOpen);
   };
@@ -155,7 +165,14 @@ export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps
           </DialogDescription>
         </DialogHeader>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "new" | "history")} className="w-full">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="new">Novo Registro</TabsTrigger>
+            <TabsTrigger value="history">Registros</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="new" className="mt-4">
+            <form onSubmit={handleSubmit} className="space-y-4">
           {/* Date Picker */}
           <div className="space-y-2">
             <Label>
@@ -310,8 +327,143 @@ export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps
               {addTimeLog.isPending ? "Registrando..." : "Registrar Horas"}
             </Button>
           </DialogFooter>
-        </form>
+            </form>
+          </TabsContent>
+
+          <TabsContent value="history" className="mt-4">
+            <TicketTimeLogsHistory logs={timeLogs} isLoading={loadingLogs} />
+            <DialogFooter className="mt-4">
+              <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </TabsContent>
+        </Tabs>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface GroupedLogs {
+  key: string;
+  projectId: string | null;
+  projectName: string;
+  isOvertime: boolean;
+  total: number;
+  logs: TicketTimeLogRow[];
+}
+
+function TicketTimeLogsHistory({
+  logs,
+  isLoading,
+}: {
+  logs: TicketTimeLogRow[] | undefined;
+  isLoading: boolean;
+}) {
+  const { grouped, total, count } = useMemo(() => {
+    const list = logs ?? [];
+    const map = new Map<string, GroupedLogs>();
+    for (const log of list) {
+      const key = log.project_id ?? "__none__";
+      if (!map.has(key)) {
+        map.set(key, {
+          key,
+          projectId: log.project_id,
+          projectName: log.project_name ?? "Sem projeto",
+          isOvertime: log.project_is_overtime,
+          total: 0,
+          logs: [],
+        });
+      }
+      const grp = map.get(key)!;
+      grp.total += log.hours;
+      grp.logs.push(log);
+    }
+    const groupedArr = Array.from(map.values()).sort((a, b) => {
+      if (!a.projectId && b.projectId) return 1;
+      if (a.projectId && !b.projectId) return -1;
+      return a.projectName.localeCompare(b.projectName);
+    });
+    const totalSum = list.reduce((acc, l) => acc + l.hours, 0);
+    return { grouped: groupedArr, total: totalSum, count: list.length };
+  }, [logs]);
+
+  if (isLoading) {
+    return (
+      <div className="space-y-3">
+        <Skeleton className="h-14 w-full" />
+        <Skeleton className="h-24 w-full" />
+        <Skeleton className="h-24 w-full" />
+      </div>
+    );
+  }
+
+  if (count === 0) {
+    return (
+      <div className="flex flex-col items-center justify-center py-10 text-center text-muted-foreground">
+        <Inbox className="h-10 w-10 mb-2 opacity-50" />
+        <p className="text-sm">Nenhum registro de horas para este ticket ainda.</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="flex items-center justify-between p-3 bg-muted rounded-lg">
+        <div className="flex flex-col">
+          <span className="text-xs text-muted-foreground">Total do ticket</span>
+          <span className="text-xs text-muted-foreground">
+            {count} {count === 1 ? "registro" : "registros"}
+          </span>
+        </div>
+        <span className="text-lg font-bold text-primary">{total.toFixed(1)} horas</span>
+      </div>
+
+      <ScrollArea className="max-h-[360px] pr-2">
+        <div className="space-y-3">
+          {grouped.map((group) => (
+            <div key={group.key} className="border rounded-lg overflow-hidden">
+              <div className="flex items-center justify-between px-3 py-2 bg-muted/60">
+                <div className="flex items-center gap-2 min-w-0">
+                  <FolderOpen className="h-4 w-4 text-muted-foreground shrink-0" />
+                  <span className="font-medium truncate">{group.projectName}</span>
+                  {group.isOvertime && (
+                    <Badge variant="secondary" className="text-xs bg-orange-100 text-orange-700 dark:bg-orange-900 dark:text-orange-300">
+                      HE
+                    </Badge>
+                  )}
+                </div>
+                <span className="text-sm font-semibold whitespace-nowrap">
+                  {group.total.toFixed(1)} h
+                </span>
+              </div>
+              <ul className="divide-y">
+                {group.logs.map((log) => (
+                  <li key={log.id} className="px-3 py-2 text-sm">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 text-muted-foreground">
+                        <span className="font-medium text-foreground">
+                          {format(new Date(log.work_date + "T00:00:00"), "dd/MM/yyyy")}
+                        </span>
+                        {log.start_time && log.end_time && (
+                          <span className="text-xs">
+                            {log.start_time.slice(0, 5)}–{log.end_time.slice(0, 5)}
+                          </span>
+                        )}
+                      </div>
+                      <span className="font-semibold whitespace-nowrap">{log.hours.toFixed(1)} h</span>
+                    </div>
+                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                      {log.analyst_name}
+                      {log.description ? ` • ${log.description}` : ""}
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+        </div>
+      </ScrollArea>
+    </div>
   );
 }
