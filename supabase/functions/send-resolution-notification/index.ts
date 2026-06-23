@@ -11,6 +11,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+function formatUserTextHtml(s: string): string {
+  return escapeHtml(s).replace(/\r?\n/g, "<br>");
+}
+
 interface ResolutionNotificationRequest {
   ticketId: string;
   ticketNumber: string;
@@ -168,7 +180,7 @@ const handler = async (req: Request): Promise<Response> => {
                   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#f8f9fa;border-left:4px solid #28a745;margin:20px 0;">
                     <tr><td style="padding:20px;">
                       <h4 style="margin:0 0 10px;color:#28a745;font-size:16px;">📋 Motivo da Resolução</h4>
-                      <p style="margin:10px 0;white-space:pre-wrap;">${resolutionReason}</p>
+                      <p style="margin:10px 0;">${formatUserTextHtml(resolutionReason)}</p>
                       <p style="font-size:12px;color:#6c757d;margin:15px 0 0;padding-top:10px;border-top:1px solid #dee2e6;">Resolvido por: <strong>${analystName}</strong></p>
                     </td></tr>
                   </table>
@@ -205,6 +217,7 @@ const handler = async (req: Request): Promise<Response> => {
         </body>
         </html>
       `,
+      text: `Ticket Resolvido\n\nOlá ${contactName},\n\nSeu ticket foi resolvido!\n\nTicket: #${ticketNumber}\nTítulo: ${ticketTitle}\n\nMotivo da Resolução:\n${resolutionReason}\n\nResolvido por: ${analystName}\n\nSe o problema não foi totalmente resolvido, basta responder este email e reabriremos seu ticket.`,
     });
 
     console.log("Resolution email sent successfully:", emailResponse);

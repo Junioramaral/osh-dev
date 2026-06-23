@@ -12,6 +12,19 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+// Escape HTML and convert newlines to <br> so all email clients (including Outlook desktop, which ignores white-space:pre-wrap) preserve line breaks from user-entered text.
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+function formatUserTextHtml(s: string): string {
+  return escapeHtml(s).replace(/\r?\n/g, "<br>");
+}
+
 // Input validation schema
 const CommentNotificationSchema = z.object({
   ticketId: z.string().uuid(),
@@ -182,7 +195,7 @@ const handler = async (req: Request): Promise<Response> => {
                       <p style="margin:0 0 10px;"><strong>Comentário de:</strong> ${authorName}</p>
                       <p style="margin:0 0 10px;"><strong>Data:</strong> ${currentDate}</p>
                       <hr style="border:none;border-top:1px solid #dee2e6;margin:10px 0;">
-                      <p style="white-space:pre-wrap;margin:0;">${commentContent}</p>
+                      <p style="margin:0;">${formatUserTextHtml(commentContent)}</p>
                     </td></tr>
                   </table>
                   <p style="color:#6c757d;font-size:14px;margin:15px 0 0;">
@@ -200,6 +213,7 @@ const handler = async (req: Request): Promise<Response> => {
         </body>
         </html>
       `,
+      text: `Atualização de Ticket\n\nOlá ${contactName},\n\nVocê recebeu uma nova atualização no seu ticket:\nTicket: #${ticketNumber}\nTítulo: ${ticketTitle}\n\nComentário de: ${authorName}\nData: ${currentDate}\n\n${commentContent}\n\n---\nVocê pode responder diretamente este email.`,
     });
 
     console.log("Email sent successfully:", emailResponse);

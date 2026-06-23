@@ -11,6 +11,18 @@ const corsHeaders = {
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
+function escapeHtml(s: string): string {
+  return s
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
+}
+function formatUserTextHtml(s: string): string {
+  return escapeHtml(s).replace(/\r?\n/g, "<br>");
+}
+
 interface NotificationRequest {
   ticketId: string;
   ticketNumber: string;
@@ -146,7 +158,7 @@ const handler = async (req: Request): Promise<Response> => {
                       <p style="margin:0 0 10px;"><strong>Email:</strong> ${clientEmail}</p>
                       <p style="margin:0 0 10px;"><strong>Data:</strong> ${currentDate}</p>
                       <hr style="border:none;border-top:1px solid #bbf7d0;margin:10px 0;">
-                      <p style="white-space:pre-wrap;margin:0;">${commentContent}</p>
+                      <p style="margin:0;">${formatUserTextHtml(commentContent)}</p>
                     </td></tr>
                   </table>
                   <p style="color:#6c757d;font-size:14px;margin:15px 0 0;">Acesse o sistema para responder ao cliente.</p>
@@ -161,6 +173,7 @@ const handler = async (req: Request): Promise<Response> => {
         </body>
         </html>
       `,
+      text: `Nova Resposta do Cliente\n\nOlá ${analystName},\n\nO cliente respondeu ao ticket que você está atendendo:\nTicket: #${ticketNumber}\nTítulo: ${ticketTitle}\n\nCliente: ${clientName}\nEmail: ${clientEmail}\nData: ${currentDate}\n\n${commentContent}\n\nAcesse o sistema para responder ao cliente.`,
     });
 
     console.log("Analyst notification email sent successfully:", emailResponse);
