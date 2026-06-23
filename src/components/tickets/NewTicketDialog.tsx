@@ -671,11 +671,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         throw new Error("Erro ao identificar usuário");
       }
 
+      // Validar Responsável obrigatório para usuários Otimizzo
+      if (isOtimizzoTenant && !data.responsible_user_id) {
+        throw new Error("Selecione o usuário responsável pelo chamado.");
+      }
+
+      const responsible = responsibleUsers?.find(u => u.id === data.responsible_user_id);
+
       const ticketData: any = {
         segment: data.segment,
         client_id: data.client_id,
-        contact_name: profile?.full_name || user.email || "Usuário",
-        contact_email: user.email || "",
+        contact_name: responsible?.full_name || profile?.full_name || user.email || "Usuário",
+        contact_email: responsible?.email || user.email || "",
         title: data.title,
         ticket_type: data.ticket_type,
         priority: data.priority,
