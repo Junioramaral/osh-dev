@@ -1,7 +1,7 @@
 import { useState, useMemo } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
-import { CalendarIcon, Clock, AlertTriangle, FolderOpen, Inbox } from "lucide-react";
+import { CalendarIcon, Clock, AlertTriangle, FolderOpen, Inbox, Pencil, Trash2 } from "lucide-react";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +36,10 @@ import { cn } from "@/lib/utils";
 import { useTimeLogMutations } from "@/hooks/useTimeLogMutations";
 import { useClientProjects } from "@/hooks/useClientProjects";
 import { useTicketTimeLogs, type TicketTimeLogRow } from "@/hooks/useTicketTimeLogs";
+import { TimeLogEditDialog } from "@/components/tickets/TimeLogEditDialog";
+import { TimeLogDeleteDialog } from "@/components/tickets/TimeLogDeleteDialog";
+import { getTimeLogPermissions } from "@/lib/timeLogPermissions";
+import { useAuth } from "@/contexts/AuthContext";
 
 interface TimeLogDialogProps {
   open: boolean;
@@ -331,7 +335,12 @@ export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps
           </TabsContent>
 
           <TabsContent value="history" className="mt-4">
-            <TicketTimeLogsHistory logs={timeLogs} isLoading={loadingLogs} />
+            <TicketTimeLogsHistory
+              logs={timeLogs}
+              isLoading={loadingLogs}
+              ticketId={ticket.id}
+              clientId={ticket.client_id}
+            />
             <DialogFooter className="mt-4">
               <Button type="button" variant="outline" onClick={() => handleOpenChange(false)}>
                 Fechar
@@ -356,10 +365,18 @@ interface GroupedLogs {
 function TicketTimeLogsHistory({
   logs,
   isLoading,
+  ticketId,
+  clientId,
 }: {
   logs: TicketTimeLogRow[] | undefined;
   isLoading: boolean;
+  ticketId: string;
+  clientId: string;
 }) {
+  const { user, isSuperAdmin, isTenantAdmin, isViewer } = useAuth();
+  const [editingLog, setEditingLog] = useState<TicketTimeLogRow | null>(null);
+  const [deletingLog, setDeletingLog] = useState<TicketTimeLogRow | null>(null);
+
   const { grouped, total, count } = useMemo(() => {
     const list = logs ?? [];
     const map = new Map<string, GroupedLogs>();
@@ -438,32 +455,104 @@ function TicketTimeLogsHistory({
                 </span>
               </div>
               <ul className="divide-y">
-                {group.logs.map((log) => (
-                  <li key={log.id} className="px-3 py-2 text-sm">
-                    <div className="flex items-center justify-between gap-2">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <span className="font-medium text-foreground">
-                          {format(new Date(log.work_date + "T00:00:00"), "dd/MM/yyyy")}
-                        </span>
-                        {log.start_time && log.end_time && (
-                          <span className="text-xs">
-                            {log.start_time.slice(0, 5)}–{log.end_time.slice(0, 5)}
+                {group.logs.map((log) => {
+                  const perms = getTimeLogPermissions(
+                    { analyst_id: log.analyst_id, logged_at: log.logged_at },
+                    user?.id,
+                    isSuperAdmin,
+                    isTenantAdmin,
+                    isViewer,
+                  );
+                  return (
+                    <li key={log.id} className="px-3 py-2 text-sm">
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <span className="font-medium text-foreground">
+                            {format(new Date(log.work_date + "T00:00:00"), "dd/MM/yyyy")}
                           </span>
-                        )}
+                          {log.start_time && log.end_time && (
+                            <span className="text-xs">
+                              {log.start_time.slice(0, 5)}–{log.end_time.slice(0, 5)}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1">
+                          <span className="font-semibold whitespace-nowrap">{log.hours.toFixed(1)} h</span>
+                          {perms.canEdit && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7"
+                              title="Editar registro"
+                              onClick={() => setEditingLog(log)}
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                          {perms.canDelete && (
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-destructive hover:text-destructive"
+                              title="Excluir registro"
+                              onClick={() => setDeletingLog(log)}
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          )}
+                        </div>
                       </div>
-                      <span className="font-semibold whitespace-nowrap">{log.hours.toFixed(1)} h</span>
-                    </div>
-                    <div className="text-xs text-muted-foreground mt-0.5 truncate">
-                      {log.analyst_name}
-                      {log.description ? ` • ${log.description}` : ""}
-                    </div>
-                  </li>
-                ))}
+                      <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                        {log.analyst_name}
+                        {log.description ? ` • ${log.description}` : ""}
+                      </div>
+                    </li>
+                  );
+                })}
               </ul>
             </div>
           ))}
         </div>
       </ScrollArea>
+
+      <TimeLogEditDialog
+        open={!!editingLog}
+        onOpenChange={(o) => !o && setEditingLog(null)}
+        log={
+          editingLog
+            ? {
+                id: editingLog.id,
+                hours: editingLog.hours,
+                description: editingLog.description ?? undefined,
+                logged_at: editingLog.logged_at,
+                ticketId,
+                clientId,
+                project_id: editingLog.project_id,
+                work_date: editingLog.work_date,
+                start_time: editingLog.start_time ?? undefined,
+                end_time: editingLog.end_time ?? undefined,
+              }
+            : null
+        }
+      />
+
+      <TimeLogDeleteDialog
+        open={!!deletingLog}
+        onOpenChange={(o) => !o && setDeletingLog(null)}
+        log={
+          deletingLog
+            ? {
+                id: deletingLog.id,
+                hours: deletingLog.hours,
+                description: deletingLog.description ?? undefined,
+                logged_at: deletingLog.logged_at,
+                ticketId,
+              }
+            : null
+        }
+      />
     </div>
   );
 }
