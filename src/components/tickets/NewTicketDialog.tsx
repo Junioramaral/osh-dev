@@ -25,6 +25,8 @@ import { Label } from "@/components/ui/label";
 import {
   Select,
   SelectContent,
+  SelectGroup,
+  SelectLabel,
   SelectItem,
   SelectTrigger,
   SelectValue,
@@ -60,6 +62,7 @@ const ticketSchema = z.object({
   app_machine_id: z.string().uuid().optional(),
   app_environment: z.enum(["prod", "hom", "qa", "dev"]).optional(),
   app_version: z.string().optional(),
+  responsible_user_id: z.string().uuid().optional().nullable(),
 }).refine(
   (data) => {
     if (data.segment === "DB") {
@@ -114,6 +117,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = form;
 
   const selectedClientId = watch("client_id");
+  const selectedResponsibleUserId = watch("responsible_user_id");
   const selectedDbEngine = watch("db_engine");
   const selectedDbEnvironment = watch("db_environment");
   const selectedDbMachineId = watch("db_machine_id");
@@ -425,6 +429,43 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
+  // Fetch responsible users (Otimizzo team + selected client) — Otimizzo tenant only
+  const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+  const { data: responsibleUsers } = useQuery({
+    queryKey: ["responsible-users", selectedClientId, isOtimizzoTenant],
+    queryFn: async () => {
+      if (!isOtimizzoTenant || !selectedClientId) return [];
+      const clientIds = Array.from(new Set([OTIMIZZO_TENANT_ID, selectedClientId]));
+      const { data: profs, error } = await supabase
+        .from("profiles")
+        .select("id, full_name, client_id")
+        .in("client_id", clientIds)
+        .order("full_name");
+      if (error) throw error;
+      const withEmails = await Promise.all(
+        (profs || []).map(async (p) => {
+          const { data: email } = await supabase.rpc("get_user_email", { _user_id: p.id });
+          return email ? { ...p, email: email as string } : null;
+        })
+      );
+      return withEmails.filter((u): u is { id: string; full_name: string; client_id: string | null; email: string } => !!u);
+    },
+    enabled: !!isOtimizzoTenant && !!selectedClientId,
+  });
+
+  const otimizzoResponsibles = responsibleUsers?.filter(u => u.client_id === OTIMIZZO_TENANT_ID) || [];
+  const clientResponsibles = responsibleUsers?.filter(u => u.client_id === selectedClientId) || [];
+  const selectedResponsible = responsibleUsers?.find(u => u.id === selectedResponsibleUserId);
+
+  // Pre-select current user as responsible when list loads
+  useEffect(() => {
+    if (!isOtimizzoTenant || !selectedClientId) return;
+    if (selectedResponsibleUserId) return;
+    if (!responsibleUsers || responsibleUsers.length === 0) return;
+    const me = responsibleUsers.find(u => u.id === profile?.id);
+    if (me) setValue("responsible_user_id", me.id);
+  }, [responsibleUsers, isOtimizzoTenant, selectedClientId, profile?.id, selectedResponsibleUserId, setValue]);
+
   // Fetch ticket categories filtered by segment
   const { data: categories } = useQuery({
     queryKey: ["ticket-categories", segment],
@@ -615,6 +656,8 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
       // Limpar categoria/subcategoria
       setValue("category", "");
       setValue("subcategory", "");
+      // Limpar responsável (será re-selecionado quando a nova lista carregar)
+      setValue("responsible_user_id", null);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedClientId]);
@@ -628,11 +671,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         throw new Error("Erro ao identificar usuário");
       }
 
+      // Validar Responsável obrigatório para usuários Otimizzo
+      if (isOtimizzoTenant && !data.responsible_user_id) {
+        throw new Error("Selecione o usuário responsável pelo chamado.");
+      }
+
+      const responsible = responsibleUsers?.find(u => u.id === data.responsible_user_id);
+
       const ticketData: any = {
         segment: data.segment,
         client_id: data.client_id,
-        contact_name: profile?.full_name || user.email || "Usuário",
-        contact_email: user.email || "",
+        contact_name: responsible?.full_name || profile?.full_name || user.email || "Usuário",
+        contact_email: responsible?.email || user.email || "",
         title: data.title,
         ticket_type: data.ticket_type,
         priority: data.priority,
@@ -866,25 +916,77 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
           {/* 1. Cliente (apenas para Otimizzo) */}
           {isOtimizzoTenant && (
-            <div className="space-y-2">
-              <Label htmlFor="client_id">Cliente *</Label>
-              <Select
-                value={watch("client_id")}
-                onValueChange={(value) => setValue("client_id", value)}
-                disabled={isAnalystOnly && (!analystQueues || analystQueues.length === 0)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredClients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="client_id">Cliente *</Label>
+                <Select
+                  value={watch("client_id")}
+                  onValueChange={(value) => setValue("client_id", value)}
+                  disabled={isAnalystOnly && (!analystQueues || analystQueues.length === 0)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredClients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responsible_user_id">Usuário Responsável *</Label>
+                <Select
+                  value={selectedResponsibleUserId || ""}
+                  onValueChange={(value) => setValue("responsible_user_id", value)}
+                  disabled={!selectedClientId || !responsibleUsers || responsibleUsers.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedClientId ? "Selecione o responsável" : "Escolha o cliente primeiro"}>
+                      {selectedResponsible
+                        ? `${selectedResponsible.full_name} (${selectedResponsible.email})`
+                        : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {otimizzoResponsibles.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Otimizzo</SelectLabel>
+                        {otimizzoResponsibles.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            <span className="flex flex-col">
+                              <span>{u.full_name}</span>
+                              <span className="text-xs text-muted-foreground">{u.email}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {clientResponsibles.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>
+                          {selectedClientData?.name || currentTenant?.name || "Cliente"}
+                        </SelectLabel>
+                        {clientResponsibles.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            <span className="flex flex-col">
+                              <span>{u.full_name}</span>
+                              <span className="text-xs text-muted-foreground">{u.email}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  O e-mail de resolução será enviado a este usuário; o criador Otimizzo entra em cópia (CC).
+                </p>
+              </div>
             </div>
           )}
 

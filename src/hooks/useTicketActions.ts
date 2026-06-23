@@ -120,6 +120,46 @@ export function useTicketActions() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.access_token && ticket.contact_email) {
+        // Build CC list: creator (Otimizzo) + current resolver (Otimizzo), excluding contact
+        const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+        const ccCandidates: string[] = [];
+
+        try {
+          // Creator: first 'created' entry in ticket_history
+          const { data: createdHist } = await supabase
+            .from("ticket_history")
+            .select("user_id")
+            .eq("ticket_id", ticket.id)
+            .eq("action_type", "created")
+            .order("created_at", { ascending: true })
+            .limit(1)
+            .maybeSingle();
+
+          const candidateIds = Array.from(
+            new Set([createdHist?.user_id, userId].filter(Boolean) as string[])
+          );
+
+          for (const uid of candidateIds) {
+            const { data: roleRow } = await supabase
+              .from("user_roles")
+              .select("tenant_id")
+              .eq("user_id", uid)
+              .maybeSingle();
+            if (roleRow?.tenant_id !== OTIMIZZO_TENANT_ID) continue;
+            const { data: email } = await supabase.rpc("get_user_email", { _user_id: uid });
+            if (
+              email &&
+              typeof email === "string" &&
+              email.toLowerCase() !== ticket.contact_email.toLowerCase() &&
+              !ccCandidates.includes(email)
+            ) {
+              ccCandidates.push(email);
+            }
+          }
+        } catch (ccErr) {
+          console.error("Erro ao montar CC do e-mail de resolução:", ccErr);
+        }
+
         try {
           await fetch(
             `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/send-resolution-notification`,
@@ -139,6 +179,7 @@ export function useTicketActions() {
                 analystName: authorName,
                 createdAt: ticket.created_at,
                 resolvedAt,
+                ccEmails: ccCandidates.length > 0 ? ccCandidates : undefined,
               }),
             }
           );
