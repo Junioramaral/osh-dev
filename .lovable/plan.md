@@ -1,49 +1,24 @@
-## Objetivo
+## Habilitar edição de registros na aba "Registros"
 
-Adicionar uma aba "Registros" no diálogo **Registrar Horas Trabalhadas** mostrando todos os lançamentos já feitos para aquele ticket, agrupados por projeto, com subtotais por projeto e total geral.
+Adicionar ações de editar/excluir em cada item da aba "Registros" do `TimeLogDialog`, reusando o `TimeLogEditDialog` e `TimeLogDeleteDialog` já existentes, com permissões via `getTimeLogPermissions` (mesma regra de 48h úteis usada em "Meus Lançamentos").
 
-## Mudanças
+### Mudanças
 
-### 1. `src/components/tickets/TimeLogDialog.tsx`
-Envolver o conteúdo atual em `<Tabs>` (shadcn) com duas abas:
+**`src/hooks/useTicketTimeLogs.ts`**
+- Incluir `logged_at` no select (necessário para a regra de 48h úteis).
+- Expor `logged_at` no tipo `TicketTimeLogRow`.
 
-- **Novo Registro** (padrão) — formulário atual, sem alteração de comportamento.
-- **Registros** — lista os lançamentos existentes do ticket, agrupados por projeto.
+**`src/components/tickets/TimeLogDialog.tsx`** (apenas o sub-componente `TicketTimeLogsHistory`)
+- Importar `TimeLogEditDialog`, `TimeLogDeleteDialog`, `getTimeLogPermissions`, `useAuth` e o role do usuário.
+- Para cada registro, calcular permissões com o usuário logado, role e `analyst_id`/`logged_at` do registro.
+- Renderizar dois botões discretos (ícones `Pencil` e `Trash2`, variant `ghost` `size="icon"`) à direita de cada linha, exibidos somente quando a permissão correspondente for verdadeira. Tooltip com o `reason` quando bloqueado é opcional — por simplicidade, apenas ocultar quando não permitido.
+- Estados locais `editingLog` e `deletingLog`; ao clicar, montar o payload esperado pelos dialogs existentes (id, hours, description, logged_at, ticketId, clientId, project_id, work_date, start_time, end_time).
+- Os dialogs já invalidam as queries de time logs via `useTimeLogMutations`; adicionar invalidação extra de `['ticket-time-logs', ticketId]` se necessário (verificar `useTimeLogMutations` — se não invalidar essa key, adicionar `queryClient.invalidateQueries` no `onSuccess` local após fechar o sub-dialog, ou invalidar manualmente no `TicketTimeLogsHistory` via efeito quando o dialog fechar).
 
-Layout da aba "Registros":
-- Cabeçalho com **Total geral** do ticket (soma de `hours`) e quantidade de lançamentos.
-- Lista de grupos por projeto:
-  - Nome do projeto (ou "Sem projeto" quando `project_id` nulo) + badge "HE" quando `is_overtime`.
-  - Subtotal de horas do grupo.
-  - Linhas dos lançamentos: data (`dd/MM/yyyy`), `start_time–end_time`, horas, analista (`full_name`), descrição truncada (tooltip com texto completo).
-- Estado vazio: "Nenhum registro de horas para este ticket ainda."
-- Loading: skeleton compacto.
-- Ordenação: projetos ordenados por nome ("Sem projeto" por último); dentro do grupo, ordenar por `work_date desc, start_time desc`.
+### Fora de escopo
+- Sem alterações de schema, RLS ou edge functions.
+- Sem mudar regras de permissão (reusa `getTimeLogPermissions`, janela de 48h úteis, Super Admin/Tenant Admin sem restrição, Viewer sem edição).
+- Sem alterar a aba "Novo Registro".
 
-### 2. Novo hook: `src/hooks/useTicketTimeLogs.ts`
-Query React Query (`['ticket-time-logs', ticketId]`, enabled quando dialog aberto na aba Registros):
-
-```ts
-supabase
-  .from('ticket_time_logs')
-  .select('id, work_date, start_time, end_time, hours, description, project_id, analyst_id, client_projects(name, is_overtime), profiles:analyst_id(full_name)')
-  .eq('ticket_id', ticketId)
-  .order('work_date', { ascending: false })
-  .order('start_time', { ascending: false })
-```
-
-Retorna os logs já mapeados; agrupamento e somatório feitos em `useMemo` no componente.
-
-### 3. Refresh
-Ao salvar um novo registro (sucesso de `addTimeLog`), invalidar também `['ticket-time-logs', ticketId]` para a aba "Registros" refletir o novo lançamento sem fechar o diálogo. Hoje o diálogo fecha após o submit; vou manter esse comportamento, então basta invalidar a query (já reabre atualizado).
-
-## Fora de escopo
-
-- Não vou permitir editar/excluir registros pela aba (já existe fluxo dedicado em `useTimeLogMutations` / Meus Lançamentos).
-- Sem mudanças em schema, RLS, edge functions ou no fluxo do formulário existente.
-- Sem alterações em outras telas (Meus Lançamentos, relatórios).
-
-## Perguntas
-
-1. A aba de Registros deve mostrar lançamentos de **todos os analistas** desse ticket, ou apenas os do **usuário logado**? (Padrão sugerido: todos do ticket.)
-2. Posso permitir clicar em um registro para abrir o fluxo de edição existente (`Meus Lançamentos`)? Se sim, faria sentido só quando o registro for do próprio usuário e dentro da janela de 48h. Caso contrário, deixo somente leitura.
+### Perguntas
+1. Para registros bloqueados (fora de 48h ou de outro analista, sem ser admin), prefere **ocultar** os botões ou **mostrá-los desabilitados com tooltip explicando o motivo**?
