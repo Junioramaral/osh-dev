@@ -1,24 +1,36 @@
-## Habilitar edição de registros na aba "Registros"
+## Problema
 
-Adicionar ações de editar/excluir em cada item da aba "Registros" do `TimeLogDialog`, reusando o `TimeLogEditDialog` e `TimeLogDeleteDialog` já existentes, com permissões via `getTimeLogPermissions` (mesma regra de 48h úteis usada em "Meus Lançamentos").
+Nos emails de notificação, o texto do comentário/resolução está sendo enviado em uma única linha contínua em clientes desktop (Outlook). Causa: o template usa `style="white-space:pre-wrap"` para preservar `\n`, mas o Outlook (motor Word) ignora essa CSS — então todas as quebras de linha do comentário viram espaço.
 
-### Mudanças
+Adicionalmente, o conteúdo é interpolado cru no HTML (`${commentContent}`), o que pode quebrar o layout se o texto tiver `<`, `>` ou `&`, e representa um risco de injeção HTML.
 
-**`src/hooks/useTicketTimeLogs.ts`**
-- Incluir `logged_at` no select (necessário para a regra de 48h úteis).
-- Expor `logged_at` no tipo `TicketTimeLogRow`.
+## Solução
 
-**`src/components/tickets/TimeLogDialog.tsx`** (apenas o sub-componente `TicketTimeLogsHistory`)
-- Importar `TimeLogEditDialog`, `TimeLogDeleteDialog`, `getTimeLogPermissions`, `useAuth` e o role do usuário.
-- Para cada registro, calcular permissões com o usuário logado, role e `analyst_id`/`logged_at` do registro.
-- Renderizar dois botões discretos (ícones `Pencil` e `Trash2`, variant `ghost` `size="icon"`) à direita de cada linha, exibidos somente quando a permissão correspondente for verdadeira. Tooltip com o `reason` quando bloqueado é opcional — por simplicidade, apenas ocultar quando não permitido.
-- Estados locais `editingLog` e `deletingLog`; ao clicar, montar o payload esperado pelos dialogs existentes (id, hours, description, logged_at, ticketId, clientId, project_id, work_date, start_time, end_time).
-- Os dialogs já invalidam as queries de time logs via `useTimeLogMutations`; adicionar invalidação extra de `['ticket-time-logs', ticketId]` se necessário (verificar `useTimeLogMutations` — se não invalidar essa key, adicionar `queryClient.invalidateQueries` no `onSuccess` local após fechar o sub-dialog, ou invalidar manualmente no `TicketTimeLogsHistory` via efeito quando o dialog fechar).
+Em cada Edge Function que renderiza texto do usuário no email, fazer:
 
-### Fora de escopo
-- Sem alterações de schema, RLS ou edge functions.
-- Sem mudar regras de permissão (reusa `getTimeLogPermissions`, janela de 48h úteis, Super Admin/Tenant Admin sem restrição, Viewer sem edição).
-- Sem alterar a aba "Novo Registro".
+1. **Escapar HTML** (`&`, `<`, `>`, `"`, `'`) do conteúdo antes de injetar.
+2. **Converter quebras de linha** (`\r\n`, `\n`) para `<br>` — funciona em todos os clientes, incluindo Outlook.
+3. **Preservar parágrafos**: duas quebras seguidas viram separação de parágrafo.
+4. **Enviar versão texto puro** (`text:` no payload do Resend) com o conteúdo original sem HTML, para clientes que preferem `text/plain` e melhor entregabilidade.
 
-### Perguntas
-1. Para registros bloqueados (fora de 48h ou de outro analista, sem ser admin), prefere **ocultar** os botões ou **mostrá-los desabilitados com tooltip explicando o motivo**?
+Implementar uma pequena função utilitária `formatUserText(raw: string)` que retorna `{ html, text }` e usá-la nos três arquivos.
+
+## Arquivos afetados
+
+- `supabase/functions/send-comment-notification/index.ts` — comentário do analista para o cliente.
+- `supabase/functions/send-analyst-notification/index.ts` — comentário do cliente para o analista.
+- `supabase/functions/send-resolution-notification/index.ts` — motivo da resolução.
+
+Em cada um:
+- Adicionar `escapeHtml` + `nl2br` (inline, ~10 linhas).
+- Substituir `${commentContent}` / `${resolutionReason}` por `${escapeHtml(content).replace(/\r?\n/g, '<br>')}`.
+- Remover `white-space:pre-wrap` (deixa de ser necessário).
+- Adicionar `text:` ao payload `resend.emails.send` com o conteúdo cru.
+
+Após as edições, fazer deploy das três funções.
+
+## Fora de escopo
+
+- Nenhuma mudança de schema, RLS, frontend ou template visual.
+- Não mudar assunto, layout, cores ou cabeçalho dos emails.
+- Não tocar nos templates de auth/Lovable.
