@@ -916,25 +916,77 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
           {/* 1. Cliente (apenas para Otimizzo) */}
           {isOtimizzoTenant && (
-            <div className="space-y-2">
-              <Label htmlFor="client_id">Cliente *</Label>
-              <Select
-                value={watch("client_id")}
-                onValueChange={(value) => setValue("client_id", value)}
-                disabled={isAnalystOnly && (!analystQueues || analystQueues.length === 0)}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o cliente" />
-                </SelectTrigger>
-                <SelectContent>
-                  {filteredClients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="client_id">Cliente *</Label>
+                <Select
+                  value={watch("client_id")}
+                  onValueChange={(value) => setValue("client_id", value)}
+                  disabled={isAnalystOnly && (!analystQueues || analystQueues.length === 0)}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecione o cliente" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {filteredClients?.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                {errors.client_id && <p className="text-sm text-destructive">{errors.client_id.message}</p>}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="responsible_user_id">Usuário Responsável *</Label>
+                <Select
+                  value={selectedResponsibleUserId || ""}
+                  onValueChange={(value) => setValue("responsible_user_id", value)}
+                  disabled={!selectedClientId || !responsibleUsers || responsibleUsers.length === 0}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder={selectedClientId ? "Selecione o responsável" : "Escolha o cliente primeiro"}>
+                      {selectedResponsible
+                        ? `${selectedResponsible.full_name} (${selectedResponsible.email})`
+                        : undefined}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent>
+                    {otimizzoResponsibles.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>Otimizzo</SelectLabel>
+                        {otimizzoResponsibles.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            <span className="flex flex-col">
+                              <span>{u.full_name}</span>
+                              <span className="text-xs text-muted-foreground">{u.email}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                    {clientResponsibles.length > 0 && (
+                      <SelectGroup>
+                        <SelectLabel>
+                          {selectedClientData?.name || currentTenant?.name || "Cliente"}
+                        </SelectLabel>
+                        {clientResponsibles.map((u) => (
+                          <SelectItem key={u.id} value={u.id}>
+                            <span className="flex flex-col">
+                              <span>{u.full_name}</span>
+                              <span className="text-xs text-muted-foreground">{u.email}</span>
+                            </span>
+                          </SelectItem>
+                        ))}
+                      </SelectGroup>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-muted-foreground">
+                  O e-mail de resolução será enviado a este usuário; o criador Otimizzo entra em cópia (CC).
+                </p>
+              </div>
             </div>
           )}
 
