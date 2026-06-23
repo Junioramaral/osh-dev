@@ -117,6 +117,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const { register, handleSubmit, watch, setValue, reset, formState: { errors, isSubmitting } } = form;
 
   const selectedClientId = watch("client_id");
+  const selectedResponsibleUserId = watch("responsible_user_id");
   const selectedDbEngine = watch("db_engine");
   const selectedDbEnvironment = watch("db_environment");
   const selectedDbMachineId = watch("db_machine_id");
