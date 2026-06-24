@@ -22,7 +22,7 @@ const ENVIRONMENT_LABELS: Record<string, string> = {
   dev: "Desenvolvimento",
 };
 
-function formatEnvironment(env?: string | null) {
+export function formatEnvironment(env?: string | null) {
   if (!env) return env;
   return ENVIRONMENT_LABELS[env] ?? env;
 }

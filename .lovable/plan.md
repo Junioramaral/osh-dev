@@ -1,18 +1,15 @@
-## Exibir nome completo do ambiente em "Informações Técnicas"
+## Aplicar nome completo do ambiente na sidebar do ticket
 
 ### Problema
-Em `TicketDetails.tsx` (linhas 269 e 278), o campo "Ambiente" é renderizado direto a partir do valor do enum salvo no banco (`prod`, `hom`, `qa`, `dev`), aparecendo abreviado.
+Em `TicketSidebar.tsx` (linha 664), o campo "Ambiente" exibe o valor cru do enum (`prod`, `hom`, `qa`, `dev`), igual ao problema já corrigido em `TicketDetails.tsx`.
 
 ### Solução
-Criar uma função utilitária local `formatEnvironment(env)` que converta:
-- `prod` → "Produção"
-- `hom` → "Homologação"
-- `qa` → "QA"
-- `dev` → "Desenvolvimento"
-
-E aplicá-la nos dois `InfoRow` de Ambiente (DB e APP).
+1. Exportar `formatEnvironment` de `src/components/tickets/TicketDetails.tsx`.
+2. Importar `formatEnvironment` em `src/components/tickets/TicketSidebar.tsx`.
+3. Aplicá-lo no `InfoRow` de "Ambiente" (linha 664), convertendo `ticket.db_environment || ticket.app_environment` para o nome legível.
 
 ### Arquivos
-- `src/components/tickets/TicketDetails.tsx` — adicionar helper e usar nos dois pontos.
+- `src/components/tickets/TicketDetails.tsx` — adicionar `export` na função `formatEnvironment`.
+- `src/components/tickets/TicketSidebar.tsx` — importar e usar `formatEnvironment`.
 
-Observação: o valor permanece como enum no banco (sem alteração de schema). Apenas a exibição é traduzida.
+Nenhuma alteração de schema necessária — apenas exibição.

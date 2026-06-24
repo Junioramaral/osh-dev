@@ -28,6 +28,7 @@ import { TimeLogDialog } from "./TimeLogDialog";
 import { SLAAdjustDialog } from "./SLAAdjustDialog";
 import { SLARecalculatePromptDialog } from "./SLARecalculatePromptDialog";
 import TicketLinkedTicketsCard from "./TicketLinkedTicketsCard";
+import { formatEnvironment } from "./TicketDetails";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
@@ -661,7 +662,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
         </CardHeader>
         <CardContent className="space-y-3">
           <InfoRow label="Segmento" value={ticket.segment} />
-          <InfoRow label="Ambiente" value={ticket.db_environment || ticket.app_environment} />
+          <InfoRow label="Ambiente" value={formatEnvironment(ticket.db_environment || ticket.app_environment)} />
           {ticket.segment === 'DB' && (
             <>
               <InfoRow label="Engine" value={ticket.db_engine} />
