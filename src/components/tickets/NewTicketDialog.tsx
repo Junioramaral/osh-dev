@@ -245,6 +245,31 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     }
   }, [currentTenant, availableSegments, segment, reset, effectiveTenantId, analystSegmentForced, analystSegments]);
 
+  // Limpar formulário sempre que o diálogo for aberto, para evitar arrastar dados
+  // de um ticket anterior (que poderia ser de outro cliente ou outro problema).
+  useEffect(() => {
+    if (!open) return;
+    reset({
+      segment: analystSegmentForced
+        ? (analystSegments[0] ?? "DB")
+        : (availableSegments[0]?.code ?? "DB"),
+      client_id: analystSegmentForced ? "" : (effectiveTenantId || ""),
+      frequency: "pontual",
+      business_impact: "medio",
+      ticket_type: "incidente",
+      priority: "P4",
+      started_at: format(new Date(), "yyyy-MM-dd'T'HH:mm"),
+    });
+    setSegment(
+      analystSegmentForced
+        ? (analystSegments[0] ?? null)
+        : (availableSegments[0]?.code ?? null),
+    );
+    setUploadFiles([]);
+    form.clearErrors();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
+
   // Fetch clients
   const { data: clients } = useQuery({
     queryKey: ["clients"],

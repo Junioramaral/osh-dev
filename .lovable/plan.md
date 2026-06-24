@@ -1,21 +1,29 @@
-## Objetivo
-Melhorar os campos "Motivo da Abertura" e "Problema Enfrentado" no diálogo de Novo Ticket para permitir múltiplas linhas (ENTER) e quebra de texto automática, em vez do input de linha única atual.
+## Problema
 
-## Mudanças
+Após criar o ticket 00101015 e clicar em "Novo ticket", o formulário reabre com todos os campos preenchidos com os dados do ticket anterior. Isso é arriscado: o usuário pode acabar abrindo um ticket para outro cliente ou outro problema sem perceber.
 
-**Arquivo:** `src/components/tickets/NewTicketDialog.tsx` (linhas ~1540–1548)
+## Causa
 
-1. Trocar `<Input>` por `<Textarea>` nos dois campos.
-2. Configurar UX:
-   - `rows={3}` para Motivo da Abertura (texto curto, mas com espaço para 2–3 linhas).
-   - `rows={5}` para Problema Enfrentado (descrição mais longa).
-   - `maxLength={500}` em Motivo da Abertura e `maxLength={2000}` em Problema Enfrentado, com contador discreto abaixo (ex.: `120 / 500`).
-   - `className="resize-y"` para permitir o usuário aumentar manualmente se quiser.
-   - Placeholders atualizados sugerindo uso de múltiplas linhas (ex.: "Ex: Sistema fora do ar desde 09h, afetando o time de vendas...").
-3. Adicionar import de `Textarea` (se ainda não existir no arquivo).
-4. Schema Zod: adicionar `.max(500)` e `.max(2000)` correspondentes para validação consistente.
+Em `src/components/tickets/NewTicketDialog.tsx`:
+
+- O `useForm` mantém o estado entre aberturas (o componente não desmonta).
+- O `useEffect` que faz `reset(...)` só executa quando `segment === null`. Depois do primeiro ticket, `segment` já está preenchido, então o reset nunca acontece de novo.
+- O `onSubmit` fecha o diálogo (`onOpenChange(false)`) mas não limpa o formulário, anexos selecionados, categoria/subcategoria, contexto de cliente, etc.
+
+## Correção (apenas frontend, escopo do diálogo)
+
+Em `src/components/tickets/NewTicketDialog.tsx`:
+
+1. Adicionar um `useEffect` que dispara toda vez que `open` passa de `false` para `true` e:
+   - Chama `reset(...)` com os mesmos defaults usados na criação inicial (segment inicial do cliente atual, `client_id` = `effectiveTenantId` quando aplicável, `frequency: "pontual"`, `business_impact: "medio"`, `ticket_type: "incidente"`, `priority: "P4"`, `started_at` recalculado para "agora").
+   - Reseta estados locais relacionados: `segment` (volta a `null` para que o effect de inicialização escolha o segmento padrão do tenant/analista novamente), `uploadFiles` (`[]`), qualquer estado de categoria/subcategoria/contexto selecionado, e mensagens de erro do form (`form.clearErrors()`).
+2. Garantir que ao submeter com sucesso o formulário também seja limpo (chamar a mesma rotina de reset após `onOpenChange(false)`), para que mesmo se o componente permanecer montado o próximo open já comece limpo — defesa em profundidade.
+3. Respeitar regras existentes:
+   - Para analista (`analystSegmentForced`), manter `client_id` vazio após o reset (analista deve escolher cliente).
+   - Para usuário direto do cliente, preencher `client_id` com `effectiveTenantId`.
+   - Não alterar lógica de SLA, criação, validações Zod, ou qualquer comportamento de backend.
 
 ## Fora de escopo
-- Não altera o schema do banco (campos já são `text`).
-- Não altera a visualização em `TicketDetails.tsx` (já usa `whitespace-pre-wrap`, então as quebras de linha aparecerão corretamente).
-- Não mexe em e-mails nem em outras telas.
+
+- Nenhuma alteração em Edge Functions, schema, RLS, e-mails ou outros componentes.
+- Nenhuma mudança visual nos campos além da limpeza dos valores.
