@@ -327,21 +327,21 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
       
       if (data.isClientComment) {
         toast({ 
-          title: 'Comentário enviado',
+          title: 'Nota enviada',
           description: `O analista responsável será notificado${ccMessage}`
         });
       } else if (data.isExternal) {
         toast({ 
-          title: 'Comentário enviado e cliente notificado por email',
+          title: 'Nota enviada e cliente notificado por email',
           description: `O cliente receberá uma notificação sobre esta atualização${ccMessage}`
         });
       } else {
-        toast({ title: 'Comentário interno adicionado com sucesso' });
+        toast({ title: 'Nota interna adicionada com sucesso' });
       }
     },
     onError: (error: any) => {
       toast({ 
-        title: 'Erro ao adicionar comentário', 
+        title: 'Erro ao adicionar nota', 
         description: error.message,
         variant: 'destructive' 
       });
@@ -357,8 +357,8 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
     
     if (newComment.length > 10000) {
       toast({ 
-        title: 'Comentário muito longo', 
-        description: 'O comentário deve ter no máximo 10.000 caracteres',
+        title: 'Nota muito longa', 
+        description: 'A nota deve ter no máximo 10.000 caracteres',
         variant: 'destructive' 
       });
       return;
@@ -374,7 +374,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
       <div className="max-h-[500px] overflow-y-auto overflow-x-hidden w-full min-w-0 max-w-full pr-2">
         <div className="w-full min-w-0 max-w-full">
           {isLoading ? (
-            <p className="text-center text-muted-foreground py-8">Carregando comentários...</p>
+            <p className="text-center text-muted-foreground py-8">Carregando notas...</p>
           ) : comments && comments.length > 0 ? (
             comments.map((comment) => (
               <CommentCard
@@ -384,7 +384,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
               />
             ))
           ) : (
-            <p className="text-center text-muted-foreground py-8">Nenhum comentário ainda</p>
+            <p className="text-center text-muted-foreground py-8">Nenhuma nota ainda</p>
           )}
         </div>
       </div>
@@ -396,7 +396,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
             <Textarea
               value={newComment}
               onChange={(e) => setNewComment(e.target.value)}
-              placeholder="Adicionar comentário..."
+              placeholder="Adicionar nota..."
               className="min-h-[100px]"
               maxLength={10000}
             />
@@ -460,7 +460,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
               {!isClientUser && (
               <div className="flex items-center gap-2">
                 <Switch checked={isInternal} onCheckedChange={setIsInternal} id="internal" />
-                <Label htmlFor="internal" className="text-sm cursor-pointer">Comentário interno</Label>
+                <Label htmlFor="internal" className="text-sm cursor-pointer">Nota interna</Label>
                 <TooltipProvider>
                   <Tooltip>
                     <TooltipTrigger>
@@ -469,8 +469,8 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
                     <TooltipContent>
                       <p className="max-w-xs text-xs">
                         {isInternal 
-                          ? "🔒 O cliente NÃO receberá este comentário" 
-                          : "📧 O cliente receberá este comentário por email"}
+                          ? "🔒 O cliente NÃO receberá esta nota" 
+                          : "📧 O cliente receberá esta nota por email"}
                       </p>
                     </TooltipContent>
                   </Tooltip>
@@ -502,7 +502,7 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
       {isViewer && (
         <Card className="p-4 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30">
           <p className="text-sm text-purple-600 dark:text-purple-400 text-center">
-            Modo somente leitura (Auditor) - Você não pode adicionar comentários
+            Modo somente leitura (Auditor) - Você não pode adicionar notas
           </p>
         </Card>
       )}
