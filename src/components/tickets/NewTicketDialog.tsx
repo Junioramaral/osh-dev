@@ -43,8 +43,8 @@ const ticketSchema = z.object({
   priority: z.enum(["P1", "P2", "P3", "P4"]),
   category: z.string().min(1, "Categoria é obrigatória"),
   subcategory: z.string().optional(),
-  opening_reason: z.string().min(1, "Motivo da abertura é obrigatório"),
-  problem_faced: z.string().min(1, "Problema enfrentado é obrigatório"),
+  opening_reason: z.string().min(1, "Motivo da abertura é obrigatório").max(500, "Máximo 500 caracteres"),
+  problem_faced: z.string().min(1, "Problema enfrentado é obrigatório").max(2000, "Máximo 2000 caracteres"),
   error_displayed: z.string().optional(),
   started_at: z.string().min(1, "Data de início é obrigatória"),
   frequency: z.enum(["pontual", "intermitente", "continuo"]),
@@ -1538,14 +1538,42 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             <div className="space-y-4">
               <div className="space-y-2">
                 <Label htmlFor="opening_reason">Motivo da Abertura *</Label>
-                <Input {...register("opening_reason")} placeholder="Ex: Sistema fora do ar" />
-                {errors.opening_reason && <p className="text-sm text-destructive">{errors.opening_reason.message}</p>}
+                <Textarea
+                  id="opening_reason"
+                  {...register("opening_reason")}
+                  placeholder={"Ex: Sistema fora do ar desde 09h\nUsuários do time de vendas impactados"}
+                  rows={3}
+                  maxLength={500}
+                  className="resize-y"
+                />
+                <div className="flex justify-between items-center">
+                  {errors.opening_reason ? (
+                    <p className="text-sm text-destructive">{errors.opening_reason.message}</p>
+                  ) : <span />}
+                  <span className="text-xs text-muted-foreground">
+                    {(watch("opening_reason")?.length ?? 0)} / 500
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-2">
                 <Label htmlFor="problem_faced">Problema Enfrentado *</Label>
-                <Input {...register("problem_faced")} placeholder="Descreva o problema" />
-                {errors.problem_faced && <p className="text-sm text-destructive">{errors.problem_faced.message}</p>}
+                <Textarea
+                  id="problem_faced"
+                  {...register("problem_faced")}
+                  placeholder={"Descreva o problema com detalhes.\nUse ENTER para separar parágrafos e organizar a leitura."}
+                  rows={5}
+                  maxLength={2000}
+                  className="resize-y"
+                />
+                <div className="flex justify-between items-center">
+                  {errors.problem_faced ? (
+                    <p className="text-sm text-destructive">{errors.problem_faced.message}</p>
+                  ) : <span />}
+                  <span className="text-xs text-muted-foreground">
+                    {(watch("problem_faced")?.length ?? 0)} / 2000
+                  </span>
+                </div>
               </div>
 
               <div className="space-y-2">
