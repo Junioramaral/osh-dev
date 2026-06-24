@@ -1,0 +1,1 @@
+UPDATE public.tickets SET faq_article_id = NULL WHERE ticket_number = '00101016';
