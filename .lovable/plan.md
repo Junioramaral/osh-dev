@@ -1,36 +1,21 @@
-## Problema
+## Objetivo
+Melhorar os campos "Motivo da Abertura" e "Problema Enfrentado" no diálogo de Novo Ticket para permitir múltiplas linhas (ENTER) e quebra de texto automática, em vez do input de linha única atual.
 
-Nos emails de notificação, o texto do comentário/resolução está sendo enviado em uma única linha contínua em clientes desktop (Outlook). Causa: o template usa `style="white-space:pre-wrap"` para preservar `\n`, mas o Outlook (motor Word) ignora essa CSS — então todas as quebras de linha do comentário viram espaço.
+## Mudanças
 
-Adicionalmente, o conteúdo é interpolado cru no HTML (`${commentContent}`), o que pode quebrar o layout se o texto tiver `<`, `>` ou `&`, e representa um risco de injeção HTML.
+**Arquivo:** `src/components/tickets/NewTicketDialog.tsx` (linhas ~1540–1548)
 
-## Solução
-
-Em cada Edge Function que renderiza texto do usuário no email, fazer:
-
-1. **Escapar HTML** (`&`, `<`, `>`, `"`, `'`) do conteúdo antes de injetar.
-2. **Converter quebras de linha** (`\r\n`, `\n`) para `<br>` — funciona em todos os clientes, incluindo Outlook.
-3. **Preservar parágrafos**: duas quebras seguidas viram separação de parágrafo.
-4. **Enviar versão texto puro** (`text:` no payload do Resend) com o conteúdo original sem HTML, para clientes que preferem `text/plain` e melhor entregabilidade.
-
-Implementar uma pequena função utilitária `formatUserText(raw: string)` que retorna `{ html, text }` e usá-la nos três arquivos.
-
-## Arquivos afetados
-
-- `supabase/functions/send-comment-notification/index.ts` — comentário do analista para o cliente.
-- `supabase/functions/send-analyst-notification/index.ts` — comentário do cliente para o analista.
-- `supabase/functions/send-resolution-notification/index.ts` — motivo da resolução.
-
-Em cada um:
-- Adicionar `escapeHtml` + `nl2br` (inline, ~10 linhas).
-- Substituir `${commentContent}` / `${resolutionReason}` por `${escapeHtml(content).replace(/\r?\n/g, '<br>')}`.
-- Remover `white-space:pre-wrap` (deixa de ser necessário).
-- Adicionar `text:` ao payload `resend.emails.send` com o conteúdo cru.
-
-Após as edições, fazer deploy das três funções.
+1. Trocar `<Input>` por `<Textarea>` nos dois campos.
+2. Configurar UX:
+   - `rows={3}` para Motivo da Abertura (texto curto, mas com espaço para 2–3 linhas).
+   - `rows={5}` para Problema Enfrentado (descrição mais longa).
+   - `maxLength={500}` em Motivo da Abertura e `maxLength={2000}` em Problema Enfrentado, com contador discreto abaixo (ex.: `120 / 500`).
+   - `className="resize-y"` para permitir o usuário aumentar manualmente se quiser.
+   - Placeholders atualizados sugerindo uso de múltiplas linhas (ex.: "Ex: Sistema fora do ar desde 09h, afetando o time de vendas...").
+3. Adicionar import de `Textarea` (se ainda não existir no arquivo).
+4. Schema Zod: adicionar `.max(500)` e `.max(2000)` correspondentes para validação consistente.
 
 ## Fora de escopo
-
-- Nenhuma mudança de schema, RLS, frontend ou template visual.
-- Não mudar assunto, layout, cores ou cabeçalho dos emails.
-- Não tocar nos templates de auth/Lovable.
+- Não altera o schema do banco (campos já são `text`).
+- Não altera a visualização em `TicketDetails.tsx` (já usa `whitespace-pre-wrap`, então as quebras de linha aparecerão corretamente).
+- Não mexe em e-mails nem em outras telas.
