@@ -1,28 +1,29 @@
-## Tornar o Dialog de Resolver Ticket mais responsivo e organizado
+## Corrigir herança de FAQ (e outros campos) entre criações de ticket
 
-### Problema
-O dialog "Resolver Ticket" (`TicketResolveDialog`) está com layout apertado: o título do ticket é cortado, a largura máxima de `600px` é insuficiente para o conteúdo (lista de tickets vinculáveis + texto de resolução), e o visual fica "bagunçado" em telas menores.
+### Causa raiz
+No `NewTicketDialog.tsx`, o `useEffect` que roda quando o diálogo abre (linhas 250-271) chama `reset({...})` apenas com os campos básicos. Campos opcionais que ficaram preenchidos do ticket anterior — em especial `faq_article_id` — não são limpos, ficam no estado do form e são gravados no novo ticket. Isso explica o 00101016 aparecer vinculado à FAQ do 00101015.
 
-### Alterações propostas
+### Correção
+Incluir explicitamente todos os campos opcionais no `reset` do `useEffect` de abertura, deixando-os como `null`/`undefined`/`""` conforme o esquema:
 
-1. **Aumentar a largura do dialog**
-   - Trocar `sm:max-w-[600px]` para `sm:max-w-[750px]` (ou `sm:max-w-[800px]`) no `DialogContent` para dar mais respiro ao conteúdo.
+- `faq_article_id: null`
+- `title: ""`, `description: ""`, `opening_reason: ""`, `problem_faced: ""`
+- `contact_name: ""`, `contact_email: ""`, `contact_phone: ""`
+- `responsible_user_id: undefined`
+- `category_id: undefined`, `subcategory_id: undefined`
+- `db_engine: undefined`, `db_environment: undefined`, `db_machine_id: undefined`, `db_name: ""`
+- `app_product_id: undefined`, `app_environment: undefined`, `app_machine_id: undefined`, `app_instance_id: undefined`
+- Qualquer outro campo opcional usado no schema
 
-2. **Melhorar o header com título longo**
-   - O título do ticket (`ticket.title`) na seção de info está com `truncate`, o que esconde texto. Em vez de truncar numa única linha, permitir quebra de linha (`break-words` ou `whitespace-normal`) ou limitar a altura com scroll se for muito longo.
+Também resetar estados auxiliares já presentes (`setUploadFiles([])`) — já feito — e garantir que `setSegment` seja chamado.
 
-3. **Responsividade em telas pequenas**
-   - Garantir que o `DialogContent` use `max-w-[95vw]` ou similar em telas abaixo de `sm`, para não haver overflow horizontal.
-   - Verificar se o campo de busca e a lista de tickets vinculáveis se adaptam corretamente à largura reduzida.
+### Limpeza de dados existente (opcional, separado)
+O ticket 00101016 já está com FAQ vinculada indevidamente. Posso (se você confirmar) executar um `UPDATE tickets SET faq_article_id = NULL WHERE ticket_number = '00101016'` para remover a vinculação fantasma desse ticket específico. Outros tickets criados após implantar o `useEffect` de reset (antes desta correção) podem ter o mesmo problema; se quiser, posso listar candidatos antes.
 
-4. **Ajustes visuais na lista de tickets**
-   - Garantir que badges e datas na lista de tickets não forcem quebra estranha.
-   - Verificar espaçamentos internos (`p-2`, `gap-2`) para que não fique amontoado.
+### Arquivos a alterar
+- `src/components/tickets/NewTicketDialog.tsx` — expandir o objeto passado ao `reset(...)` dentro do `useEffect([open])`.
 
-### Arquivos a modificar
-- `src/components/tickets/TicketResolveDialog.tsx`
-
-### Testes
-- Abrir o dialog em diferentes larguras de viewport (mobile, tablet, desktop).
-- Verificar que o título do ticket não é cortado de forma abrupta.
-- Verificar que não há scroll horizontal e que o conteúdo se adapta.
+### Teste manual
+1. Criar ticket selecionando uma FAQ.
+2. Abrir "Novo ticket" novamente — confirmar que o `FAQSelector` aparece vazio e que o ticket criado salva `faq_article_id = null`.
+3. Repetir alternando cliente/segmento.
