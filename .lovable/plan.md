@@ -1,29 +1,28 @@
-## Problema
+## Tornar o Dialog de Resolver Ticket mais responsivo e organizado
 
-Após criar o ticket 00101015 e clicar em "Novo ticket", o formulário reabre com todos os campos preenchidos com os dados do ticket anterior. Isso é arriscado: o usuário pode acabar abrindo um ticket para outro cliente ou outro problema sem perceber.
+### Problema
+O dialog "Resolver Ticket" (`TicketResolveDialog`) está com layout apertado: o título do ticket é cortado, a largura máxima de `600px` é insuficiente para o conteúdo (lista de tickets vinculáveis + texto de resolução), e o visual fica "bagunçado" em telas menores.
 
-## Causa
+### Alterações propostas
 
-Em `src/components/tickets/NewTicketDialog.tsx`:
+1. **Aumentar a largura do dialog**
+   - Trocar `sm:max-w-[600px]` para `sm:max-w-[750px]` (ou `sm:max-w-[800px]`) no `DialogContent` para dar mais respiro ao conteúdo.
 
-- O `useForm` mantém o estado entre aberturas (o componente não desmonta).
-- O `useEffect` que faz `reset(...)` só executa quando `segment === null`. Depois do primeiro ticket, `segment` já está preenchido, então o reset nunca acontece de novo.
-- O `onSubmit` fecha o diálogo (`onOpenChange(false)`) mas não limpa o formulário, anexos selecionados, categoria/subcategoria, contexto de cliente, etc.
+2. **Melhorar o header com título longo**
+   - O título do ticket (`ticket.title`) na seção de info está com `truncate`, o que esconde texto. Em vez de truncar numa única linha, permitir quebra de linha (`break-words` ou `whitespace-normal`) ou limitar a altura com scroll se for muito longo.
 
-## Correção (apenas frontend, escopo do diálogo)
+3. **Responsividade em telas pequenas**
+   - Garantir que o `DialogContent` use `max-w-[95vw]` ou similar em telas abaixo de `sm`, para não haver overflow horizontal.
+   - Verificar se o campo de busca e a lista de tickets vinculáveis se adaptam corretamente à largura reduzida.
 
-Em `src/components/tickets/NewTicketDialog.tsx`:
+4. **Ajustes visuais na lista de tickets**
+   - Garantir que badges e datas na lista de tickets não forcem quebra estranha.
+   - Verificar espaçamentos internos (`p-2`, `gap-2`) para que não fique amontoado.
 
-1. Adicionar um `useEffect` que dispara toda vez que `open` passa de `false` para `true` e:
-   - Chama `reset(...)` com os mesmos defaults usados na criação inicial (segment inicial do cliente atual, `client_id` = `effectiveTenantId` quando aplicável, `frequency: "pontual"`, `business_impact: "medio"`, `ticket_type: "incidente"`, `priority: "P4"`, `started_at` recalculado para "agora").
-   - Reseta estados locais relacionados: `segment` (volta a `null` para que o effect de inicialização escolha o segmento padrão do tenant/analista novamente), `uploadFiles` (`[]`), qualquer estado de categoria/subcategoria/contexto selecionado, e mensagens de erro do form (`form.clearErrors()`).
-2. Garantir que ao submeter com sucesso o formulário também seja limpo (chamar a mesma rotina de reset após `onOpenChange(false)`), para que mesmo se o componente permanecer montado o próximo open já comece limpo — defesa em profundidade.
-3. Respeitar regras existentes:
-   - Para analista (`analystSegmentForced`), manter `client_id` vazio após o reset (analista deve escolher cliente).
-   - Para usuário direto do cliente, preencher `client_id` com `effectiveTenantId`.
-   - Não alterar lógica de SLA, criação, validações Zod, ou qualquer comportamento de backend.
+### Arquivos a modificar
+- `src/components/tickets/TicketResolveDialog.tsx`
 
-## Fora de escopo
-
-- Nenhuma alteração em Edge Functions, schema, RLS, e-mails ou outros componentes.
-- Nenhuma mudança visual nos campos além da limpeza dos valores.
+### Testes
+- Abrir o dialog em diferentes larguras de viewport (mobile, tablet, desktop).
+- Verificar que o título do ticket não é cortado de forma abrupta.
+- Verificar que não há scroll horizontal e que o conteúdo se adapta.

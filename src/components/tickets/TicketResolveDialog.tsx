@@ -90,7 +90,7 @@ export function TicketResolveDialog({
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[95vw] sm:max-w-[750px] max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <CheckCircle className="h-5 w-5 text-green-600" />
@@ -104,9 +104,9 @@ export function TicketResolveDialog({
         <div className="space-y-4 py-4">
           {/* Ticket Info */}
           <div className="bg-muted/50 p-3 rounded-lg space-y-1">
-            <div className="flex items-center gap-2">
-              <Badge variant="outline">#{ticket.ticket_number}</Badge>
-              <span className="text-sm font-medium truncate">{ticket.title}</span>
+            <div className="flex items-start gap-2 flex-wrap">
+              <Badge variant="outline" className="shrink-0">#{ticket.ticket_number}</Badge>
+              <span className="text-sm font-medium break-words min-w-0 flex-1">{ticket.title}</span>
             </div>
             <p className="text-xs text-muted-foreground">
               Contato: {ticket.contact_name}
