@@ -94,7 +94,7 @@ export default function TicketDetail() {
                 {isRFC && <TabsTrigger value="rfc">RFC</TabsTrigger>}
                 <TabsTrigger value="timeline">Timeline</TabsTrigger>
                 <TabsTrigger value="comments">
-                  Comentários {comments && comments.length > 0 ? `(${comments.length})` : ''}
+                  Notas {comments && comments.length > 0 ? `(${comments.length})` : ''}
                 </TabsTrigger>
                 <TabsTrigger value="attachments">Anexos</TabsTrigger>
                 {showReportTab && <TabsTrigger value="report">Relatório</TabsTrigger>}
