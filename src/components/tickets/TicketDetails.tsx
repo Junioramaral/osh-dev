@@ -15,6 +15,18 @@ interface TicketDetailsProps {
   ticket: any;
 }
 
+const ENVIRONMENT_LABELS: Record<string, string> = {
+  prod: "Produção",
+  hom: "Homologação",
+  qa: "QA",
+  dev: "Desenvolvimento",
+};
+
+function formatEnvironment(env?: string | null) {
+  if (!env) return env;
+  return ENVIRONMENT_LABELS[env] ?? env;
+}
+
 function InfoRow({ label, value }: { label: string; value: any }) {
   if (!value) return null;
   return (
@@ -266,7 +278,7 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
               <>
                 <InfoRow label="Engine" value={ticket.db_engine} />
                 <InfoRow label="Instância" value={ticket.database_instances?.instance_name} />
-                <InfoRow label="Ambiente" value={ticket.db_environment} />
+                <InfoRow label="Ambiente" value={formatEnvironment(ticket.db_environment)} />
                 <InfoRow label="Máquina" value={ticket.db_machine?.hostname} />
               </>
             )}
@@ -275,7 +287,7 @@ export default function TicketDetails({ ticket }: TicketDetailsProps) {
                 <InfoRow label="Produto" value={ticket.application_products?.name} />
                 <InfoRow label="Versão" value={ticket.app_version} />
                 <InfoRow label="Módulo" value={ticket.app_module} />
-                <InfoRow label="Ambiente" value={ticket.app_environment} />
+                <InfoRow label="Ambiente" value={formatEnvironment(ticket.app_environment)} />
                 <InfoRow label="Máquina" value={ticket.app_machine?.hostname} />
               </>
             )}
