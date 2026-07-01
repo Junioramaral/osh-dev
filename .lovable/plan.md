@@ -1,34 +1,16 @@
-## Renomear "Comentários" → "Notas" na aba do ticket
+## Problema
+O diálogo "Registrar Horas Trabalhadas" está com `sm:max-w-lg` (~512px), o que corta as abas "Novo Registro/Registros", força truncamento no título, e provoca scroll horizontal na aba Registros (datas/horários/descrições grandes ficam apertados numa coluna estreita).
 
-### Escopo
-Apenas a UI da aba de comentários do ticket. Emails, RFC, CSAT e relatórios permanecem com "Comentário(s)".
+## Solução
+Ajustar apenas o `DialogContent` e alguns detalhes de layout interno em `src/components/tickets/TimeLogDialog.tsx`:
 
-### Alterações
+1. **Largura do diálogo**: trocar `sm:max-w-lg` por `w-[95vw] sm:max-w-3xl` (mesmo padrão já usado no `TicketResolveDialog`), permitindo até ~768px em telas normais e ocupando 95% em mobile.
+2. **Título/descrição**: permitir quebra de linha no título do ticket (`break-words`) para eliminar o truncamento visível no print.
+3. **Aba "Registros"**:
+   - Aumentar o `max-h` do ScrollArea de 360px para algo como `max-h-[55vh]` aproveitando a altura extra.
+   - Garantir `min-w-0` e `break-words` nas linhas de descrição/ticket para evitar overflow horizontal.
+4. **Aba "Novo Registro"**: manter o grid de 2 colunas já existente (data/hora), sem mudanças funcionais.
 
-**`src/pages/TicketDetail.tsx`** (linha 97)
-- Título da aba: `Comentários (n)` → `Notas (n)`
-
-**`src/components/tickets/TicketComments.tsx`**
-- Estados vazios/loading:
-  - "Carregando comentários..." → "Carregando notas..."
-  - "Nenhum comentário ainda" → "Nenhuma nota ainda"
-- Placeholder do textarea: "Adicionar comentário..." → "Adicionar nota..."
-- Label do checkbox: "Comentário interno" → "Nota interna"
-- Mensagens de ajuda do checkbox:
-  - "🔒 O cliente NÃO receberá este comentário" → "🔒 O cliente NÃO receberá esta nota"
-  - "📧 O cliente receberá este comentário por email" → "📧 O cliente receberá esta nota por email"
-- Toasts:
-  - "Comentário enviado" → "Nota enviada"
-  - "Comentário enviado e cliente notificado por email" → "Nota enviada e cliente notificado por email"
-  - "Comentário interno adicionado com sucesso" → "Nota interna adicionada com sucesso"
-  - "Erro ao adicionar comentário" → "Erro ao adicionar nota"
-  - "Comentário muito longo" + descrição "O comentário deve ter no máximo 10.000 caracteres" → "Nota muito longa" / "A nota deve ter no máximo 10.000 caracteres"
-- Mensagem do viewer: "Você não pode adicionar comentários" → "Você não pode adicionar notas"
-
-### Fora do escopo (mantém "Comentário")
-- Emails (`send-comment-notification`, `send-rfc-decision-notification`)
-- RFC approval (`RFCApproval.tsx`)
-- CSAT (`CSATSatisfactionReport.tsx`, `CSATDashboard.tsx`)
-- Relatórios de tenant (`TenantUserReport.tsx`)
-- Textos de outras telas (Index, Reports, DeleteTicketDialog, TicketTimeline, TicketAttachments, hooks de bulk, etc.)
-- Nomes de variáveis, tabelas e logs no código (apenas strings de UI são alteradas)
+## Fora do escopo
+- Nenhuma mudança em regras de negócio, permissões, mutations ou hooks.
+- Nenhuma alteração em outros diálogos.
