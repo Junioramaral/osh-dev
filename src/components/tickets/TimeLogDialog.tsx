@@ -158,13 +158,13 @@ export function TimeLogDialog({ open, onOpenChange, ticket }: TimeLogDialogProps
 
   return (
     <Dialog open={open} onOpenChange={handleOpenChange}>
-      <DialogContent className="sm:max-w-lg">
+      <DialogContent className="w-[95vw] sm:max-w-3xl">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Clock className="h-5 w-5 text-primary" />
             Registrar Horas Trabalhadas
           </DialogTitle>
-          <DialogDescription>
+          <DialogDescription className="break-words">
             Ticket #{ticket.ticket_number} - {ticket.title}
           </DialogDescription>
         </DialogHeader>
@@ -436,7 +436,7 @@ function TicketTimeLogsHistory({
         <span className="text-lg font-bold text-primary">{total.toFixed(1)} horas</span>
       </div>
 
-      <ScrollArea className="max-h-[360px] pr-2">
+      <ScrollArea className="max-h-[55vh] pr-2">
         <div className="space-y-3">
           {grouped.map((group) => (
             <div key={group.key} className="border rounded-lg overflow-hidden">
@@ -464,9 +464,9 @@ function TicketTimeLogsHistory({
                     isViewer,
                   );
                   return (
-                    <li key={log.id} className="px-3 py-2 text-sm">
-                      <div className="flex items-center justify-between gap-2">
-                        <div className="flex items-center gap-2 text-muted-foreground">
+                    <li key={log.id} className="px-3 py-2 text-sm min-w-0">
+                      <div className="flex items-center justify-between gap-2 min-w-0">
+                        <div className="flex items-center gap-2 text-muted-foreground min-w-0">
                           <span className="font-medium text-foreground">
                             {format(new Date(log.work_date + "T00:00:00"), "dd/MM/yyyy")}
                           </span>
@@ -504,7 +504,7 @@ function TicketTimeLogsHistory({
                           )}
                         </div>
                       </div>
-                      <div className="text-xs text-muted-foreground mt-0.5 truncate">
+                      <div className="text-xs text-muted-foreground mt-0.5 break-words">
                         {log.analyst_name}
                         {log.description ? ` • ${log.description}` : ""}
                       </div>
