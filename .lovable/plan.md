@@ -1,10 +1,15 @@
-## Permitir qualquer tipo de arquivo no upload
+## Problema
+O bucket `tickets` no Supabase Storage tem uma lista restrita de `allowed_mime_types` (jpeg, png, pdf, docx, etc). Arquivos como `.sql` chegam como `application/octet-stream` e são bloqueados pelo Storage — daí o erro `mime type application/octet-stream is not supported`. A validação foi removida no frontend, mas o bloqueio real acontece no backend.
 
-O componente `FileUploadZone` (usado na abertura do chamado, comentários e anexos) bloqueia extensões como `.sql` por causa de uma lista fixa de MIME types (`allowedTypes`). Vou remover essa restrição.
+## Correção
+Criar uma migration que remove a restrição de MIME types do bucket `tickets`, permitindo qualquer tipo de arquivo (mantendo o limite de tamanho de 10MB e as RLS existentes de isolamento por tenant).
 
-### Alterações em `src/components/tickets/FileUploadZone.tsx`
+```sql
+UPDATE storage.buckets
+SET allowed_mime_types = NULL
+WHERE id = 'tickets';
+```
 
-1. **Remover a checagem `allowedTypes`** dentro de `validateFile`. Mantém apenas a validação de tamanho (`maxSizeMB`).
-2. **Atualizar o `<input type="file">`**: trocar `accept="image/*,.pdf,.doc,..."` por `accept="*/*"` para que o seletor do sistema mostre todos os arquivos.
-
-Nenhuma outra lógica muda: compressão de imagens continua só para `file.type.startsWith("image/")`, limites de quantidade/tamanho permanecem, e os componentes que usam o Zone (`NewTicketDialog`, `TicketAttachments`, etc.) não precisam de ajuste.
+## Escopo
+- 1 arquivo novo: `supabase/migrations/<timestamp>_allow_any_mime_tickets_bucket.sql`
+- Nenhuma alteração de RLS, tamanho, ou código frontend.
