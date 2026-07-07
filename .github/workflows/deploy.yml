@@ -13,7 +13,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout do código
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
+
+      - name: Configurar Node.js 20
+        uses: actions/setup-node@v6
+        with:
+          node-version: '20'
+          cache: 'npm'          # Cacheia node_modules entre execuções, acelera o build
 
       - name: Instalar Vercel CLI
         run: npm install --global vercel@latest
