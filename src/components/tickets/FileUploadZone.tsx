@@ -90,25 +90,6 @@ export function FileUploadZone({
     if (file.size > maxSizeMB * 1024 * 1024) {
       return `Arquivo muito grande. Máximo: ${maxSizeMB}MB`;
     }
-
-    const allowedTypes = [
-      "image/jpeg",
-      "image/png",
-      "image/gif",
-      "image/webp",
-      "application/pdf",
-      "application/msword",
-      "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-      "application/vnd.ms-excel",
-      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-      "text/plain",
-      "text/csv",
-    ];
-
-    if (!allowedTypes.includes(file.type)) {
-      return "Tipo de arquivo não permitido";
-    }
-
     return null;
   };
 
@@ -237,7 +218,7 @@ export function FileUploadZone({
           type="file"
           id="file-upload"
           multiple
-          accept="image/*,.pdf,.doc,.docx,.xls,.xlsx,.txt,.csv"
+          accept="*/*"
           onChange={handleFileInput}
           className="hidden"
           disabled={files.length >= maxFiles}
