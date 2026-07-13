@@ -7,11 +7,13 @@
 -- "up". Rodar manualmente (psql ou SQL editor do Supabase) só se precisar
 -- reverter.
 --
--- Seguro rodar SOMENTE enquanto nenhuma outra tabela referenciar `tenants`
--- além de `clients` (via clients_tenant_id_fkey, removida no passo 1
--- abaixo). A migration 016 do plano vai introduzir outras referências
--- (ex: tenant_users) — depois disso, este rollback deixa de ser seguro
--- como está e precisa ser revisado.
+-- NÃO É MAIS SEGURO rodar isso isoladamente: a migration 016
+-- (supabase/migrations/20260714120000_create_tenant_client_users.sql)
+-- criou `tenant_users`, que também referencia `tenants` via FK. Reverter
+-- este arquivo sem antes reverter a 016 deixa `tenant_users` órfã e
+-- rows do tenant Otimizzo perdidos de vínculo. Ordem correta: rodar o
+-- down da 016 primeiro (supabase/migrations_rollback/20260714120000_create_tenant_client_users_down.sql),
+-- só depois este.
 
 -- 1. Remove a FK antes de poder dropar a coluna
 ALTER TABLE public.clients DROP CONSTRAINT IF EXISTS clients_tenant_id_fkey;
