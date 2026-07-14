@@ -36,6 +36,19 @@ Nunca usar `OR is_platform_admin()` em policies RLS de tabelas
 operacionais (clients, tickets, teams, queues, projects, SLA,
 auditoria, FAQ, CSAT, RFC). Ver skill `rls-policy` e `tenant-audit`.
 
+**Lista fechada de exceções onde o bypass `OR is_platform_admin()` é
+válido** — só estas 3 tabelas, nenhuma outra sem nova decisão
+documentada aqui:
+1. `tenants` — o Super Admin precisa enxergar todos os tenants pra
+   operar a plataforma
+2. `platform_admins` — a própria lista de quem é Super Admin
+3. `tenant_users` — dado estrutural/administrativo de tenant (quem tem
+   acesso a qual tenant e com qual papel), não dado operacional do
+   negócio do tenant
+
+Nenhuma outra tabela (clients, tickets, teams, queues, projects, SLA,
+auditoria, FAQ, CSAT, RFC, `client_users`, etc.) deve usar esse bypass.
+
 ### ⚠️ Regra crítica #2 — otimizzo.com tem dupla identidade
 A otimizzo.com é, ao mesmo tempo:
 1. **Super Admin da plataforma** — via linha em `platform_admins`
