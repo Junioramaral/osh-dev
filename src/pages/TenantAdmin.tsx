@@ -57,6 +57,7 @@ export default function TenantAdmin() {
       const { data, error } = await supabase
         .from("clients")
         .select("*")
+        .is("deleted_at", null)
         .order("created_at", { ascending: false });
 
       if (error) throw error;
@@ -200,7 +201,7 @@ export default function TenantAdmin() {
     }
   };
 
-  const deleteTenantMutation = useMutation({
+  const softDeleteTenantMutation = useMutation({
     mutationFn: async (tenantId: string) => {
       // 1. Buscar todos os profiles associados ao tenant
       const { data: profiles, error: profilesError } = await supabase
@@ -239,10 +240,10 @@ export default function TenantAdmin() {
 
       if (rolesError) console.error("Erro ao deletar user_roles:", rolesError);
 
-      // 4. Deletar o tenant (CASCADE irá deletar o resto)
+      // 4. Desativar o tenant permanentemente (soft delete via deleted_at)
       const { error: deleteError } = await supabase
         .from("clients")
-        .delete()
+        .update({ deleted_at: new Date().toISOString() })
         .eq("id", tenantId);
 
       if (deleteError) throw deleteError;
@@ -250,14 +251,14 @@ export default function TenantAdmin() {
       return { tenantId, deletedUsers: deletedUsersCount };
     },
     onSuccess: (data) => {
-      toast.success("Tenant removido com sucesso", {
-        description: `Tenant e ${data.deletedUsers} usuário(s) foram deletados permanentemente.`,
+      toast.success("Tenant desativado permanentemente", {
+        description: `Tenant desativado e ${data.deletedUsers} usuário(s) foram deletados permanentemente.`,
       });
       queryClient.invalidateQueries({ queryKey: ["tenants"] });
       queryClient.invalidateQueries({ queryKey: ["clients"] });
     },
     onError: (error: any) => {
-      toast.error("Erro ao remover tenant", {
+      toast.error("Erro ao desativar tenant", {
         description: error.message,
       });
     },
@@ -292,7 +293,7 @@ export default function TenantAdmin() {
       return;
     }
 
-    await deleteTenantMutation.mutateAsync(tenantToDelete.id);
+    await softDeleteTenantMutation.mutateAsync(tenantToDelete.id);
     setIsDeleteDialogOpen(false);
     setTenantToDelete(null);
     setConfirmText("");
@@ -551,22 +552,19 @@ export default function TenantAdmin() {
           <AlertDialogHeader>
             <AlertDialogTitle className="flex items-center gap-2 text-destructive">
               <AlertTriangle className="h-5 w-5" />
-              Confirmar Remoção de Tenant
+              Confirmar Desativação Permanente de Tenant
             </AlertDialogTitle>
             <AlertDialogDescription className="space-y-3">
               <p className="font-semibold text-foreground">
-                Você está prestes a remover o tenant "{tenantToDelete?.name}".
+                Você está prestes a desativar permanentemente o tenant "{tenantToDelete?.name}".
               </p>
-              
+
               <div className="bg-destructive/10 border border-destructive/30 rounded-md p-3 space-y-2">
-                <p className="font-medium text-destructive text-sm">⚠️ Esta ação é IRREVERSÍVEL e irá deletar:</p>
+                <p className="font-medium text-destructive text-sm">⚠️ Esta ação é IRREVERSÍVEL e irá:</p>
                 <ul className="text-xs space-y-1 text-muted-foreground ml-4">
-                  <li>• Todos os tickets do tenant</li>
-                  <li>• Todas as máquinas cadastradas</li>
-                  <li>• Todas as instâncias de banco de dados</li>
-                  <li>• Todas as instâncias de aplicação</li>
-                  <li>• Todos os contatos cadastrados</li>
-                  <li>• Todas as associações de usuários (roles)</li>
+                  <li>• Desativar permanentemente o tenant (some das listagens, mas os dados permanecem no banco)</li>
+                  <li>• Deletar todas as contas de usuário do Auth vinculadas</li>
+                  <li>• Deletar todas as associações de usuários (roles)</li>
                 </ul>
               </div>
 
@@ -584,14 +582,14 @@ export default function TenantAdmin() {
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleteTenantMutation.isPending}>Cancelar</AlertDialogCancel>
+            <AlertDialogCancel disabled={softDeleteTenantMutation.isPending}>Cancelar</AlertDialogCancel>
             <Button
               variant="destructive"
               onClick={handleConfirmDelete}
-              disabled={confirmText !== tenantToDelete?.name || deleteTenantMutation.isPending}
+              disabled={confirmText !== tenantToDelete?.name || softDeleteTenantMutation.isPending}
             >
-              {deleteTenantMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-              Remover Permanentemente
+              {softDeleteTenantMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Desativar Permanentemente
             </Button>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -29,8 +29,9 @@ export default function Clients() {
       const { data, error } = await supabase
         .from("clients")
         .select("*")
+        .is("deleted_at", null)
         .order("name");
-      
+
       if (error) throw error;
       return data;
     },

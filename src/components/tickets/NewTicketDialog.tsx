@@ -43,8 +43,8 @@ const ticketSchema = z.object({
   priority: z.enum(["P1", "P2", "P3", "P4"]),
   category: z.string().min(1, "Categoria é obrigatória"),
   subcategory: z.string().optional(),
-  opening_reason: z.string().min(1, "Motivo da abertura é obrigatório").max(500, "Máximo 500 caracteres"),
-  problem_faced: z.string().min(1, "Problema enfrentado é obrigatório").max(2000, "Máximo 2000 caracteres"),
+  opening_reason: z.string().min(1, "Motivo da abertura é obrigatório"),
+  problem_faced: z.string().max(2000, "Máximo 2000 caracteres").optional(),
   error_displayed: z.string().optional(),
   started_at: z.string().min(1, "Data de início é obrigatória"),
   frequency: z.enum(["pontual", "intermitente", "continuo"]),
@@ -597,7 +597,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   // Auto-selecionar engine quando houver apenas 1
   useEffect(() => {
-    if (availableDbEngines.length === 1 && segment === "DB") {
+    if (availableDbEngines.length === 1 && segment === "DB" && !selectedDbEngine) {
       setValue("db_engine", availableDbEngines[0] as any);
     }
   }, [availableDbEngines, segment, setValue]);
@@ -1589,7 +1589,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   {...register("opening_reason")}
                   placeholder={"Ex: Sistema fora do ar desde 09h\nUsuários do time de vendas impactados"}
                   rows={3}
-                  maxLength={500}
                   className="resize-y"
                 />
                 <div className="flex justify-between items-center">
@@ -1597,13 +1596,13 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                     <p className="text-sm text-destructive">{errors.opening_reason.message}</p>
                   ) : <span />}
                   <span className="text-xs text-muted-foreground">
-                    {(watch("opening_reason")?.length ?? 0)} / 500
+                    {(watch("opening_reason")?.length ?? 0)} caracteres
                   </span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="problem_faced">Problema Enfrentado *</Label>
+                <Label htmlFor="problem_faced">Problema Enfrentado</Label>
                 <Textarea
                   id="problem_faced"
                   {...register("problem_faced")}

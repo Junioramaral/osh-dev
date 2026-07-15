@@ -36,8 +36,8 @@ const SLADashboard = () => {
   const { data: clients } = useQuery({
     queryKey: ["clients-list", profile?.id],
     queryFn: async () => {
-      const query = supabase.from("clients").select("id, name").order("name");
-      
+      const query = supabase.from("clients").select("id, name").is("deleted_at", null).order("name");
+
       // RLS will handle tenant filtering automatically
       const { data, error } = await query;
       if (error) throw error;

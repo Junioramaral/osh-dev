@@ -289,7 +289,8 @@ const Dashboard = () => {
       if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
         const { count } = await supabase
           .from('clients')
-          .select('*', { count: 'exact', head: true });
+          .select('*', { count: 'exact', head: true })
+          .is('deleted_at', null);
         clientsCount = count || 0;
       }
 
