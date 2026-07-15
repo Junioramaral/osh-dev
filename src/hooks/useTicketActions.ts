@@ -162,7 +162,7 @@ export function useTicketActions() {
 
         try {
           await fetch(
-            `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/send-resolution-notification`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-resolution-notification`,
             {
               method: "POST",
               headers: {
