@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   Dialog,
   DialogContent,
@@ -35,8 +36,6 @@ interface Props {
   isLoading?: boolean;
 }
 
-const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
-
 export function RequiredFieldsBeforeResolveDialog({
   open,
   onOpenChange,
@@ -48,6 +47,7 @@ export function RequiredFieldsBeforeResolveDialog({
   const [analystId, setAnalystId] = useState<string>("");
   const [teamId, setTeamId] = useState<string>("");
   const [queueId, setQueueId] = useState<string>("");
+  const { tenantId } = useTenant();
 
   useEffect(() => {
     if (!open) {
@@ -58,18 +58,27 @@ export function RequiredFieldsBeforeResolveDialog({
   }, [open]);
 
   const { data: analysts, isLoading: loadingAnalysts } = useQuery({
-    queryKey: ["otimizzo-analysts-required"],
+    queryKey: ["tenant-analysts-required", tenantId],
     queryFn: async () => {
+      const { data: tenantUserRows, error: tuError } = await supabase
+        .from("tenant_users")
+        .select("user_id")
+        .eq("tenant_id", tenantId);
+      if (tuError) throw tuError;
+
+      const userIds = (tenantUserRows || []).map((r) => r.user_id);
+      if (userIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name")
-        .eq("client_id", OTIMIZZO_TENANT_ID)
+        .in("id", userIds)
         .eq("is_active", true)
         .order("full_name");
       if (error) throw error;
       return data || [];
     },
-    enabled: open && missing.analyst,
+    enabled: open && missing.analyst && !!tenantId,
   });
 
   const { data: teams, isLoading: loadingTeams } = useQuery({

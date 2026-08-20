@@ -17,9 +17,7 @@ import CSATSatisfactionReport from "@/components/reports/CSATSatisfactionReport"
 import MyTimeLogsReport from "@/components/reports/MyTimeLogsReport";
 import ReportSendHistory from "@/components/reports/ReportSendHistory";
 import { useReportSendHistory } from "@/hooks/useReportSendHistory";
-import { useAuth } from "@/contexts/AuthContext";
-
-const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+import { useTenant } from "@/contexts/TenantContext";
 
 type ReportType = "monthly" | "categories" | "performance" | "comparison" | "resolution-time" | "closure-ranking" | "queue-workload" | "client-hours" | "analyst-hours-management" | "csat-satisfaction" | "my-time-logs" | null;
 
@@ -110,17 +108,15 @@ const reportTypes = [
 const Reports = () => {
   const [selectedReport, setSelectedReport] = useState<ReportType>(null);
   const { data: sendHistory } = useReportSendHistory();
-  const { isSuperAdmin, isOtimizzoUser, isViewer, profile, tenantId } = useAuth();
+  const { isTenantStaff, clientId } = useTenant();
 
   // Check if user is a client (not internal)
-  const isClient = profile?.client_id !== null && 
-                   profile?.client_id !== OTIMIZZO_TENANT_ID &&
-                   tenantId !== OTIMIZZO_TENANT_ID;
+  const isClient = !!clientId && !isTenantStaff;
 
   // Filter reports based on user type
   const visibleReports = reportTypes.filter(report => {
     if ('internalOnly' in report && report.internalOnly) {
-      return !isClient && (isSuperAdmin || isOtimizzoUser || isViewer);
+      return !isClient && isTenantStaff;
     }
     return true;
   });

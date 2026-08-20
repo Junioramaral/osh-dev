@@ -55,14 +55,23 @@ export function TicketRow({ ticket, isSelected, onToggleSelect, showClientColumn
   };
   
   return (
-    <TableRow 
+    <TableRow
+      tabIndex={0}
+      aria-label={`Ticket ${ticket.ticket_number}: ${ticket.title}`}
       className={cn(
-        "cursor-pointer hover:bg-muted/50",
-        isSelected && "bg-primary/5 border-l-4 border-l-primary",
+        "cursor-pointer hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset",
+        isSelected && "bg-primary/5",
         isClosedTicket && "opacity-60 bg-muted/30",
-        wasUnlockedByInactivity && !isClosedTicket && "bg-yellow-100 dark:bg-yellow-900/30 border-l-4 border-l-yellow-500"
+        wasUnlockedByInactivity && !isClosedTicket && "bg-yellow-100 dark:bg-yellow-900/30"
       )}
       onClick={handleRowClick}
+      onKeyDown={(e) => {
+        if (e.target !== e.currentTarget) return;
+        if (e.key === "Enter" || e.key === " ") {
+          e.preventDefault();
+          navigate(`/tickets/${ticket.id}`);
+        }
+      }}
     >
       <TableCell onClick={(e) => e.stopPropagation()}>
         <Checkbox 

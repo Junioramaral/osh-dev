@@ -4,6 +4,7 @@ import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -80,6 +81,7 @@ const AVAILABLE_COLORS = [
 
 export default function SegmentDialog({ open, onOpenChange, segment }: SegmentDialogProps) {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenant();
   const isEditing = !!segment;
 
   const form = useForm<SegmentFormData>({
@@ -122,6 +124,7 @@ export default function SegmentDialog({ open, onOpenChange, segment }: SegmentDi
   const createMutation = useMutation({
     mutationFn: async (data: SegmentFormData) => {
       const { error } = await supabase.from("segments").insert({
+        tenant_id: tenantId,
         code: data.code.toUpperCase(),
         display_name: data.display_name,
         description: data.description || null,

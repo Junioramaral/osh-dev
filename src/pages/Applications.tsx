@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -78,7 +79,8 @@ const ENVIRONMENT_CONFIG = {
 };
 
 export default function Applications() {
-  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantAdmin, hasTenantRole } = useTenant();
   const queryClient = useQueryClient();
   const [environmentPages, setEnvironmentPages] = useState<Record<string, number>>({});
   const [environmentSorts, setEnvironmentSorts] = useState<Record<string, SortConfig>>({});
@@ -345,7 +347,7 @@ export default function Applications() {
             </div>
             <p className="text-muted-foreground">Catálogo de produtos e implantações</p>
           </div>
-          {selectedClient && !isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
+          {selectedClient && (isTenantAdmin || hasTenantRole('analyst_app')) && (
             <Button onClick={() => {
               setSelectedInstance(null);
               setDialogOpen(true);
@@ -609,7 +611,7 @@ export default function Applications() {
                                               )}
                                             </TableCell>
                                             <TableCell>
-                                              {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_app')) && (
+                                              {(isTenantAdmin || hasTenantRole('analyst_app')) && (
                                                 <Button
                                                   variant="ghost"
                                                   size="icon"

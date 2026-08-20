@@ -2,21 +2,28 @@ import { useParams, useNavigate } from "react-router-dom";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Skeleton } from "@/components/ui/skeleton";
 import { ArrowLeft, AlertCircle } from "lucide-react";
 import ClientForm from "@/components/clients/ClientForm";
 import { formatCnpj } from "@/lib/cnpjUtils";
 
+const statusVariant: Record<string, "default" | "secondary" | "destructive"> = {
+  ativo: "default",
+  inativo: "secondary",
+  suspenso: "destructive",
+};
+
 export default function ClientDetail() {
   const { clientId } = useParams();
   const navigate = useNavigate();
-  const { isSuperAdmin, isViewer, hasRole } = useAuth();
+  const { isTenantStaff } = useTenant();
 
-  const hasAccess =
-    isSuperAdmin || isViewer || hasRole("tenant_admin") || hasRole("analyst_db") || hasRole("analyst_app");
+  const hasAccess = isTenantStaff;
 
   const { data: client, isLoading } = useQuery({
     queryKey: ["client", clientId],
@@ -70,12 +77,23 @@ export default function ClientDetail() {
   return (
     <AppLayout>
       <div className="space-y-6">
-        <div className="flex items-center gap-4">
-          <Button variant="ghost" size="icon" onClick={() => navigate("/clients")}>
+        <div className="flex items-start gap-4">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => navigate("/clients")}
+            className="mt-1 shrink-0"
+            aria-label="Voltar para clientes"
+          >
             <ArrowLeft className="h-4 w-4" />
           </Button>
-          <div>
-            <h1 className="text-3xl font-bold text-foreground">{client.name}</h1>
+          <div className="min-w-0">
+            <div className="flex flex-wrap items-center gap-2">
+              <h1 className="text-2xl font-bold text-foreground sm:text-3xl">{client.name}</h1>
+              {client.status && (
+                <Badge variant={statusVariant[client.status] ?? "secondary"}>{client.status}</Badge>
+              )}
+            </div>
             <p className="text-muted-foreground">CNPJ: {client.cnpj ? formatCnpj(client.cnpj) : "N/A"}</p>
           </div>
         </div>

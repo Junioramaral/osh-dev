@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   Dialog,
   DialogContent,
@@ -78,7 +78,7 @@ export default function MachineDialog({
   machine,
   lockedClientId,
 }: MachineDialogProps) {
-  const { isSuperAdmin, profile } = useAuth();
+  const { isTenantAdmin, clientId } = useTenant();
   const createMachine = useCreateMachine();
   const updateMachine = useUpdateMachine();
   const [additionalUsers, setAdditionalUsers] = useState<AdditionalUser[]>([]);
@@ -101,7 +101,7 @@ export default function MachineDialog({
   const form = useForm<MachineFormData>({
     resolver: zodResolver(machineSchema),
     defaultValues: {
-      client_id: lockedClientId || profile?.client_id || "",
+      client_id: lockedClientId || clientId || "",
       environment: "prod",
       operating_system: "Linux",
       hostname: "",
@@ -116,10 +116,10 @@ export default function MachineDialog({
   });
 
   useEffect(() => {
-    if (!isSuperAdmin && profile?.client_id) {
-      form.setValue("client_id", profile.client_id);
+    if (!isTenantAdmin && clientId) {
+      form.setValue("client_id", clientId);
     }
-  }, [isSuperAdmin, profile, form]);
+  }, [isTenantAdmin, clientId, form]);
 
   useEffect(() => {
     if (lockedClientId && open && !machine) {
@@ -309,7 +309,7 @@ export default function MachineDialog({
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!isSuperAdmin || !!machine || !!lockedClientId}
+                    disabled={!isTenantAdmin || !!machine || !!lockedClientId}
                   >
                     <FormControl>
                       <SelectTrigger>

@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { Card, CardContent } from "@/components/ui/card";
@@ -46,7 +47,7 @@ type FAQArticle = Database["public"]["Tables"]["faq_articles"]["Row"] & {
 };
 
 export default function FAQ() {
-  const { isSuperAdmin, hasRole, isOtimizzoUser, isViewer } = useAuth();
+  const { isTenantStaff } = useTenant();
   const queryClient = useQueryClient();
   
   const [searchTerm, setSearchTerm] = useState("");
@@ -63,8 +64,8 @@ export default function FAQ() {
   const [viewDialogOpen, setViewDialogOpen] = useState(false);
   const [viewingArticle, setViewingArticle] = useState<FAQArticle | null>(null);
 
-  const canManageArticles = !isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app'));
-  const canSeeAllFilters = isSuperAdmin || isOtimizzoUser || isViewer;
+  const canManageArticles = isTenantStaff;
+  const canSeeAllFilters = isTenantStaff;
 
   // Load articles with relations
   const { data: articles, isLoading } = useQuery({

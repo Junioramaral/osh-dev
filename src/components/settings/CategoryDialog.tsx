@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { useActiveSegments } from "@/hooks/useSegments";
 import { toast } from "sonner";
 import {
@@ -64,6 +65,7 @@ export default function CategoryDialog({
   category,
 }: CategoryDialogProps) {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenant();
   const isEditing = !!category;
   const { data: segments, isLoading: segmentsLoading } = useActiveSegments();
 
@@ -99,6 +101,7 @@ export default function CategoryDialog({
     mutationFn: async (data: CategoryFormData) => {
       const segmentValue = data.segment === "both" ? null : data.segment as "DB" | "APP";
       const { error } = await supabase.from("ticket_categories").insert({
+        tenant_id: tenantId,
         name: data.name,
         segment: segmentValue,
         is_active: data.is_active,

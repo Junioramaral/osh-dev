@@ -15,17 +15,17 @@ import TicketSidebar from "@/components/tickets/TicketSidebar";
 import TicketSLATab from "@/components/tickets/TicketSLATab";
 import { AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 
 export default function TicketDetail() {
   const { ticketId } = useParams<{ ticketId: string }>();
   const { data: ticket, isLoading, error } = useTicketDetail(ticketId);
   const { data: comments } = useTicketComments(ticketId);
-  const { isOtimizzoUser, isSuperAdmin } = useAuth();
-  
+  const { isTenantStaff } = useTenant();
+
   const isRFC = ticket?.record_type === 'rfc';
   const isResolved = ticket?.status === 'resolvido' || ticket?.status === 'fechado';
-  const showReportTab = isRFC && isResolved && (isOtimizzoUser || isSuperAdmin);
+  const showReportTab = isRFC && isResolved && isTenantStaff;
   
   if (error) {
     return (

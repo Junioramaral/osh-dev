@@ -1,28 +1,23 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 
-const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 const ALL_SEGMENTS = ["DB", "APP"] as const;
 export type SegmentCode = (typeof ALL_SEGMENTS)[number];
 
 /**
  * Returns which segments should be selectable for the current context.
  * - Client users: limited to their own client's contracted segments.
- * - Internal users (Otimizzo/admin/analyst): if a clientId is provided
+ * - Internal users (tenant staff/admin/analyst): if a clientId is provided
  *   (not "all"/null), limited to that client's segments; otherwise all.
  */
 export function useAvailableSegments(clientId?: string | null) {
-  const { profile, isSuperAdmin, isOtimizzoUser } = useAuth();
+  const { isTenantStaff, clientId: myClientId } = useTenant();
 
-  const isClientUser =
-    !!profile?.client_id &&
-    profile.client_id !== OTIMIZZO_TENANT_ID &&
-    !isSuperAdmin &&
-    !isOtimizzoUser;
+  const isClientUser = !isTenantStaff;
 
   const effectiveClientId = isClientUser
-    ? profile?.client_id ?? null
+    ? myClientId ?? null
     : clientId && clientId !== "all"
       ? clientId
       : null;

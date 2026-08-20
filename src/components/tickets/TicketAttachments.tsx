@@ -109,7 +109,7 @@ interface TicketAttachmentsProps {
 
 export default function TicketAttachments({ ticket, ticketId }: TicketAttachmentsProps) {
   const { data: comments } = useTicketComments(ticketId);
-  const { user, profile, isViewer } = useAuth();
+  const { user, profile } = useAuth();
   const queryClient = useQueryClient();
   const [signedUrls, setSignedUrls] = useState<Record<string, string>>({});
   const [loadingUrls, setLoadingUrls] = useState<Record<string, boolean>>({});
@@ -166,7 +166,7 @@ export default function TicketAttachments({ ticket, ticketId }: TicketAttachment
   }, [allAttachments.length, ticket.evidences, comments]);
 
   const isClosed = ticket.status === 'resolvido' || ticket.status === 'fechado';
-  const canUpload = !isViewer && !isClosed;
+  const canUpload = !isClosed;
 
   const handleUpload = async () => {
     if (files.length === 0) return;

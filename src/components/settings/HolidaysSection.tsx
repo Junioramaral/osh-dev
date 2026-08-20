@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +34,7 @@ interface HolidaysSectionProps {
 
 export default function HolidaysSection({ isReadOnly }: HolidaysSectionProps) {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenant();
   const currentYear = new Date().getFullYear();
   const [selectedYear, setSelectedYear] = useState(currentYear);
   const [addDialogOpen, setAddDialogOpen] = useState(false);
@@ -65,6 +67,7 @@ export default function HolidaysSection({ isReadOnly }: HolidaysSectionProps) {
       if (error) throw error;
 
       const holidaysToInsert = data.holidays.map((h: any) => ({
+        tenant_id: tenantId,
         holiday_date: h.date,
         name: h.name,
         is_automatic: true,
@@ -72,7 +75,7 @@ export default function HolidaysSection({ isReadOnly }: HolidaysSectionProps) {
 
       const { error: upsertError } = await supabase
         .from("sla_holidays")
-        .upsert(holidaysToInsert, { onConflict: "holiday_date" });
+        .upsert(holidaysToInsert, { onConflict: "tenant_id,holiday_date" });
       if (upsertError) throw upsertError;
 
       queryClient.invalidateQueries({ queryKey: ["sla_holidays", selectedYear] });
@@ -88,7 +91,7 @@ export default function HolidaysSection({ isReadOnly }: HolidaysSectionProps) {
     mutationFn: async ({ date, name }: { date: string; name: string }) => {
       const { error } = await supabase
         .from("sla_holidays")
-        .upsert({ holiday_date: date, name, is_automatic: false }, { onConflict: "holiday_date" });
+        .upsert({ tenant_id: tenantId, holiday_date: date, name, is_automatic: false }, { onConflict: "tenant_id,holiday_date" });
       if (error) throw error;
     },
     onSuccess: () => {

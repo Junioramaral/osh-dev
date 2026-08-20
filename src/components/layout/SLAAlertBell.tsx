@@ -8,6 +8,7 @@ import {
 } from "@/components/ui/popover";
 import { useOverdueSLAAlertsCount, useOverdueSLAAlerts } from "@/hooks/useOverdueSLAAlertsCount";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { Link } from "react-router-dom";
 import { formatSmartDate } from "@/lib/dateUtils";
 import { supabase } from "@/integrations/supabase/client";
@@ -15,14 +16,15 @@ import { useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
 export const SLAAlertBell = () => {
-  const { isSuperAdmin, isOtimizzoUser, isViewer, user } = useAuth();
+  const { user } = useAuth();
+  const { isTenantAdmin, isTenantStaff } = useTenant();
   const { data: count = 0 } = useOverdueSLAAlertsCount();
   const { data: alerts = [] } = useOverdueSLAAlerts();
   const queryClient = useQueryClient();
   const [acknowledgingAll, setAcknowledgingAll] = useState(false);
 
-  // Only show for Otimizzo users, Super Admins, and Viewers
-  if (!isSuperAdmin && !isOtimizzoUser && !isViewer) {
+  // Only show for tenant staff and tenant admins
+  if (!isTenantAdmin && !isTenantStaff) {
     return null;
   }
 

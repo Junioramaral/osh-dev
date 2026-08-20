@@ -1,5 +1,6 @@
 import { ReactNode, useState, useCallback, useMemo } from "react";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { Navigate } from "react-router-dom";
 import { usePendingTicketsCount } from "@/hooks/usePendingTicketsCount";
 import { useMyTicketsCount } from "@/hooks/useMyTicketsCount";
@@ -22,6 +23,7 @@ import {
   ClipboardCheck,
   ClipboardList,
   ShieldCheck,
+  Building2,
 } from "lucide-react";
 
 interface AppLayoutProps {
@@ -29,7 +31,8 @@ interface AppLayoutProps {
 }
 
 const AppLayout = ({ children }: AppLayoutProps) => {
-  const { user, profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId, signOut, loading, mustChangePassword } = useAuth();
+  const { user, profile, signOut, loading, mustChangePassword } = useAuth();
+  const { isPlatformAdmin, isTenantAdmin, isTenantStaff, tenantId } = useTenant();
   const [profileDialogOpen, setProfileDialogOpen] = useState(false);
 
   const { data: pendingCount = 0 } = usePendingTicketsCount();
@@ -40,25 +43,25 @@ const AppLayout = ({ children }: AppLayoutProps) => {
   const operationalNav = useMemo(() => [
     { name: "Dashboard", href: "/dashboard", icon: LayoutDashboard, show: true },
     { name: "Tickets", href: "/tickets", icon: Ticket, show: true },
-    { name: "Meus Tickets", href: "/my-tickets", icon: UserCheck, show: isOtimizzoUser || isSuperAdmin || isViewer },
-    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isSuperAdmin || isOtimizzoUser || isViewer },
-    { name: "Satisfação (CSAT)", href: "/csat", icon: Star, show: isSuperAdmin || isOtimizzoUser || isViewer },
+    { name: "Meus Tickets", href: "/my-tickets", icon: UserCheck, show: isTenantStaff },
+    { name: "Dashboard SLA", href: "/sla-dashboard", icon: BarChart3, show: isTenantStaff },
+    { name: "Satisfação (CSAT)", href: "/csat", icon: Star, show: isTenantStaff },
     { name: "Base de Conhecimento", href: "/faq", icon: FileText, show: true },
-    { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isSuperAdmin || isOtimizzoUser || isViewer },
-    { name: "Execução RFC", href: "/rfc-execution", icon: ClipboardCheck, show: isOtimizzoUser || isSuperAdmin },
-    { name: "Aprovação RFC", href: "/rfc-aprovacao", icon: ShieldCheck, show: isOtimizzoUser || isSuperAdmin },
-    { name: "Minhas RFCs", href: "/minhas-rfcs", icon: ClipboardList, show: !isOtimizzoUser && !isSuperAdmin && !isViewer },
-  ].filter(item => item.show), [isSuperAdmin, isViewer, isOtimizzoUser]);
+    { name: "Relatórios", href: "/reports", icon: FileBarChart, show: isTenantStaff },
+    { name: "Execução RFC", href: "/rfc-execution", icon: ClipboardCheck, show: isTenantStaff },
+    { name: "Aprovação RFC", href: "/rfc-aprovacao", icon: ShieldCheck, show: isTenantStaff },
+    { name: "Minhas RFCs", href: "/minhas-rfcs", icon: ClipboardList, show: !isTenantStaff },
+  ].filter(item => item.show), [isTenantStaff]);
 
   const adminNav = useMemo(() => [
-    { name: "Admin Tenants", href: "/admin/tenants", icon: Users, show: isSuperAdmin || isViewer },
-    { name: "Meu Tenant", href: `/admin/tenants/${tenantId}`, icon: Users, show: isTenantAdmin && !isSuperAdmin && !isViewer },
-    { name: "Clientes", href: "/clients", icon: Users, show: isSuperAdmin || isOtimizzoUser || isViewer },
-    
-    { name: "Máquinas", href: "/machines", icon: Server, show: isSuperAdmin || isOtimizzoUser || isViewer },
-    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isSuperAdmin || isOtimizzoUser || isViewer },
-    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isSuperAdmin || isOtimizzoUser || isViewer },
-  ].filter(item => item.show), [isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser, tenantId]);
+    { name: "Plataforma", href: "/platform/tenants", icon: Building2, show: isPlatformAdmin },
+    { name: "Meu Tenant", href: "/my-tenant", icon: Users, show: isTenantAdmin && !isPlatformAdmin },
+    { name: "Clientes", href: "/clients", icon: Users, show: isTenantStaff },
+
+    { name: "Máquinas", href: "/machines", icon: Server, show: isTenantStaff },
+    { name: "Bancos de Dados", href: "/databases", icon: Database, show: isTenantStaff },
+    { name: "Aplicativos", href: "/applications", icon: AppWindow, show: isTenantStaff },
+  ].filter(item => item.show), [isPlatformAdmin, isTenantAdmin, isTenantStaff, tenantId]);
 
   if (mustChangePassword) {
     return <Navigate to="/auth" replace />;
@@ -89,10 +92,9 @@ const AppLayout = ({ children }: AppLayoutProps) => {
           myTicketsCount={myTicketsCount}
           profile={profile}
           userEmail={user?.email}
-          isSuperAdmin={isSuperAdmin}
+          isPlatformAdmin={isPlatformAdmin}
           isTenantAdmin={isTenantAdmin}
-          isViewer={isViewer}
-          isOtimizzoUser={isOtimizzoUser}
+          isTenantStaff={isTenantStaff}
           onProfileOpen={handleProfileOpen}
           signOut={signOut}
         />

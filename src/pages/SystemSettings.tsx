@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { Navigate } from "react-router-dom";
 import AppLayout from "@/components/layout/AppLayout";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -62,7 +63,8 @@ interface AppProduct {
 }
 
 export default function SystemSettings() {
-  const { isSuperAdmin, isViewer, loading } = useAuth();
+  const { loading } = useAuth();
+  const { isTenantAdmin, tenantId } = useTenant();
   const queryClient = useQueryClient();
 
   const [engineDialogOpen, setEngineDialogOpen] = useState(false);
@@ -144,11 +146,12 @@ export default function SystemSettings() {
     mutationFn: async (days: number) => {
       const { error } = await supabase
         .from("system_configs")
-        .upsert({ 
-          key: 'ticket_inactivity_days', 
+        .upsert({
+          tenant_id: tenantId,
+          key: 'ticket_inactivity_days',
           value: String(days),
-          updated_at: new Date().toISOString() 
-        }, { onConflict: 'key' });
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'tenant_id,key' });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -174,9 +177,9 @@ export default function SystemSettings() {
   const saveBusinessHoursMutation = useMutation({
     mutationFn: async ({ start, end, days }: { start: string; end: string; days: number[] }) => {
       const updates = [
-        supabase.from("system_configs").upsert({ key: 'business_hours_start', value: JSON.stringify(start), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
-        supabase.from("system_configs").upsert({ key: 'business_hours_end', value: JSON.stringify(end), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
-        supabase.from("system_configs").upsert({ key: 'business_days', value: JSON.stringify(days), updated_at: new Date().toISOString() }, { onConflict: 'key' }),
+        supabase.from("system_configs").upsert({ tenant_id: tenantId, key: 'business_hours_start', value: JSON.stringify(start), updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,key' }),
+        supabase.from("system_configs").upsert({ tenant_id: tenantId, key: 'business_hours_end', value: JSON.stringify(end), updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,key' }),
+        supabase.from("system_configs").upsert({ tenant_id: tenantId, key: 'business_days', value: JSON.stringify(days), updated_at: new Date().toISOString() }, { onConflict: 'tenant_id,key' }),
       ];
       const results = await Promise.all(updates);
       const error = results.find(r => r.error)?.error;
@@ -322,13 +325,13 @@ export default function SystemSettings() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("segments")
-        .delete()
+        .update({ is_active: false })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["segments"] });
-      toast.success("Segmento removido");
+      toast.success("Segmento desativado");
       setDeleteSegmentId(null);
     },
     onError: (error) => {
@@ -376,13 +379,13 @@ export default function SystemSettings() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("database_engines")
-        .delete()
+        .update({ is_active: false })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["database_engines"] });
-      toast.success("Engine removido");
+      toast.success("Engine desativado");
       setDeleteEngineId(null);
     },
     onError: (error) => {
@@ -395,13 +398,13 @@ export default function SystemSettings() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("application_products")
-        .delete()
+        .update({ is_active: false })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["application_products"] });
-      toast.success("Produto removido");
+      toast.success("Produto desativado");
       setDeleteProductId(null);
     },
     onError: (error) => {
@@ -432,13 +435,13 @@ export default function SystemSettings() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("queues")
-        .delete()
+        .update({ is_active: false })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["queues"] });
-      toast.success("Fila removida");
+      toast.success("Fila desativada");
       setDeleteQueueId(null);
     },
     onError: (error) => {
@@ -470,14 +473,14 @@ export default function SystemSettings() {
     mutationFn: async (id: string) => {
       const { error } = await supabase
         .from("ticket_categories")
-        .delete()
+        .update({ is_active: false })
         .eq("id", id);
       if (error) throw error;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["ticket_categories_with_counts"] });
       queryClient.invalidateQueries({ queryKey: ["ticket_categories"] });
-      toast.success("Categoria removida");
+      toast.success("Categoria desativada");
       setDeleteCategoryId(null);
     },
     onError: (error) => {
@@ -513,11 +516,12 @@ export default function SystemSettings() {
     );
   }
 
-  if (!isSuperAdmin && !isViewer) {
+  if (!isTenantAdmin) {
     return <Navigate to="/dashboard" replace />;
   }
 
-  const isReadOnly = isViewer;
+  // ponytail: isViewer legacy role removed (zero real users held it) — read-only mode is now always off.
+  const isReadOnly = false;
 
   return (
     <AppLayout>
@@ -726,7 +730,7 @@ export default function SystemSettings() {
                   )}
                 </div>
 
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -754,12 +758,14 @@ export default function SystemSettings() {
                         </TableRow>
                       ) : (
                         engines?.map((engine) => (
-                          <TableRow 
+                          <TableRow
                             key={engine.id}
-                            className="cursor-pointer hover:bg-muted/50"
+                            className={`hover:bg-muted/50 ${!isReadOnly ? 'cursor-pointer' : ''}`}
                             onClick={() => {
-                              setSelectedEngine(engine);
-                              setEngineDialogOpen(true);
+                              if (!isReadOnly) {
+                                setSelectedEngine(engine);
+                                setEngineDialogOpen(true);
+                              }
                             }}
                           >
                             <TableCell className="font-medium">{engine.name}</TableCell>
@@ -774,7 +780,7 @@ export default function SystemSettings() {
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="icon">
+                                  <Button variant="ghost" size="icon" disabled={isReadOnly} aria-label={`Ações para ${engine.name}`}>
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -823,18 +829,20 @@ export default function SystemSettings() {
               <TabsContent value="queues">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">Filas de Atendimento</h2>
-                  <Button
-                    onClick={() => {
-                      setSelectedQueue(null);
-                      setQueueDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Fila
-                  </Button>
+                  {!isReadOnly && (
+                    <Button
+                      onClick={() => {
+                        setSelectedQueue(null);
+                        setQueueDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nova Fila
+                    </Button>
+                  )}
                 </div>
 
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -862,12 +870,14 @@ export default function SystemSettings() {
                         </TableRow>
                       ) : (
                         queues?.map((queue) => (
-                          <TableRow 
+                          <TableRow
                             key={queue.id}
-                            className="cursor-pointer hover:bg-muted/50"
+                            className={`hover:bg-muted/50 ${!isReadOnly ? 'cursor-pointer' : ''}`}
                             onClick={() => {
-                              setSelectedQueue(queue);
-                              setQueueDialogOpen(true);
+                              if (!isReadOnly) {
+                                setSelectedQueue(queue);
+                                setQueueDialogOpen(true);
+                              }
                             }}
                           >
                             <TableCell className="font-medium">{queue.name}</TableCell>
@@ -882,7 +892,7 @@ export default function SystemSettings() {
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="icon">
+                                  <Button variant="ghost" size="icon" disabled={isReadOnly} aria-label={`Ações para ${queue.name}`}>
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -931,18 +941,20 @@ export default function SystemSettings() {
               <TabsContent value="categories">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">Categorias de Ticket</h2>
-                  <Button
-                    onClick={() => {
-                      setSelectedCategory(null);
-                      setCategoryDialogOpen(true);
-                    }}
-                  >
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Categoria
-                  </Button>
+                  {!isReadOnly && (
+                    <Button
+                      onClick={() => {
+                        setSelectedCategory(null);
+                        setCategoryDialogOpen(true);
+                      }}
+                    >
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nova Categoria
+                    </Button>
+                  )}
                 </div>
 
-                <div className="border rounded-lg">
+                <div className="border rounded-lg overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow>
@@ -972,12 +984,14 @@ export default function SystemSettings() {
                         </TableRow>
                       ) : (
                         categories?.map((category) => (
-                          <TableRow 
+                          <TableRow
                             key={category.id}
-                            className="cursor-pointer hover:bg-muted/50"
+                            className={`hover:bg-muted/50 ${!isReadOnly ? 'cursor-pointer' : ''}`}
                             onClick={() => {
-                              setSelectedCategory(category);
-                              setCategoryDialogOpen(true);
+                              if (!isReadOnly) {
+                                setSelectedCategory(category);
+                                setCategoryDialogOpen(true);
+                              }
                             }}
                           >
                             <TableCell className="font-medium">{category.name}</TableCell>
@@ -1009,7 +1023,7 @@ export default function SystemSettings() {
                             <TableCell>
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="icon">
+                                  <Button variant="ghost" size="icon" disabled={isReadOnly} aria-label={`Ações para ${category.name}`}>
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>
@@ -1089,7 +1103,7 @@ export default function SystemSettings() {
               )}
             </div>
 
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1139,7 +1153,7 @@ export default function SystemSettings() {
                         <TableCell onClick={(e) => e.stopPropagation()}>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon" disabled={isReadOnly}>
+                              <Button variant="ghost" size="icon" disabled={isReadOnly} aria-label={`Ações para ${product.name}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -1209,7 +1223,7 @@ export default function SystemSettings() {
               )}
             </div>
 
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1266,7 +1280,7 @@ export default function SystemSettings() {
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" disabled={isReadOnly} aria-label={`Ações para ${team.name}`}>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
@@ -1324,7 +1338,7 @@ export default function SystemSettings() {
               )}
             </div>
 
-            <div className="border rounded-lg">
+            <div className="border rounded-lg overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -1409,7 +1423,7 @@ export default function SystemSettings() {
                             {!isReadOnly && (
                               <DropdownMenu>
                                 <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
-                                  <Button variant="ghost" size="icon">
+                                  <Button variant="ghost" size="icon" aria-label={`Ações para ${segment.name}`}>
                                     <MoreHorizontal className="h-4 w-4" />
                                   </Button>
                                 </DropdownMenuTrigger>

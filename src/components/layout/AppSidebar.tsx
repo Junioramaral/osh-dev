@@ -33,10 +33,9 @@ interface AppSidebarProps {
   myTicketsCount: number;
   profile: { full_name: string; avatar_url: string | null } | null;
   userEmail: string | undefined;
-  isSuperAdmin: boolean;
+  isPlatformAdmin: boolean;
   isTenantAdmin: boolean;
-  isViewer: boolean;
-  isOtimizzoUser: boolean;
+  isTenantStaff: boolean;
   onProfileOpen: () => void;
   signOut: () => void;
 }
@@ -48,10 +47,9 @@ const AppSidebar = ({
   myTicketsCount,
   profile,
   userEmail,
-  isSuperAdmin,
+  isPlatformAdmin,
   isTenantAdmin,
-  isViewer,
-  isOtimizzoUser,
+  isTenantStaff,
   onProfileOpen,
   signOut,
 }: AppSidebarProps) => {
@@ -59,14 +57,12 @@ const AppSidebar = ({
   const { setOpen, isMobile, state, setOpenMobile } = useSidebar();
   const collapsed = state === "collapsed";
 
-  const roleLabel = isSuperAdmin
+  const roleLabel = isPlatformAdmin
     ? "Super Admin"
     : isTenantAdmin
     ? "Tenant Admin"
-    : isViewer
-    ? "Auditor"
-    : isOtimizzoUser
-    ? "Otimizzo"
+    : isTenantStaff
+    ? "Analista"
     : "Usuário";
 
   const handleNavClick = () => {
@@ -207,7 +203,7 @@ const AppSidebar = ({
             )}
           </SidebarMenuItem>
 
-          {(isSuperAdmin || isViewer) && (
+          {isTenantAdmin && (
             <SidebarMenuItem>
               <SidebarMenuButton
                 asChild

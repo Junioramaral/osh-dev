@@ -4,6 +4,11 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AuthProvider } from "@/contexts/AuthContext";
+import { TenantProvider } from "@/contexts/TenantContext";
+import RequirePlatformAdmin from "@/components/RequirePlatformAdmin";
+import PlatformTenants from "./pages/PlatformTenants";
+import PlatformTenantDetail from "./pages/PlatformTenantDetail";
+import MyTenant from "./pages/MyTenant";
 import Index from "./pages/Index";
 import Auth from "./pages/Auth";
 import ResetPassword from "./pages/ResetPassword";
@@ -18,8 +23,6 @@ import Databases from "./pages/Databases";
 import Applications from "./pages/Applications";
 import Machines from "./pages/Machines";
 import FAQ from "./pages/FAQ";
-import TenantAdmin from "./pages/TenantAdmin";
-import TenantDetail from "./pages/TenantDetail";
 import SLADashboard from "./pages/SLADashboard";
 import SLAAcknowledge from "./pages/SLAAcknowledge";
 import CSATDashboard from "./pages/CSATDashboard";
@@ -40,6 +43,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+        <TenantProvider>
           <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
@@ -59,9 +63,10 @@ const App = () => (
             <Route path="/machines" element={<Machines />} />
             <Route path="/faq" element={<FAQ />} />
             <Route path="/reports" element={<Reports />} />
-            <Route path="/admin/tenants" element={<TenantAdmin />} />
-            <Route path="/admin/tenants/:tenantId" element={<TenantDetail />} />
-            
+            <Route path="/platform/tenants" element={<RequirePlatformAdmin><PlatformTenants /></RequirePlatformAdmin>} />
+            <Route path="/platform/tenants/:tenantId" element={<RequirePlatformAdmin><PlatformTenantDetail /></RequirePlatformAdmin>} />
+            <Route path="/my-tenant" element={<MyTenant />} />
+
             <Route path="/system-settings" element={<SystemSettings />} />
             <Route path="/rfc-execution" element={<RFCExecution />} />
             <Route path="/rfc-aprovacao" element={<RFCApproval />} />
@@ -69,6 +74,7 @@ const App = () => (
             {/* ADD ALL CUSTOM ROUTES ABOVE THE CATCH-ALL "*" ROUTE */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+        </TenantProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { supabase } from "@/integrations/supabase/client";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -79,8 +80,6 @@ import {
 } from "recharts";
 import { useMonthlyTicketVolume } from "@/hooks/useMonthlyTicketVolume";
 
-const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
-
 interface DashboardStats {
   totalTickets: number;
   ticketsFechados: number;
@@ -126,7 +125,8 @@ const PRIORITY_STYLES: Record<string, { color: string; bgColor: string }> = {
 };
 
 const Dashboard = () => {
-  const { user, profile, roles, isSuperAdmin, hasRole } = useAuth();
+  const { user, profile } = useAuth();
+  const { clientId, isTenantStaff, isTenantAdmin, isAnalyst, hasTenantRole } = useTenant();
   const [stats, setStats] = useState<DashboardStats>({
     totalTickets: 0,
     ticketsFechados: 0,
@@ -156,17 +156,12 @@ const Dashboard = () => {
   const navigate = useNavigate();
 
   // Determine if current user is a client user
-  const isClientUser = profile?.client_id && 
-    profile.client_id !== OTIMIZZO_TENANT_ID && 
-    !isSuperAdmin && 
-    !hasRole('analyst_db') && 
-    !hasRole('analyst_app') &&
-    !hasRole('tenant_admin');
+  const isClientUser = !!clientId && !isTenantStaff;
 
   // Fetch monthly volume data for bar chart (12 months stored, display configurable)
   // Clients see only their tenant; staff/admins see global volume (RLS handles scope).
   const { data: monthlyVolumeData } = useMonthlyTicketVolume(
-    isClientUser ? (profile?.client_id ?? null) : null,
+    isClientUser ? clientId : null,
     12
   );
 
@@ -176,19 +171,19 @@ const Dashboard = () => {
 
   useEffect(() => {
     const loadClientSegments = async () => {
-      if (!isClientUser || !profile?.client_id) {
+      if (!isClientUser || !clientId) {
         setClientSegments(null);
         return;
       }
       const { data } = await supabase
         .from("clients")
         .select("segments")
-        .eq("id", profile.client_id)
+        .eq("id", clientId)
         .maybeSingle();
       setClientSegments(((data as any)?.segments as string[] | null) ?? []);
     };
     loadClientSegments();
-  }, [profile, isClientUser]);
+  }, [profile, isClientUser, clientId]);
 
   useEffect(() => {
     loadMonthlyTrend(trendPeriod);
@@ -286,7 +281,7 @@ const Dashboard = () => {
 
       // Total clients (if admin or analyst)
       let clientsCount = 0;
-      if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
+      if (isTenantStaff) {
         const { count } = await supabase
           .from('clients')
           .select('*', { count: 'exact', head: true })
@@ -297,7 +292,7 @@ const Dashboard = () => {
       // Tickets retornados à fila por inatividade (apenas para admins)
       let retornadosCount = 0;
       let inactivityDaysValue = 7;
-      if (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app')) {
+      if (isTenantStaff) {
         // Buscar configuração de dias de inatividade
         const { data: configData } = await supabase
           .from('system_configs')
@@ -495,7 +490,7 @@ const Dashboard = () => {
       .map(({ segment, ...rest }) => rest);
 
   // Card de clientes (condicional)
-  const showClientsCard = isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db') || hasRole('analyst_app');
+  const showClientsCard = isTenantStaff;
   if (showClientsCard) {
     distributionCards.push({
       title: "Total de Clientes",
@@ -548,23 +543,20 @@ const Dashboard = () => {
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">Tipo de usuário:</span>
               <Badge variant="secondary" className="capitalize font-medium">
-                {isSuperAdmin 
-                  ? 'Super Admin' 
-                  : hasRole('tenant_admin') 
-                    ? 'Tenant Admin' 
-                    : hasRole('analyst_db') 
-                      ? 'Analista DB' 
-                      : hasRole('analyst_app') 
-                        ? 'Analista APP' 
-                        : 'Usuário'}
+                {isTenantAdmin
+                  ? 'Tenant Admin'
+                  : hasTenantRole('analyst_db')
+                    ? 'Analista DB'
+                    : hasTenantRole('analyst_app')
+                      ? 'Analista APP'
+                      : 'Usuário'}
               </Badge>
             </div>
             <p className="text-sm text-muted-foreground max-w-2xl">
-              {isSuperAdmin && "Como super administrador, você tem acesso total ao sistema e pode gerenciar todos os tenants."}
-              {!isSuperAdmin && hasRole('tenant_admin') && "Como administrador do tenant, você pode gerenciar usuários e recursos do seu tenant."}
-              {hasRole('analyst_db') && "Como analista de banco de dados, você pode gerenciar tickets DB."}
-              {hasRole('analyst_app') && "Como analista de aplicativos, você pode gerenciar tickets APP."}
-              {!isSuperAdmin && !hasRole('tenant_admin') && !hasRole('analyst_db') && !hasRole('analyst_app') && "Você pode criar e acompanhar seus tickets."}
+              {isTenantAdmin && "Como administrador do tenant, você pode gerenciar usuários e recursos do seu tenant."}
+              {hasTenantRole('analyst_db') && "Como analista de banco de dados, você pode gerenciar tickets DB."}
+              {hasTenantRole('analyst_app') && "Como analista de aplicativos, você pode gerenciar tickets APP."}
+              {!isTenantStaff && "Você pode criar e acompanhar seus tickets."}
             </p>
             
             {/* Atalhos Rápidos */}
@@ -577,8 +569,8 @@ const Dashboard = () => {
                 Novo Ticket
               </Button>
               
-              {(isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app')) && (
-                <Button 
+              {isTenantStaff && (
+                <Button
                   variant="outline"
                   onClick={() => navigate('/my-tickets')}
                   className="gap-2"
@@ -629,7 +621,7 @@ const Dashboard = () => {
             <DashboardSection title="Visão Geral de Tickets" icon={Ticket}>
               {ticketOverviewCards.map(renderStatCard)}
               {/* Card de Tickets Retornados por Inatividade - Apenas Admin */}
-              {(isSuperAdmin || hasRole('analyst_db') || hasRole('analyst_app') || hasRole('tenant_admin')) && (
+              {isTenantStaff && (
                 <Card className="hover:shadow-md transition-shadow">
                   <CardHeader className="flex flex-row items-center justify-between pb-2">
                     <CardTitle className="text-sm font-medium text-muted-foreground">
@@ -733,31 +725,33 @@ const Dashboard = () => {
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>#</TableHead>
-                        <TableHead>Categoria</TableHead>
-                        <TableHead className="text-center">Qtd</TableHead>
-                        <TableHead className="text-center">%</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {topCategories.map((cat, index) => (
-                        <TableRow key={cat.name}>
-                          <TableCell className="font-bold text-muted-foreground">{index + 1}</TableCell>
-                          <TableCell className="font-medium">{cat.name}</TableCell>
-                          <TableCell className="text-center font-semibold">{cat.count}</TableCell>
-                          <TableCell className="text-center">
-                            {totalForDistribution > 0
-                              ? Math.round((cat.count / totalForDistribution) * 100)
-                              : 0}
-                            %
-                          </TableCell>
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>#</TableHead>
+                          <TableHead>Categoria</TableHead>
+                          <TableHead className="text-center">Qtd</TableHead>
+                          <TableHead className="text-center">%</TableHead>
                         </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
+                      </TableHeader>
+                      <TableBody>
+                        {topCategories.map((cat, index) => (
+                          <TableRow key={cat.name}>
+                            <TableCell className="font-bold text-muted-foreground">{index + 1}</TableCell>
+                            <TableCell className="font-medium">{cat.name}</TableCell>
+                            <TableCell className="text-center font-semibold">{cat.count}</TableCell>
+                            <TableCell className="text-center">
+                              {totalForDistribution > 0
+                                ? Math.round((cat.count / totalForDistribution) * 100)
+                                : 0}
+                              %
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </CardContent>
               </Card>
             )}
@@ -824,22 +818,22 @@ const Dashboard = () => {
                     labelStyle={{ color: 'hsl(var(--foreground))' }}
                   />
                   <Legend />
-                  <Line 
-                    type="monotone" 
-                    dataKey="abertos" 
-                    name="Abertos" 
-                    stroke="hsl(215, 65%, 55%)" 
+                  <Line
+                    type="monotone"
+                    dataKey="abertos"
+                    name="Abertos"
+                    stroke="hsl(var(--primary))"
                     strokeWidth={2}
-                    dot={{ fill: 'hsl(215, 65%, 55%)', strokeWidth: 2 }}
+                    dot={{ fill: 'hsl(var(--primary))', strokeWidth: 2 }}
                     activeDot={{ r: 6 }}
                   />
-                  <Line 
-                    type="monotone" 
-                    dataKey="fechados" 
-                    name="Fechados" 
-                    stroke="hsl(142, 71%, 45%)" 
+                  <Line
+                    type="monotone"
+                    dataKey="fechados"
+                    name="Fechados"
+                    stroke="hsl(var(--success))"
                     strokeWidth={2}
-                    dot={{ fill: 'hsl(142, 71%, 45%)', strokeWidth: 2 }}
+                    dot={{ fill: 'hsl(var(--success))', strokeWidth: 2 }}
                     activeDot={{ r: 6 }}
                   />
                 </LineChart>
@@ -928,55 +922,57 @@ const Dashboard = () => {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Mês</TableHead>
-                    <TableHead className="text-center">Abertos</TableHead>
-                    <TableHead className="text-center">Fechados</TableHead>
-                    <TableHead className="text-center">Saldo</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {monthlyVolumeData.slice(-barChartPeriod).map((m) => {
-                    const saldo = m.fechados - m.abertos;
-                    return (
-                      <TableRow key={m.month}>
-                        <TableCell className="capitalize font-medium">{m.monthLabel}</TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-yellow-600 font-semibold">{m.abertos}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className="text-green-600 font-semibold">{m.fechados}</span>
-                        </TableCell>
-                        <TableCell className="text-center">
-                          <span className={saldo >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
-                            {saldo > 0 ? "+" : ""}{saldo}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                  {(() => {
-                    const slice = monthlyVolumeData.slice(-barChartPeriod);
-                    const totalAbertos = slice.reduce((sum, m) => sum + m.abertos, 0);
-                    const totalFechados = slice.reduce((sum, m) => sum + m.fechados, 0);
-                    const totalSaldo = totalFechados - totalAbertos;
-                    return (
-                      <TableRow className="font-bold border-t-2">
-                        <TableCell>Total</TableCell>
-                        <TableCell className="text-center text-yellow-600">{totalAbertos}</TableCell>
-                        <TableCell className="text-center text-green-600">{totalFechados}</TableCell>
-                        <TableCell className="text-center">
-                          <span className={totalSaldo >= 0 ? "text-green-600" : "text-red-600"}>
-                            {totalSaldo > 0 ? "+" : ""}{totalSaldo}
-                          </span>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })()}
-                </TableBody>
-              </Table>
+              <div className="overflow-x-auto">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Mês</TableHead>
+                      <TableHead className="text-center">Abertos</TableHead>
+                      <TableHead className="text-center">Fechados</TableHead>
+                      <TableHead className="text-center">Saldo</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {monthlyVolumeData.slice(-barChartPeriod).map((m) => {
+                      const saldo = m.fechados - m.abertos;
+                      return (
+                        <TableRow key={m.month}>
+                          <TableCell className="capitalize font-medium">{m.monthLabel}</TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-yellow-600 font-semibold">{m.abertos}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className="text-green-600 font-semibold">{m.fechados}</span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <span className={saldo >= 0 ? "text-green-600 font-semibold" : "text-red-600 font-semibold"}>
+                              {saldo > 0 ? "+" : ""}{saldo}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    {(() => {
+                      const slice = monthlyVolumeData.slice(-barChartPeriod);
+                      const totalAbertos = slice.reduce((sum, m) => sum + m.abertos, 0);
+                      const totalFechados = slice.reduce((sum, m) => sum + m.fechados, 0);
+                      const totalSaldo = totalFechados - totalAbertos;
+                      return (
+                        <TableRow className="font-bold border-t-2">
+                          <TableCell>Total</TableCell>
+                          <TableCell className="text-center text-yellow-600">{totalAbertos}</TableCell>
+                          <TableCell className="text-center text-green-600">{totalFechados}</TableCell>
+                          <TableCell className="text-center">
+                            <span className={totalSaldo >= 0 ? "text-green-600" : "text-red-600"}>
+                              {totalSaldo > 0 ? "+" : ""}{totalSaldo}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })()}
+                  </TableBody>
+                </Table>
+              </div>
             </CardContent>
           </Card>
         )}

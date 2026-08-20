@@ -23,10 +23,10 @@ export interface MyTimeLogRow {
 export interface MyTimeLogsFilters {
   startDate: Date;
   endDate: Date;
-  analystId: string; // 'all' allowed only for super admin
+  analystId: string; // 'all' allowed only for tenant admin
   clientId: string;  // 'all' or uuid
   projectId: string; // 'all' or uuid
-  isSuperAdmin: boolean;
+  isTenantAdmin: boolean;
   currentUserId?: string;
 }
 
@@ -58,13 +58,13 @@ export function useMyTimeLogsData(filters: MyTimeLogsFilters) {
         .order("work_date", { ascending: false })
         .order("start_time", { ascending: true });
 
-      // Force own logs unless super admin
-      if (!filters.isSuperAdmin) {
+      // Force own logs unless tenant admin
+      if (!filters.isTenantAdmin) {
         query = query.eq("analyst_id", filters.currentUserId!);
       } else if (filters.analystId !== "all") {
         query = query.eq("analyst_id", filters.analystId);
       } else {
-        // Super Admin + "Todos": restrict to internal analysts (tenant owner)
+        // Tenant Admin + "Todos": restrict to internal analysts (tenant owner)
         const { data: internal } = await supabase
           .from("profiles")
           .select("id")
