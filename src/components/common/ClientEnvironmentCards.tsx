@@ -1,6 +1,8 @@
+import { useNavigate } from "react-router-dom";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { LucideIcon } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { LucideIcon, Users } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export const ENVIRONMENT_LABELS: Record<string, { label: string; color: string }> = {
@@ -27,12 +29,21 @@ interface Props {
 }
 
 export default function ClientEnvironmentCards({ items, icon: Icon, onSelect, emptyLabel }: Props) {
+  const navigate = useNavigate();
+
   if (items.length === 0) {
     return (
       <Card>
         <CardContent className="flex flex-col items-center justify-center py-16">
           <Icon className="h-12 w-12 text-muted-foreground mb-4" />
-          <p className="text-muted-foreground">{emptyLabel || "Nenhum cliente encontrado"}</p>
+          <h3 className="text-lg font-semibold mb-2">{emptyLabel || "Nenhum cliente encontrado"}</h3>
+          <p className="text-muted-foreground text-center max-w-md mb-4">
+            Este recurso pertence a um cliente. Cadastre ou selecione um cliente para começar.
+          </p>
+          <Button onClick={() => navigate("/clients")}>
+            <Users className="mr-2 h-4 w-4" />
+            Ir para Clientes
+          </Button>
         </CardContent>
       </Card>
     );

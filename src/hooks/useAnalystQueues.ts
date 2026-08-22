@@ -1,16 +1,18 @@
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 
 /**
  * Hook to get queue IDs associated with the current analyst via user_queues.
  * Used to filter tickets based on analyst's direct queue assignments.
  */
 export function useAnalystQueues() {
-  const { user, hasRole, isSuperAdmin, isOtimizzoUser } = useAuth();
-  
-  const isAnalyst = hasRole('analyst_db') || hasRole('analyst_app');
-  const shouldFetchQueues = isAnalyst && !isSuperAdmin && !!user?.id;
+  const { user } = useAuth();
+  const { hasTenantRole, isTenantAdmin, isTenantStaff } = useTenant();
+
+  const isAnalyst = hasTenantRole('analyst_db') || hasTenantRole('analyst_app');
+  const shouldFetchQueues = isAnalyst && !isTenantAdmin && !!user?.id;
 
   const { data: queueIds, isLoading, error } = useQuery({
     queryKey: ["analyst-queues", user?.id],
@@ -56,6 +58,6 @@ export function useAnalystQueues() {
     isAnalyst,
     hasQueues: (queueIds?.length || 0) > 0,
     // Returns true if analyst should have restricted view
-    shouldRestrictView: isAnalyst && !isSuperAdmin && !isOtimizzoUser,
+    shouldRestrictView: isAnalyst && !isTenantAdmin && !isTenantStaff,
   };
 }

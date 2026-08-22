@@ -69,32 +69,3 @@ export const useUpdateClient = () => {
     },
   });
 };
-
-export const useDeleteClient = () => {
-  const queryClient = useQueryClient();
-
-  return useMutation({
-    mutationFn: async (clientId: string) => {
-      const { error } = await supabase
-        .from("clients")
-        .delete()
-        .eq("id", clientId);
-
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["clients"] });
-      toast({
-        title: "Sucesso",
-        description: "Cliente deletado com sucesso!",
-      });
-    },
-    onError: (error: Error) => {
-      toast({
-        title: "Erro",
-        description: `Erro ao deletar cliente: ${error.message}`,
-        variant: "destructive",
-      });
-    },
-  });
-};

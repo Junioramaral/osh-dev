@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useAnalystQueues } from "@/hooks/useAnalystQueues";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Collapsible, CollapsibleContent } from "@/components/ui/collapsible";
 import { Label } from "@/components/ui/label";
 import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -33,7 +35,8 @@ import { SegmentSelect } from "@/components/common/SegmentSelect";
 import { cn } from "@/lib/utils";
 
 export default function Tickets() {
-  const { profile, tenantId, hasRole, isSuperAdmin, isOtimizzoUser, isAnalyst, isTenantAdmin } = useAuth();
+  const { profile } = useAuth();
+  const { tenantId, clientId, isTenantStaff, isTenantAdmin, isAnalyst, hasTenantRole } = useTenant();
   const { queueIds: analystQueueIds, queues: analystQueues, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -54,6 +57,7 @@ export default function Tickets() {
   const [teamFilter, setTeamFilter] = useState<string>("all");
   const [queueFilter, setQueueFilter] = useState<string>("all");
   const [typeFilter, setTypeFilter] = useState<string>("all");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const [isNewTicketOpen, setIsNewTicketOpen] = useState(false);
   const [selectedTickets, setSelectedTickets] = useState<Set<string>>(new Set());
   const [showAssignAnalystDialog, setShowAssignAnalystDialog] = useState(false);
@@ -92,7 +96,7 @@ export default function Tickets() {
     bulkUnlockTickets,
   } = useBulkTicketActions();
 
-  const isClient = !isOtimizzoUser && !isSuperAdmin;
+  const isClient = !isTenantStaff;
 
   const toggleTicketSelection = (ticketId: string) => {
     setSelectedTickets(prev => {
@@ -367,20 +371,20 @@ export default function Tickets() {
 
   // Check if user is from Otimizzo tenant
   const { data: currentTenant } = useQuery({
-    queryKey: ["current-tenant", tenantId],
+    queryKey: ["current-tenant", clientId],
     queryFn: async () => {
-      if (!tenantId) return null;
-      
+      if (!clientId) return null;
+
       const { data, error } = await supabase
         .from("clients")
         .select("id, name, tenant_type")
-        .eq("id", tenantId)
+        .eq("id", clientId)
         .single();
-      
+
       if (error) throw error;
       return data;
     },
-    enabled: !!tenantId,
+    enabled: !!clientId,
   });
 
   // Fetch all clients (only for Otimizzo users)
@@ -396,7 +400,7 @@ export default function Tickets() {
       if (error) throw error;
       return data;
     },
-    enabled: isOtimizzoUser,
+    enabled: isTenantStaff,
   });
 
   // Fetch all teams (only for Otimizzo/super admin users)
@@ -411,7 +415,7 @@ export default function Tickets() {
       if (error) throw error;
       return data;
     },
-    enabled: isOtimizzoUser || isSuperAdmin,
+    enabled: isTenantStaff,
   });
 
   // Fetch all queues (only for Otimizzo/super admin users)
@@ -427,7 +431,7 @@ export default function Tickets() {
       if (error) throw error;
       return data;
     },
-    enabled: isOtimizzoUser || isSuperAdmin,
+    enabled: isTenantStaff,
   });
 
   const { data: tickets, isLoading } = useQuery({
@@ -639,77 +643,106 @@ export default function Tickets() {
               </div>
             </PopoverContent>
           </Popover>
-          <Select value={typeFilter} onValueChange={setTypeFilter}>
-            <SelectTrigger className="w-[160px]">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos os tipos</SelectItem>
-              <SelectItem value="ticket">Suporte</SelectItem>
-              <SelectItem value="rfc">RFC</SelectItem>
-            </SelectContent>
-          </Select>
-          <SegmentSelect
-            value={segmentFilter}
-            onValueChange={setSegmentFilter}
-            clientId={clientFilter}
-            shortLabels
-            className="w-[180px]"
-          />
-
-          {isOtimizzoUser && (
-            <Select value={clientFilter} onValueChange={setClientFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Todos os clientes" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os clientes</SelectItem>
-                {allClients?.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-
-          {(isOtimizzoUser || isSuperAdmin) && (
-            <Select value={teamFilter} onValueChange={setTeamFilter}>
-              <SelectTrigger className="w-[200px]">
-                <SelectValue placeholder="Todos os times" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os times</SelectItem>
-                <SelectItem value="none">Sem time atribuído</SelectItem>
-                {allTeams?.map((team) => (
-                  <SelectItem key={team.id} value={team.id}>
-                    {team.name} ({team.segment})
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => setFiltersOpen((o) => !o)}
+            className="justify-between font-normal md:w-auto"
+          >
+            <span>
+              Mais filtros
+              {[typeFilter, segmentFilter, clientFilter, teamFilter, queueFilter].filter((v) => v !== "all").length > 0
+                ? ` (${[typeFilter, segmentFilter, clientFilter, teamFilter, queueFilter].filter((v) => v !== "all").length})`
+                : ""}
+            </span>
+            <ChevronDown className={cn("h-4 w-4 opacity-50 ml-2 shrink-0 transition-transform", filtersOpen && "rotate-180")} />
+          </Button>
         </div>
 
+        <Collapsible open={filtersOpen}>
+          <CollapsibleContent className="flex flex-col md:flex-row flex-wrap gap-4 pt-4">
+            <Select value={typeFilter} onValueChange={setTypeFilter}>
+              <SelectTrigger className="w-full md:w-[160px]">
+                <SelectValue placeholder="Tipo" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os tipos</SelectItem>
+                <SelectItem value="ticket">Suporte</SelectItem>
+                <SelectItem value="rfc">RFC</SelectItem>
+              </SelectContent>
+            </Select>
+            <SegmentSelect
+              value={segmentFilter}
+              onValueChange={setSegmentFilter}
+              clientId={clientFilter}
+              shortLabels
+              className="w-full md:w-[180px]"
+            />
+
+            {isTenantStaff && (
+              <Select value={clientFilter} onValueChange={setClientFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Todos os clientes" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os clientes</SelectItem>
+                  {allClients?.map((client) => (
+                    <SelectItem key={client.id} value={client.id}>
+                      {client.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+
+            {isTenantStaff && (
+              <Select value={teamFilter} onValueChange={setTeamFilter}>
+                <SelectTrigger className="w-full md:w-[200px]">
+                  <SelectValue placeholder="Todos os times" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Todos os times</SelectItem>
+                  <SelectItem value="none">Sem time atribuído</SelectItem>
+                  {allTeams?.map((team) => (
+                    <SelectItem key={team.id} value={team.id}>
+                      {team.name} ({team.segment})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </CollapsibleContent>
+        </Collapsible>
+
         {/* Queue Filter Buttons */}
-        {(isOtimizzoUser || isSuperAdmin) && allQueues && allQueues.length > 0 && (() => {
+        {isTenantStaff && allQueues && allQueues.length > 0 && (() => {
           const visibleQueues = shouldRestrictView && hasQueues
             ? allQueues.filter(q => analystQueueIds.includes(q.id))
             : allQueues;
           return visibleQueues.length > 0 ? (
-          <div className="flex flex-wrap gap-2 items-center">
+          <Collapsible open={filtersOpen}>
+            <CollapsibleContent className="flex flex-wrap gap-2 items-center">
             <span className="text-sm text-muted-foreground flex items-center gap-1">
               <ListOrdered className="h-4 w-4" />
               Filas:
             </span>
             {!(shouldRestrictView && hasQueues) && (
               <Badge
+                role="button"
+                tabIndex={0}
+                aria-pressed={queueFilter === "all"}
                 variant={queueFilter === "all" ? "default" : "outline"}
                 className={cn(
-                  "cursor-pointer transition-colors",
+                  "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   queueFilter === "all" && "bg-primary text-primary-foreground"
                 )}
                 onClick={() => setQueueFilter("all")}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setQueueFilter("all");
+                  }
+                }}
               >
                 Todas
               </Badge>
@@ -717,27 +750,46 @@ export default function Tickets() {
             {visibleQueues.map((queue) => (
               <Badge
                 key={queue.id}
+                role="button"
+                tabIndex={0}
+                aria-pressed={queueFilter === queue.id}
                 variant={queueFilter === queue.id ? "default" : "outline"}
                 className={cn(
-                  "cursor-pointer transition-colors",
+                  "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                   queueFilter === queue.id && "bg-primary text-primary-foreground"
                 )}
                 onClick={() => setQueueFilter(queue.id)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" || e.key === " ") {
+                    e.preventDefault();
+                    setQueueFilter(queue.id);
+                  }
+                }}
               >
                 {queue.name}
               </Badge>
             ))}
             <Badge
+              role="button"
+              tabIndex={0}
+              aria-pressed={queueFilter === "none"}
               variant={queueFilter === "none" ? "default" : "outline"}
               className={cn(
-                "cursor-pointer transition-colors",
+                "cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2",
                 queueFilter === "none" && "bg-muted-foreground text-background"
               )}
               onClick={() => setQueueFilter("none")}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  setQueueFilter("none");
+                }
+              }}
             >
               Sem fila
             </Badge>
-          </div>
+            </CollapsibleContent>
+          </Collapsible>
           ) : null;
         })()}
 
@@ -763,8 +815,9 @@ export default function Tickets() {
           </Card>
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <Card>
-            <Table className="min-w-[1200px]">
-              <TableHeader>
+            <div className="overflow-x-auto">
+              <Table className="min-w-[1200px]">
+                <TableHeader>
                 <TableRow>
                   <TableHead className="w-12">
                     <Checkbox 
@@ -795,7 +848,8 @@ export default function Tickets() {
                   />
                 ))}
               </TableBody>
-            </Table>
+              </Table>
+            </div>
           </Card>
         ) : (
           <Card>
@@ -805,7 +859,12 @@ export default function Tickets() {
               <p className="text-muted-foreground text-center max-w-md">
                 {searchTerm ||
                 JSON.stringify([...statusFilters].sort()) !== JSON.stringify([...DEFAULT_STATUS_FILTERS].sort()) ||
-                segmentFilter !== "all"
+                segmentFilter !== "all" ||
+                clientFilter !== "all" ||
+                teamFilter !== "all" ||
+                queueFilter !== "all" ||
+                typeFilter !== "all" ||
+                hiddenLockedCount > 0
                   ? "Tente ajustar os filtros de busca"
                   : "Crie seu primeiro ticket para começar"}
               </p>
@@ -829,7 +888,7 @@ export default function Tickets() {
           onReleaseTickets={!isClient ? () => setShowReleaseDialog(true) : undefined}
           onDeleteTickets={() => setShowDeleteDialog(true)}
           isClient={isClient}
-          canDelete={isSuperAdmin || isTenantAdmin}
+          canDelete={isTenantAdmin}
         />
       )}
 

@@ -10,10 +10,59 @@ export type Database = {
   // Allows to automatically instantiate createClient with right options
   // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
   __InternalSupabase: {
-    PostgrestVersion: "13.0.5"
+    PostgrestVersion: "14.5"
+  }
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
+      app_version: {
+        Row: {
+          changelog: string | null
+          id: number
+          migration_range: string | null
+          released_at: string
+          version: string
+        }
+        Insert: {
+          changelog?: string | null
+          id?: number
+          migration_range?: string | null
+          released_at?: string
+          version: string
+        }
+        Update: {
+          changelog?: string | null
+          id?: number
+          migration_range?: string | null
+          released_at?: string
+          version?: string
+        }
+        Relationships: []
+      }
       application_instances: {
         Row: {
           active_modules: Json | null
@@ -193,6 +242,35 @@ export type Database = {
           },
         ]
       }
+      client_users: {
+        Row: {
+          client_id: string
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          client_id: string
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          client_id?: string
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_users_client_id_fkey"
+            columns: ["client_id"]
+            isOneToOne: false
+            referencedRelation: "clients"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       clients: {
         Row: {
           app_product_ids: string[] | null
@@ -201,6 +279,7 @@ export type Database = {
           contract_start_date: string | null
           created_at: string | null
           db_engines: string[] | null
+          deleted_at: string | null
           domain: string | null
           id: string
           is_active: boolean | null
@@ -226,6 +305,7 @@ export type Database = {
           sla_db_p4_resolution: number | null
           status: string | null
           tags: string[] | null
+          tenant_id: string
           tenant_type: string | null
           updated_at: string | null
         }
@@ -236,6 +316,7 @@ export type Database = {
           contract_start_date?: string | null
           created_at?: string | null
           db_engines?: string[] | null
+          deleted_at?: string | null
           domain?: string | null
           id?: string
           is_active?: boolean | null
@@ -261,6 +342,7 @@ export type Database = {
           sla_db_p4_resolution?: number | null
           status?: string | null
           tags?: string[] | null
+          tenant_id: string
           tenant_type?: string | null
           updated_at?: string | null
         }
@@ -271,6 +353,7 @@ export type Database = {
           contract_start_date?: string | null
           created_at?: string | null
           db_engines?: string[] | null
+          deleted_at?: string | null
           domain?: string | null
           id?: string
           is_active?: boolean | null
@@ -296,10 +379,19 @@ export type Database = {
           sla_db_p4_resolution?: number | null
           status?: string | null
           tags?: string[] | null
+          tenant_id?: string
           tenant_type?: string | null
           updated_at?: string | null
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "clients_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       database_engines: {
         Row: {
@@ -590,6 +682,24 @@ export type Database = {
           },
         ]
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -642,6 +752,7 @@ export type Database = {
           is_active: boolean | null
           name: string
           sort_order: number | null
+          tenant_id: string
         }
         Insert: {
           created_at?: string | null
@@ -650,6 +761,7 @@ export type Database = {
           is_active?: boolean | null
           name: string
           sort_order?: number | null
+          tenant_id: string
         }
         Update: {
           created_at?: string | null
@@ -658,8 +770,17 @@ export type Database = {
           is_active?: boolean | null
           name?: string
           sort_order?: number | null
+          tenant_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "queues_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       report_send_logs: {
         Row: {
@@ -917,6 +1038,7 @@ export type Database = {
           name: string
           segment: string
           specialization: string | null
+          tenant_id: string
         }
         Insert: {
           created_at?: string | null
@@ -924,6 +1046,7 @@ export type Database = {
           name: string
           segment: string
           specialization?: string | null
+          tenant_id: string
         }
         Update: {
           created_at?: string | null
@@ -931,8 +1054,17 @@ export type Database = {
           name?: string
           segment?: string
           specialization?: string | null
+          tenant_id?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "teams_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       teams_queues: {
         Row: {
@@ -969,6 +1101,65 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      tenant_users: {
+        Row: {
+          created_at: string
+          id: string
+          role: string
+          tenant_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          role: string
+          tenant_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          role?: string
+          tenant_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "tenant_users_tenant_id_fkey"
+            columns: ["tenant_id"]
+            isOneToOne: false
+            referencedRelation: "tenants"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      tenants: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          is_platform_owner: boolean
+          name: string
+          slug: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_platform_owner?: boolean
+          name: string
+          slug: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          is_platform_owner?: boolean
+          name?: string
+          slug?: string
+        }
+        Relationships: []
       }
       ticket_categories: {
         Row: {
@@ -1669,6 +1860,8 @@ export type Database = {
         }[]
       }
       get_analyst_queue_ids: { Args: { _user_id: string }; Returns: string[] }
+      get_current_client_id: { Args: never; Returns: string }
+      get_current_tenant_id: { Args: never; Returns: string }
       get_tenant_by_domain: { Args: { _email: string }; Returns: string }
       get_user_email: { Args: { _user_id: string }; Returns: string }
       get_user_tenant_id: { Args: { _user_id: string }; Returns: string }
@@ -1685,7 +1878,9 @@ export type Database = {
       }
       is_analyst: { Args: { _user_id: string }; Returns: boolean }
       is_otimizzo_user: { Args: { _user_id: string }; Returns: boolean }
+      is_platform_admin: { Args: never; Returns: boolean }
       is_super_admin: { Args: { _user_id: string }; Returns: boolean }
+      is_tenant_admin: { Args: never; Returns: boolean }
       is_viewer: { Args: { _user_id: string }; Returns: boolean }
       update_machine_secret: {
         Args: { new_value: string; secret_id: string }
@@ -1725,6 +1920,7 @@ export type Database = {
         | "aguardando_aprovacao"
         | "aprovado"
         | "liberado"
+        | "rascunho"
       ticket_type:
         | "incidente"
         | "duvida"
@@ -1857,6 +2053,9 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: [
@@ -1888,6 +2087,7 @@ export const Constants = {
         "aguardando_aprovacao",
         "aprovado",
         "liberado",
+        "rascunho",
       ],
       ticket_type: [
         "incidente",

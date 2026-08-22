@@ -32,12 +32,11 @@ import { formatEnvironment } from "./TicketDetails";
 import { useTicketActions } from "@/hooks/useTicketActions";
 import { useTicketTimeLogs, useTicketHistory } from "@/hooks/useTicketDetail";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { cn } from "@/lib/utils";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { useQueryClient, useQuery } from "@tanstack/react-query";
-
-const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
 
 interface TicketSidebarProps {
   ticket: any;
@@ -61,29 +60,39 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
   const [savingRequiredFields, setSavingRequiredFields] = useState(false);
   const [showSLAAdjustDialog, setShowSLAAdjustDialog] = useState(false);
   const [pendingPriority, setPendingPriority] = useState<string | null>(null);
-  const { profile, isViewer, isOtimizzoUser, isSuperAdmin } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantStaff, isTenantAdmin, tenantId } = useTenant();
   const queryClient = useQueryClient();
   const { data: timeLogs } = useTicketTimeLogs(ticket.id);
   const { data: history } = useTicketHistory(ticket.id);
-  const canAssignAnalyst = (isOtimizzoUser || isSuperAdmin) && !isViewer;
+  const canAssignAnalyst = isTenantStaff || isTenantAdmin;
   const [editingAnalyst, setEditingAnalyst] = useState(false);
   const [assigningAnalyst, setAssigningAnalyst] = useState(false);
   const [pendingAnalystId, setPendingAnalystId] = useState<string>("");
   const [pendingTeamId, setPendingTeamId] = useState<string>("");
 
   const { data: assignableAnalysts } = useQuery({
-    queryKey: ["sidebar-otimizzo-analysts"],
+    queryKey: ["sidebar-tenant-analysts", tenantId],
     queryFn: async () => {
+      const { data: tenantUserRows, error: tuError } = await supabase
+        .from("tenant_users")
+        .select("user_id")
+        .eq("tenant_id", tenantId);
+      if (tuError) throw tuError;
+
+      const userIds = (tenantUserRows || []).map((r) => r.user_id);
+      if (userIds.length === 0) return [];
+
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, team_id")
-        .eq("client_id", OTIMIZZO_TENANT_ID)
+        .in("id", userIds)
         .eq("is_active", true)
         .order("full_name");
       if (error) throw error;
       return data || [];
     },
-    enabled: canAssignAnalyst,
+    enabled: canAssignAnalyst && !!tenantId,
   });
 
   const { data: analystTeams, isLoading: loadingAnalystTeams } = useQuery({
@@ -188,10 +197,10 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
 
   const totalLogs = timeLogs?.length || 0;
   
-  // Apenas analistas Otimizzo/SuperAdmin podem registrar horas (não clientes, não viewers)
-  const canLogTime = (isOtimizzoUser || isSuperAdmin) && !isViewer;
+  // Apenas staff do tenant pode registrar horas (não clientes)
+  const canLogTime = isTenantStaff || isTenantAdmin;
   const { resolveTicketWithReason, updateTicketStatus, updateTicketPriority, adjustSLA } = useTicketActions();
-  const canAdjustSLA = (isOtimizzoUser || isSuperAdmin) && !isViewer && ticket.record_type !== 'rfc';
+  const canAdjustSLA = (isTenantStaff || isTenantAdmin) && ticket.record_type !== 'rfc';
   
   const slaStatus = calculateSLAStatus(ticket);
   const now = new Date();
@@ -331,8 +340,8 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             </div>
           )}
 
-          {/* Status Dropdown - only show if not resolved and not viewer */}
-          {!isResolved && !isViewer && (
+          {/* Status Dropdown - only show if not resolved */}
+          {!isResolved && (
             <>
               <div className="space-y-2">
                 <Label className="text-xs text-muted-foreground">Alterar Status</Label>
@@ -399,7 +408,7 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
             </Button>
           )}
 
-          {/* Log Time Button - visible for Otimizzo/SuperAdmin even on resolved tickets */}
+          {/* Log Time Button - visible for tenant staff even on resolved tickets */}
           {canLogTime && (
             <Button
               variant="outline"
@@ -410,18 +419,11 @@ export default function TicketSidebar({ ticket }: TicketSidebarProps) {
               Registrar Horas
             </Button>
           )}
-
-          {/* Viewer read-only message */}
-          {isViewer && !isResolved && (
-            <p className="text-xs text-purple-600 dark:text-purple-400 text-center">
-              Modo somente leitura (Auditor)
-            </p>
-          )}
         </CardContent>
       </Card>
 
-      {/* Hours Summary Card - visible for Otimizzo/SuperAdmin */}
-      {(isOtimizzoUser || isSuperAdmin) && (
+      {/* Hours Summary Card - visible for tenant staff */}
+      {(isTenantStaff || isTenantAdmin) && (
         <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
           <CardHeader className="pb-2">
             <CardTitle className="text-sm flex items-center gap-2">

@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "@/hooks/use-toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -25,9 +26,10 @@ interface RFCFormSectionProps {
 }
 
 export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionProps) {
-  const { profile, tenantId, isOtimizzoUser } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantStaff, clientId: myClientId } = useTenant();
 
-  const [clientId, setClientId] = useState<string>("");
+  const [pickedClientId, setPickedClientId] = useState<string>("");
   const [contactId, setContactId] = useState<string>("");
   const [segment, setSegment] = useState<"DB" | "APP">("DB");
   const [title, setTitle] = useState("");
@@ -61,11 +63,11 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
       if (error) throw error;
       return data;
     },
-    enabled: !!isOtimizzoUser,
+    enabled: !!isTenantStaff,
   });
 
-  // For client users, use their own tenantId
-  const effectiveClientId = isOtimizzoUser ? clientId : (tenantId || "");
+  // For client users, use their own client id
+  const effectiveClientId = isTenantStaff ? pickedClientId : (myClientId || "");
 
   // Reset contact when client changes
   useEffect(() => {
@@ -74,7 +76,7 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
     setDbEngine(""); setDbEnvironment(""); setDbMachineId(""); setDbInstanceId("");
     setAppProductId(""); setAppEnvironment(""); setAppMachineId(""); setAppInstanceId("");
     setAppModule(""); setAppVersion("");
-  }, [clientId]);
+  }, [pickedClientId]);
 
   // Reset technical fields when segment changes
   useEffect(() => {
@@ -232,12 +234,12 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         return { id: p.id, full_name: p.full_name, email: au?.email || "" };
       });
     },
-    enabled: !!isOtimizzoUser && !!effectiveClientId,
+    enabled: !!isTenantStaff && !!effectiveClientId,
   });
 
   const isValid =
     !!effectiveClientId &&
-    (!isOtimizzoUser || !!contactId) &&
+    (!isTenantStaff || !!contactId) &&
     title.trim().length > 0 &&
     steps.length > 0;
 
@@ -262,10 +264,10 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         .join("\n");
 
       const selectedContact = contacts?.find((c) => c.id === contactId);
-      const contactName = isOtimizzoUser && selectedContact
+      const contactName = isTenantStaff && selectedContact
         ? selectedContact.full_name
         : (profile?.full_name || user.email || "Usuário");
-      const contactEmail = isOtimizzoUser && selectedContact
+      const contactEmail = isTenantStaff && selectedContact
         ? selectedContact.email
         : (user.email || "");
 
@@ -367,11 +369,11 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         </p>
       </div>
 
-      {/* 1. Cliente — apenas para usuários Otimizzo */}
-      {isOtimizzoUser && (
+      {/* 1. Cliente — apenas para staff do tenant */}
+      {isTenantStaff && (
         <div className="space-y-2">
           <Label htmlFor="rfc-client">Cliente *</Label>
-          <Select value={clientId} onValueChange={setClientId}>
+          <Select value={pickedClientId} onValueChange={setPickedClientId}>
             <SelectTrigger id="rfc-client">
               <SelectValue placeholder="Selecione o cliente" />
             </SelectTrigger>
@@ -386,8 +388,8 @@ export default function RFCFormSection({ onSuccess, onCancel }: RFCFormSectionPr
         </div>
       )}
 
-      {/* 1b. Contato — apenas para usuários Otimizzo, após selecionar cliente */}
-      {isOtimizzoUser && clientId && (
+      {/* 1b. Contato — apenas para staff do tenant, após selecionar cliente */}
+      {isTenantStaff && pickedClientId && (
         <div className="space-y-2">
           <Label htmlFor="rfc-contact">Contato *</Label>
           <Select value={contactId} onValueChange={setContactId} disabled={contactsLoading}>

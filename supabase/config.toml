@@ -1,6 +1,12 @@
-project_id = "ukrgzsntvddzwtmccwbf"
+project_id = "eilykstqtppppuuxnpde"
 
 [functions.invite-user]
+verify_jwt = false
+
+[functions.create-tenant]
+verify_jwt = false
+
+[functions.invite-tenant-user]
 verify_jwt = false
 
 [functions.sla-monitor]

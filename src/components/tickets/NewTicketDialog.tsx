@@ -6,6 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { useActiveSegments } from "@/hooks/useSegments";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "@/hooks/use-toast";
 import { TicketCreatedDialog } from "./TicketCreatedDialog";
 import { FileUploadZone, FileWithPreview } from "./FileUploadZone";
@@ -43,8 +44,8 @@ const ticketSchema = z.object({
   priority: z.enum(["P1", "P2", "P3", "P4"]),
   category: z.string().min(1, "Categoria é obrigatória"),
   subcategory: z.string().optional(),
-  opening_reason: z.string().min(1, "Motivo da abertura é obrigatório").max(500, "Máximo 500 caracteres"),
-  problem_faced: z.string().min(1, "Problema enfrentado é obrigatório").max(2000, "Máximo 2000 caracteres"),
+  opening_reason: z.string().min(1, "Motivo da abertura é obrigatório"),
+  problem_faced: z.string().max(2000, "Máximo 2000 caracteres").optional(),
   error_displayed: z.string().optional(),
   started_at: z.string().min(1, "Data de início é obrigatória"),
   frequency: z.enum(["pontual", "intermitente", "continuo"]),
@@ -89,7 +90,8 @@ interface NewTicketDialogProps {
 }
 
 export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogProps) {
-  const { profile, tenantId, hasRole, isOtimizzoUser, isSuperAdmin, isTenantAdmin } = useAuth();
+  const { profile } = useAuth();
+  const { clientId, tenantId, hasTenantRole, isTenantStaff, isTenantAdmin } = useTenant();
   const queryClient = useQueryClient();
   const [recordType, setRecordType] = useState<"suporte" | "rfc">("suporte");
   const [segment, setSegment] = useState<string | null>(null);
@@ -98,8 +100,9 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
   const [uploadFiles, setUploadFiles] = useState<FileWithPreview[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
-  // Usar profile.client_id como fonte primária (carrega antes dos roles)
-  const effectiveTenantId = tenantId || profile?.client_id || null;
+  // Only meaningful for a client-contact user (their own client, from client_users).
+  // Staff have no default client — they always pick one from the "Cliente" dropdown.
+  const effectiveTenantId = clientId || null;
 
   const form = useForm<TicketFormData>({
     resolver: zodResolver(ticketSchema),
@@ -145,16 +148,18 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     enabled: !!effectiveTenantId,
   });
 
-  const isOtimizzoTenant = currentTenant?.tenant_type === 'otimizzo';
+  // Replaces the old currentTenant.tenant_type === 'otimizzo' pseudo-client detection —
+  // isTenantStaff is the direct flag for "current user is tenant staff, not a client contact".
+  const isOtimizzoTenant = isTenantStaff;
 
-  // Check if analyst (not super_admin/tenant_admin) to restrict by queues
-  const isAnalystOnly = isOtimizzoUser && (hasRole('analyst_db') || hasRole('analyst_app')) && !isSuperAdmin && !isTenantAdmin;
+  // Check if analyst (not tenant_admin) to restrict by queues
+  const isAnalystOnly = isTenantStaff && (hasTenantRole('analyst_db') || hasTenantRole('analyst_app')) && !isTenantAdmin;
 
   // Derive analyst segments from roles instead of team
   const analystSegments: string[] = [];
   if (isAnalystOnly) {
-    if (hasRole('analyst_db')) analystSegments.push('DB');
-    if (hasRole('analyst_app')) analystSegments.push('APP');
+    if (hasTenantRole('analyst_db')) analystSegments.push('DB');
+    if (hasTenantRole('analyst_app')) analystSegments.push('APP');
   }
 
   // Fetch analyst's assigned queues from user_queues
@@ -475,32 +480,42 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
     },
   });
 
-  // Fetch responsible users (Otimizzo team + selected client) — Otimizzo tenant only
-  const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+  // Fetch responsible users (tenant staff + selected client's own contacts)
   const { data: responsibleUsers } = useQuery({
-    queryKey: ["responsible-users", selectedClientId, isOtimizzoTenant],
+    queryKey: ["responsible-users", selectedClientId, isOtimizzoTenant, tenantId],
     queryFn: async () => {
-      if (!isOtimizzoTenant || !selectedClientId) return [];
-      const clientIds = Array.from(new Set([OTIMIZZO_TENANT_ID, selectedClientId]));
+      if (!isOtimizzoTenant || !selectedClientId || !tenantId) return [];
+
+      const [{ data: tenantUserRows, error: tuError }, { data: clientUserRows, error: cuError }] = await Promise.all([
+        supabase.from("tenant_users").select("user_id").eq("tenant_id", tenantId),
+        supabase.from("client_users").select("user_id").eq("client_id", selectedClientId),
+      ]);
+      if (tuError) throw tuError;
+      if (cuError) throw cuError;
+
+      const tenantUserIds = new Set((tenantUserRows || []).map((r) => r.user_id));
+      const allIds = Array.from(new Set([...tenantUserIds, ...(clientUserRows || []).map((r) => r.user_id)]));
+      if (allIds.length === 0) return [];
+
       const { data: profs, error } = await supabase
         .from("profiles")
-        .select("id, full_name, client_id")
-        .in("client_id", clientIds)
+        .select("id, full_name")
+        .in("id", allIds)
         .order("full_name");
       if (error) throw error;
       const withEmails = await Promise.all(
         (profs || []).map(async (p) => {
           const { data: email } = await supabase.rpc("get_user_email", { _user_id: p.id });
-          return email ? { ...p, email: email as string } : null;
+          return email ? { ...p, email: email as string, isTenantStaffMember: tenantUserIds.has(p.id) } : null;
         })
       );
-      return withEmails.filter((u): u is { id: string; full_name: string; client_id: string | null; email: string } => !!u);
+      return withEmails.filter((u): u is { id: string; full_name: string; email: string; isTenantStaffMember: boolean } => !!u);
     },
-    enabled: !!isOtimizzoTenant && !!selectedClientId,
+    enabled: !!isOtimizzoTenant && !!selectedClientId && !!tenantId,
   });
 
-  const otimizzoResponsibles = responsibleUsers?.filter(u => u.client_id === OTIMIZZO_TENANT_ID) || [];
-  const clientResponsibles = responsibleUsers?.filter(u => u.client_id === selectedClientId) || [];
+  const otimizzoResponsibles = responsibleUsers?.filter(u => u.isTenantStaffMember) || [];
+  const clientResponsibles = responsibleUsers?.filter(u => !u.isTenantStaffMember) || [];
   const selectedResponsible = responsibleUsers?.find(u => u.id === selectedResponsibleUserId);
 
   // Pre-select current user as responsible when list loads
@@ -597,7 +612,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
   // Auto-selecionar engine quando houver apenas 1
   useEffect(() => {
-    if (availableDbEngines.length === 1 && segment === "DB") {
+    if (availableDbEngines.length === 1 && segment === "DB" && !selectedDbEngine) {
       setValue("db_engine", availableDbEngines[0] as any);
     }
   }, [availableDbEngines, segment, setValue]);
@@ -927,7 +942,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         </DialogHeader>
 
         {/* Seletor de Tipo de Registro — RFC apenas para usuários internos (Otimizzo/SuperAdmin) */}
-        {(isOtimizzoUser || isSuperAdmin) && (
+        {(isTenantStaff || isTenantAdmin) && (
           <Tabs value={recordType} onValueChange={(v) => setRecordType(v as "suporte" | "rfc")}>
             <TabsList className="grid w-full grid-cols-2">
               <TabsTrigger value="suporte">Suporte</TabsTrigger>
@@ -937,7 +952,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
         )}
 
         {/* Formulário RFC */}
-        {(isOtimizzoUser || isSuperAdmin) && recordType === "rfc" && (
+        {(isTenantStaff || isTenantAdmin) && recordType === "rfc" && (
           <RFCFormSection
             onSuccess={(ticket) => {
               setCreatedTicket(ticket);
@@ -1170,7 +1185,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             const availableQueues = isAnalystOnly && analystQueues && analystQueues.length > 0
               ? queues?.filter(q => analystQueues.includes(q.id))
               : queues;
-            return isOtimizzoUser && availableQueues && availableQueues.length > 0 ? (
+            return isTenantStaff && availableQueues && availableQueues.length > 0 ? (
               <div className="space-y-2">
                 <Label htmlFor="queue_id" className="flex items-center gap-2">
                   <ListOrdered className="h-4 w-4" />
@@ -1203,7 +1218,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             <>
               {/* Aviso se não houver engines cadastradas */}
               {availableDbEngines.length === 0 && (
-                isOtimizzoUser ? (
+                isTenantStaff ? (
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -1242,7 +1257,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
 
               {/* Aviso se não houver instâncias */}
               {dbInstances?.length === 0 && selectedDbEngine && (
-                isOtimizzoUser ? (
+                isTenantStaff ? (
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -1404,7 +1419,7 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
             <>
               {/* Aviso se não houver instâncias */}
               {appInstances?.length === 0 && selectedAppProductId && (
-                isOtimizzoUser ? (
+                isTenantStaff ? (
                   <div className="p-4 bg-amber-50 border border-amber-200 rounded-lg flex items-start gap-3">
                     <AlertCircle className="h-5 w-5 text-amber-600 flex-shrink-0 mt-0.5" />
                     <div className="flex-1">
@@ -1589,7 +1604,6 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                   {...register("opening_reason")}
                   placeholder={"Ex: Sistema fora do ar desde 09h\nUsuários do time de vendas impactados"}
                   rows={3}
-                  maxLength={500}
                   className="resize-y"
                 />
                 <div className="flex justify-between items-center">
@@ -1597,13 +1611,13 @@ export default function NewTicketDialog({ open, onOpenChange }: NewTicketDialogP
                     <p className="text-sm text-destructive">{errors.opening_reason.message}</p>
                   ) : <span />}
                   <span className="text-xs text-muted-foreground">
-                    {(watch("opening_reason")?.length ?? 0)} / 500
+                    {(watch("opening_reason")?.length ?? 0)} caracteres
                   </span>
                 </div>
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="problem_faced">Problema Enfrentado *</Label>
+                <Label htmlFor="problem_faced">Problema Enfrentado</Label>
                 <Textarea
                   id="problem_faced"
                   {...register("problem_faced")}

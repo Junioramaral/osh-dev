@@ -40,6 +40,7 @@ import { TimeLogEditDialog } from "@/components/tickets/TimeLogEditDialog";
 import { TimeLogDeleteDialog } from "@/components/tickets/TimeLogDeleteDialog";
 import { getTimeLogPermissions } from "@/lib/timeLogPermissions";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 
 interface TimeLogDialogProps {
   open: boolean;
@@ -373,7 +374,8 @@ function TicketTimeLogsHistory({
   ticketId: string;
   clientId: string;
 }) {
-  const { user, isSuperAdmin, isTenantAdmin, isViewer } = useAuth();
+  const { user } = useAuth();
+  const { isTenantAdmin } = useTenant();
   const [editingLog, setEditingLog] = useState<TicketTimeLogRow | null>(null);
   const [deletingLog, setDeletingLog] = useState<TicketTimeLogRow | null>(null);
 
@@ -459,9 +461,7 @@ function TicketTimeLogsHistory({
                   const perms = getTimeLogPermissions(
                     { analyst_id: log.analyst_id, logged_at: log.logged_at },
                     user?.id,
-                    isSuperAdmin,
                     isTenantAdmin,
-                    isViewer,
                   );
                   return (
                     <li key={log.id} className="px-3 py-2 text-sm min-w-0">

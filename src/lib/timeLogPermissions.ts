@@ -4,8 +4,7 @@
  * Rules:
  * - Analysts can edit/delete their own logs within 48 business hours
  * - Friday logs extend to Monday (24h Friday + weekend + 24h Monday)
- * - Super Admin and Tenant Admin have full access without time limits
- * - Viewers have read-only access
+ * - Tenant Admin has full access without time limits
  */
 
 export interface TimeLogPermissions {
@@ -58,22 +57,15 @@ export function isWithin48BusinessHours(loggedAt: Date): boolean {
 export function getTimeLogPermissions(
   log: TimeLogData,
   currentUserId: string | undefined,
-  isSuperAdmin: boolean,
-  isTenantAdmin: boolean,
-  isViewer: boolean
+  isTenantAdmin: boolean
 ): TimeLogPermissions {
   // Not authenticated
   if (!currentUserId) {
     return { canEdit: false, canDelete: false, reason: "Usuário não autenticado" };
   }
-  
-  // Viewers cannot edit/delete anything
-  if (isViewer) {
-    return { canEdit: false, canDelete: false, reason: "Modo somente leitura" };
-  }
-  
-  // Super Admin and Tenant Admin have full access
-  if (isSuperAdmin || isTenantAdmin) {
+
+  // Tenant Admin has full access
+  if (isTenantAdmin) {
     return { canEdit: true, canDelete: true };
   }
   

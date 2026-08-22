@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -26,7 +27,8 @@ import { calculateSLAStatus, formatDuration, type SLAStatus } from "@/lib/ticket
 import { SegmentSelect } from "@/components/common/SegmentSelect";
 
 const SLADashboard = () => {
-  const { profile, hasRole, isSuperAdmin, tenantId } = useAuth();
+  const { profile } = useAuth();
+  const { hasTenantRole } = useTenant();
   const [period, setPeriod] = useState("month");
   const [segment, setSegment] = useState<string>("all");
   const [clientId, setClientId] = useState<string>("all");
@@ -36,8 +38,8 @@ const SLADashboard = () => {
   const { data: clients } = useQuery({
     queryKey: ["clients-list", profile?.id],
     queryFn: async () => {
-      const query = supabase.from("clients").select("id, name").order("name");
-      
+      const query = supabase.from("clients").select("id, name").is("deleted_at", null).order("name");
+
       // RLS will handle tenant filtering automatically
       const { data, error } = await query;
       if (error) throw error;
@@ -87,9 +89,9 @@ const SLADashboard = () => {
       
       // Apply role-based filters
       // RLS handles tenant filtering automatically
-      if (hasRole('analyst_db') && !hasRole('analyst_app') && !hasRole('tenant_admin')) {
+      if (hasTenantRole('analyst_db') && !hasTenantRole('analyst_app') && !hasTenantRole('tenant_admin')) {
         query = query.eq('segment', 'DB');
-      } else if (hasRole('analyst_app') && !hasRole('analyst_db') && !hasRole('tenant_admin')) {
+      } else if (hasTenantRole('analyst_app') && !hasTenantRole('analyst_db') && !hasTenantRole('tenant_admin')) {
         query = query.eq('segment', 'APP');
       }
       

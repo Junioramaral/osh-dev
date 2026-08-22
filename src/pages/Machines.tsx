@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -80,7 +81,8 @@ const ENVIRONMENT_CONFIG = {
 };
 
 export default function Machines() {
-  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantAdmin } = useTenant();
   const queryClient = useQueryClient();
   const [typeFilter, setTypeFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -345,7 +347,7 @@ export default function Machines() {
             </div>
             <p className="text-muted-foreground">Catálogo de ativos de infraestrutura</p>
           </div>
-          {selectedClient && isSuperAdmin && !isViewer && (
+          {selectedClient && isTenantAdmin && (
             <Button onClick={() => setIsDialogOpen(true)}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Máquina
@@ -551,7 +553,7 @@ export default function Machines() {
                                           {machine.location || "-"}
                                         </TableCell>
                                         <TableCell>
-                                          {(isSuperAdmin || hasRole('tenant_admin')) && (
+                                          {isTenantAdmin && (
                                             <Button
                                               variant="ghost"
                                               size="icon"

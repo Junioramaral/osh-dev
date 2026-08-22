@@ -4,6 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import { toast } from "sonner";
 import {
   Dialog,
@@ -51,6 +52,7 @@ export default function DatabaseEngineDialog({
   engine,
 }: DatabaseEngineDialogProps) {
   const queryClient = useQueryClient();
+  const { tenantId } = useTenant();
   const isEditing = !!engine;
 
   const form = useForm<EngineFormData>({
@@ -80,6 +82,7 @@ export default function DatabaseEngineDialog({
       const { error } = await supabase
         .from("database_engines")
         .insert({
+          tenant_id: tenantId,
           name: data.name,
           description: data.description || null,
         });

@@ -5,7 +5,7 @@ import { getTicketTypeLabel } from "@/lib/ticketUtils";
 import { useState, useEffect } from "react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { toast } from "sonner";
@@ -54,7 +54,7 @@ const TICKET_TYPES = [
 ];
 
 function TicketIncidentCard({ ticket }: { ticket: any }) {
-  const { isOtimizzoUser } = useAuth();
+  const { isTenantStaff } = useTenant();
   const queryClient = useQueryClient();
   const [isEditing, setIsEditing] = useState(false);
   const [ticketType, setTicketType] = useState<string>(ticket.ticket_type ?? "");
@@ -142,7 +142,7 @@ function TicketIncidentCard({ ticket }: { ticket: any }) {
             <AlertCircle className="h-5 w-5 text-muted-foreground" />
             Detalhes do Ticket
           </CardTitle>
-          {isOtimizzoUser && (
+          {isTenantStaff && (
             <div className="flex items-center gap-1">
               {!isEditing ? (
                 <Button

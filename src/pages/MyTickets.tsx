@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useAnalystQueues } from "@/hooks/useAnalystQueues";
 import { SegmentSelect } from "@/components/common/SegmentSelect";
 import AppLayout from "@/components/layout/AppLayout";
@@ -27,7 +28,8 @@ import { ReleaseTicketDialog } from "@/components/tickets/ReleaseTicketDialog";
 import { useBulkTicketActions } from "@/hooks/useBulkTicketActions";
 
 export default function MyTickets() {
-  const { profile, isSuperAdmin, isOtimizzoUser } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantStaff } = useTenant();
   const { queues: analystQueues, queueIds: analystQueueIds, shouldRestrictView, hasQueues } = useAnalystQueues();
   const [searchTerm, setSearchTerm] = useState("");
   const STATUS_OPTIONS: { value: string; label: string }[] = [
@@ -319,7 +321,7 @@ export default function MyTickets() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, [selectedTickets]);
 
-  const canUseBulkActions = isOtimizzoUser || isSuperAdmin;
+  const canUseBulkActions = isTenantStaff;
 
   // Calcular o team_id comum dos tickets selecionados
   const getCommonTeamId = (): string | null => {
@@ -361,7 +363,7 @@ export default function MyTickets() {
       if (error) throw error;
       return data;
     },
-    enabled: isOtimizzoUser || isSuperAdmin,
+    enabled: isTenantStaff,
   });
 
   // Fetch tickets atribuídos ao usuário OU lockados pelo usuário
@@ -427,8 +429,23 @@ export default function MyTickets() {
     if (statusA !== statusB) {
       return statusA - statusB;
     }
-    
-    // Nível 2: Dentro do mesmo grupo, ordenar por ticket_number decrescente
+
+    // Nível 2: dentro do mesmo grupo de status, priorizar por urgência (P1 primeiro)
+    const priorityOrder: Record<string, number> = { P1: 0, P2: 1, P3: 2, P4: 3 };
+    const prioA = priorityOrder[a.priority as string] ?? 4;
+    const prioB = priorityOrder[b.priority as string] ?? 4;
+    if (prioA !== prioB) {
+      return prioA - prioB;
+    }
+
+    // Nível 3: dentro da mesma prioridade, quem estoura o SLA primeiro sobe
+    const deadlineA = a.sla_resolution_deadline ? new Date(a.sla_resolution_deadline).getTime() : Infinity;
+    const deadlineB = b.sla_resolution_deadline ? new Date(b.sla_resolution_deadline).getTime() : Infinity;
+    if (deadlineA !== deadlineB) {
+      return deadlineA - deadlineB;
+    }
+
+    // Nível 4: desempate por ticket_number decrescente
     const numA = parseInt(a.ticket_number, 10) || 0;
     const numB = parseInt(b.ticket_number, 10) || 0;
     return numB - numA; // Decrescente: mais novo primeiro
@@ -471,6 +488,7 @@ export default function MyTickets() {
           <div className="relative flex-1">
             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
             <Input
+              aria-label="Buscar por número ou título"
               placeholder="Buscar por número ou título..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
@@ -541,7 +559,7 @@ export default function MyTickets() {
             className="w-[180px]"
           />
 
-          {(isOtimizzoUser || isSuperAdmin) && (
+          {isTenantStaff && (
             <Select value={teamFilter} onValueChange={setTeamFilter}>
               <SelectTrigger className="w-[200px]">
                 <SelectValue placeholder="Todos os times" />
@@ -582,38 +600,40 @@ export default function MyTickets() {
           </Card>
         ) : filteredTickets && filteredTickets.length > 0 ? (
           <Card>
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead className="w-12">
-                    <Checkbox 
-                      checked={selectedTickets.size === filteredTickets.length && filteredTickets.length > 0}
-                      onCheckedChange={toggleSelectAll}
+            <div className="overflow-x-auto">
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-12">
+                      <Checkbox
+                        checked={selectedTickets.size === filteredTickets.length && filteredTickets.length > 0}
+                        onCheckedChange={toggleSelectAll}
+                      />
+                    </TableHead>
+                    <TableHead>Número</TableHead>
+                    <TableHead>Tempo de Vida</TableHead>
+                    <TableHead>Título</TableHead>
+                    <TableHead>Cliente</TableHead>
+                    <TableHead>Analista</TableHead>
+                    <TableHead>Time</TableHead>
+                    <TableHead>Fila</TableHead>
+                    <TableHead>Prioridade</TableHead>
+                    <TableHead>Status</TableHead>
+                    <TableHead>SLA</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {filteredTickets.map((ticket) => (
+                    <TicketRow
+                      key={ticket.id}
+                      ticket={ticket}
+                      isSelected={selectedTickets.has(ticket.id)}
+                      onToggleSelect={() => toggleTicketSelection(ticket.id)}
                     />
-                  </TableHead>
-                  <TableHead>Número</TableHead>
-                  <TableHead>Tempo de Vida</TableHead>
-                  <TableHead>Título</TableHead>
-                  <TableHead>Cliente</TableHead>
-                  <TableHead>Analista</TableHead>
-                  <TableHead>Time</TableHead>
-                  <TableHead>Fila</TableHead>
-                  <TableHead>Prioridade</TableHead>
-                  <TableHead>Status</TableHead>
-                  <TableHead>SLA</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredTickets.map((ticket) => (
-                  <TicketRow 
-                    key={ticket.id} 
-                    ticket={ticket}
-                    isSelected={selectedTickets.has(ticket.id)}
-                    onToggleSelect={() => toggleTicketSelection(ticket.id)}
-                  />
-                ))}
-              </TableBody>
-            </Table>
+                  ))}
+                </TableBody>
+              </Table>
+            </div>
           </Card>
         ) : (
           <Card>

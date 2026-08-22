@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   Dialog,
   DialogContent,
@@ -28,18 +29,28 @@ export function BulkAssignAnalystDialog({
   selectedCount
 }: BulkAssignAnalystDialogProps) {
   const [selectedAnalyst, setSelectedAnalyst] = useState<string>("");
+  const { tenantId } = useTenant();
 
-  // Buscar analistas Otimizzo ativos
+  // Buscar analistas ativos do tenant atual
   const { data: analysts, isLoading } = useQuery({
-    queryKey: ["otimizzo-analysts"],
+    queryKey: ["tenant-analysts", tenantId],
     queryFn: async () => {
-      // ID fixo do tenant Otimizzo para evitar problemas com RLS
-      const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+      const { data: tenantUserRows, error: tuError } = await supabase
+        .from("tenant_users")
+        .select("user_id")
+        .eq("tenant_id", tenantId);
+      if (tuError) {
+        console.error("Erro ao buscar equipe do tenant:", tuError);
+        throw tuError;
+      }
+
+      const userIds = (tenantUserRows || []).map((r) => r.user_id);
+      if (userIds.length === 0) return [];
 
       const { data, error } = await supabase
         .from("profiles")
         .select("id, full_name, team_id")
-        .eq("client_id", OTIMIZZO_TENANT_ID)
+        .in("id", userIds)
         .eq("is_active", true)
         .order("full_name");
 
@@ -47,10 +58,10 @@ export function BulkAssignAnalystDialog({
         console.error("Erro ao buscar analistas:", error);
         throw error;
       }
-      
+
       return data || [];
     },
-    enabled: open,
+    enabled: open && !!tenantId,
   });
 
   const handleConfirm = () => {

@@ -11,12 +11,18 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Switch } from "@/components/ui/switch";
+import { Badge } from "@/components/ui/badge";
 import { Loader2, Database, Package, Mail, FolderKanban } from "lucide-react";
 import ClientProjectsTab from "./ClientProjectsTab";
 import { formatCnpj } from "@/lib/cnpjUtils";
 import { TenantUsersManager } from "@/components/tenants/TenantUsersManager";
 import { TenantUserReport } from "@/components/tenants/TenantUserReport";
 import { useCreateClient, useUpdateClient } from "@/hooks/useClientMutations";
+import { useTenant } from "@/contexts/TenantContext";
+import { PhoneInput } from "@/components/ui/phone-input";
+import { Label } from "@/components/ui/label";
+import { cleanPhone, isValidPhone } from "@/lib/phoneUtils";
+import { toast } from "sonner";
 import type { Tables } from "@/integrations/supabase/types";
 
 type Client = Tables<"clients">;
@@ -141,9 +147,37 @@ const clientSchema = z.object({
   sla_app_p4_first_response: z.coerce.number().min(1).default(1400),
   sla_app_p4_resolution: z.coerce.number().min(1).default(4320),
   receive_monthly_report: z.boolean().default(false),
+}).superRefine((data, ctx) => {
+  if (data.segments.includes("DB") && data.db_engines.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Selecione ao menos uma engine de banco",
+      path: ["db_engines"],
+    });
+  }
+  if (data.segments.includes("APP") && data.app_product_ids.length === 0) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      message: "Selecione ao menos um produto de aplicação",
+      path: ["app_product_ids"],
+    });
+  }
 });
 
 type ClientFormData = z.infer<typeof clientSchema>;
+
+// P1 dispara escalonamento Twilio (SMS/WhatsApp/ligação) — a severidade decrescente aqui
+// existe pra dar hierarquia visual aos 16 campos de SLA, que antes eram idênticos.
+const PRIORITY_SEVERITY: Array<{
+  priority: "p1" | "p2" | "p3" | "p4";
+  label: string;
+  variant: "destructive" | "default" | "secondary" | "outline";
+}> = [
+  { priority: "p1", label: "Crítico", variant: "destructive" },
+  { priority: "p2", label: "Alta", variant: "default" },
+  { priority: "p3", label: "Média", variant: "secondary" },
+  { priority: "p4", label: "Baixa", variant: "outline" },
+];
 
 interface ClientFormProps {
   mode: "create" | "edit";
@@ -153,10 +187,13 @@ interface ClientFormProps {
 }
 
 export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFormProps) {
+  const { tenantId } = useTenant();
   const createClient = useCreateClient();
   const updateClient = useUpdateClient();
   const [selectedSegments, setSelectedSegments] = useState<string[]>([]);
   const [activeTab, setActiveTab] = useState("basic");
+  const [adminContact, setAdminContact] = useState({ name: "", email: "", phone: "" });
+  const [adminContactErrors, setAdminContactErrors] = useState<Record<string, string>>({});
 
   const { data: appProducts } = useQuery({
     queryKey: ["application_products"],
@@ -249,7 +286,27 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
     }
   }, [mode, client, form]);
 
+  const validateAdminContact = (domain: string) => {
+    const next: Record<string, string> = {};
+    if (!adminContact.name.trim()) next.name = "Nome do administrador é obrigatório";
+    if (!adminContact.email.trim()) next.email = "Email do administrador é obrigatório";
+    else if (domain && adminContact.email.split("@")[1]?.toLowerCase() !== domain.toLowerCase()) {
+      next.email = `Email deve pertencer ao domínio ${domain}`;
+    }
+    if (adminContact.phone && !isValidPhone(adminContact.phone)) next.phone = "Telefone inválido";
+    setAdminContactErrors(next);
+    return Object.keys(next).length === 0;
+  };
+
   const onSubmit = async (data: ClientFormData) => {
+    if (mode === "create" && !validateAdminContact(data.domain || "")) {
+      setActiveTab("basic");
+      toast.error("Verifique os dados do contato do cliente", {
+        description: "Corrija os campos destacados na seção \"Contato do Cliente\" antes de continuar.",
+      });
+      return;
+    }
+
     try {
       const clientData = {
         ...data,
@@ -264,7 +321,29 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
       };
 
       if (mode === "create") {
-        await createClient.mutateAsync(clientData as any);
+        const created = await createClient.mutateAsync({ ...clientData, tenant_id: tenantId } as any);
+
+        const { error: inviteError } = await supabase.functions.invoke("invite-user", {
+          body: {
+            email: adminContact.email,
+            full_name: adminContact.name,
+            phone: adminContact.phone ? cleanPhone(adminContact.phone) : undefined,
+            tenant_id: created.id,
+            role: "user",
+          },
+        });
+
+        if (inviteError) {
+          console.error("Erro ao enviar convite:", inviteError);
+          toast.warning("Cliente criado, mas houve um erro ao enviar o convite ao administrador.", {
+            description: "Você pode reenviar o convite na aba Usuários do cliente.",
+          });
+        } else {
+          toast.success(`Convite enviado para ${adminContact.email}`);
+        }
+
+        setAdminContact({ name: "", email: "", phone: "" });
+        setAdminContactErrors({});
         form.reset();
         onSaved?.();
       } else if (client) {
@@ -282,17 +361,19 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
     <Form {...form}>
       <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-          <TabsList className="flex w-full flex-wrap h-auto gap-1">
-            <TabsTrigger value="basic">Informações Básicas</TabsTrigger>
-            {mode === "edit" && <TabsTrigger value="users">Usuários</TabsTrigger>}
-            {mode === "edit" && <TabsTrigger value="report">Relatório</TabsTrigger>}
-            <TabsTrigger value="contract">Contrato</TabsTrigger>
-            <TabsTrigger value="sla">SLAs</TabsTrigger>
-            <TabsTrigger value="projects">
-              <FolderKanban className="h-4 w-4 mr-1" />
-              Projetos
-            </TabsTrigger>
-          </TabsList>
+          <div className="-mx-1 overflow-x-auto px-1 pb-1">
+            <TabsList className="h-auto w-max min-w-full justify-start gap-1 sm:w-full sm:flex-wrap">
+              <TabsTrigger value="basic" className="shrink-0">Informações Básicas</TabsTrigger>
+              {mode === "edit" && <TabsTrigger value="users" className="shrink-0">Usuários</TabsTrigger>}
+              {mode === "edit" && <TabsTrigger value="report" className="shrink-0">Relatório</TabsTrigger>}
+              <TabsTrigger value="contract" className="shrink-0">Contrato</TabsTrigger>
+              <TabsTrigger value="sla" className="shrink-0">SLAs</TabsTrigger>
+              <TabsTrigger value="projects" className="shrink-0">
+                <FolderKanban className="h-4 w-4 mr-1" />
+                Projetos
+              </TabsTrigger>
+            </TabsList>
+          </div>
 
           <TabsContent value="basic" className="space-y-4">
             <FormField
@@ -401,10 +482,14 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
               render={({ field }) => (
                 <FormItem>
                   <FormLabel>Segmentos</FormLabel>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
                     {/* Coluna Esquerda: Banco de Dados */}
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
+                    <div
+                      className={`rounded-lg border p-4 space-y-3 transition-colors ${
+                        field.value.includes("DB") ? "border-primary/40 bg-primary/[0.03]" : "border-border"
+                      }`}
+                    >
+                      <label htmlFor="segment-db" className="flex min-h-[44px] items-center gap-2 cursor-pointer">
                         <Checkbox
                           id="segment-db"
                           checked={field.value.includes("DB")}
@@ -419,10 +504,8 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
                             }
                           }}
                         />
-                        <label htmlFor="segment-db" className="text-sm font-medium cursor-pointer">
-                          Banco de Dados (DB)
-                        </label>
-                      </div>
+                        <span className="text-sm font-medium">Banco de Dados (DB)</span>
+                      </label>
 
                       {selectedSegments.includes("DB") && (
                         <FormField
@@ -434,27 +517,32 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
                                 <Database className="h-4 w-4 text-blue-500" />
                                 Engines de Banco ({engineField.value.length})
                               </FormLabel>
-                              <div className="space-y-3 border rounded-md p-4 bg-muted/20">
-                                {dbEngines?.map((engine) => (
-                                  <div key={engine.id} className="flex items-center space-x-3">
-                                    <Checkbox
-                                      id={`engine-${engine.name}`}
-                                      checked={engineField.value.includes(engine.name)}
-                                      onCheckedChange={(checked) => {
-                                        const newEngines = checked
-                                          ? [...engineField.value, engine.name]
-                                          : engineField.value.filter((e) => e !== engine.name);
-                                        engineField.onChange(newEngines);
-                                      }}
-                                    />
-                                    <div className="flex items-center gap-2">
+                              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-2 gap-2">
+                                {dbEngines?.map((engine) => {
+                                  const checked = engineField.value.includes(engine.name);
+                                  return (
+                                    <label
+                                      key={engine.id}
+                                      htmlFor={`engine-${engine.id}`}
+                                      className={`flex min-h-[44px] items-center gap-2 rounded-md border p-2.5 cursor-pointer transition-colors ${
+                                        checked ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+                                      }`}
+                                    >
+                                      <Checkbox
+                                        id={`engine-${engine.id}`}
+                                        checked={checked}
+                                        onCheckedChange={(next) => {
+                                          const newEngines = next
+                                            ? [...engineField.value, engine.name]
+                                            : engineField.value.filter((e) => e !== engine.name);
+                                          engineField.onChange(newEngines);
+                                        }}
+                                      />
                                       <DatabaseEngineIcon engine={engine.name} />
-                                      <label htmlFor={`engine-${engine.name}`} className="text-sm cursor-pointer">
-                                        {engine.name}
-                                      </label>
-                                    </div>
-                                  </div>
-                                ))}
+                                      <span className="text-sm truncate">{engine.name}</span>
+                                    </label>
+                                  );
+                                })}
                               </div>
                               <FormMessage />
                             </FormItem>
@@ -464,8 +552,12 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
                     </div>
 
                     {/* Coluna Direita: Aplicação */}
-                    <div className="space-y-3">
-                      <div className="flex items-center space-x-2">
+                    <div
+                      className={`rounded-lg border p-4 space-y-3 transition-colors ${
+                        field.value.includes("APP") ? "border-primary/40 bg-primary/[0.03]" : "border-border"
+                      }`}
+                    >
+                      <label htmlFor="segment-app" className="flex min-h-[44px] items-center gap-2 cursor-pointer">
                         <Checkbox
                           id="segment-app"
                           checked={field.value.includes("APP")}
@@ -480,10 +572,8 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
                             }
                           }}
                         />
-                        <label htmlFor="segment-app" className="text-sm font-medium cursor-pointer">
-                          Aplicação (APP)
-                        </label>
-                      </div>
+                        <span className="text-sm font-medium">Aplicação (APP)</span>
+                      </label>
 
                       {selectedSegments.includes("APP") && (
                         <FormField
@@ -495,34 +585,40 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
                                 <Package className="h-4 w-4 text-green-500" />
                                 Produtos de Aplicação ({productField.value.length})
                               </FormLabel>
-                              <div className="space-y-3 border rounded-md p-4 bg-muted/20 max-h-64 overflow-y-auto">
-                                {appProducts?.map((product) => (
-                                  <div key={product.id} className="flex items-start space-x-3">
-                                    <Checkbox
-                                      id={`app-${product.id}`}
-                                      checked={productField.value.includes(product.id)}
-                                      onCheckedChange={(checked) => {
-                                        const newProducts = checked
-                                          ? [...productField.value, product.id]
-                                          : productField.value.filter((id) => id !== product.id);
-                                        productField.onChange(newProducts);
-                                      }}
-                                    />
-                                    <div className="flex items-start gap-2 min-w-0">
+                              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-2 max-h-64 overflow-y-auto pr-1">
+                                {appProducts?.map((product) => {
+                                  const checked = productField.value.includes(product.id);
+                                  return (
+                                    <label
+                                      key={product.id}
+                                      htmlFor={`app-${product.id}`}
+                                      className={`flex items-start gap-2 rounded-md border p-2.5 cursor-pointer transition-colors ${
+                                        checked ? "border-primary bg-primary/5" : "border-border hover:bg-muted/40"
+                                      }`}
+                                    >
+                                      <Checkbox
+                                        id={`app-${product.id}`}
+                                        checked={checked}
+                                        onCheckedChange={(next) => {
+                                          const newProducts = next
+                                            ? [...productField.value, product.id]
+                                            : productField.value.filter((id) => id !== product.id);
+                                          productField.onChange(newProducts);
+                                        }}
+                                        className="mt-0.5"
+                                      />
                                       <ApplicationProductIcon productName={product.name} />
                                       <div className="flex flex-col min-w-0">
-                                        <label htmlFor={`app-${product.id}`} className="text-sm font-medium cursor-pointer">
-                                          {product.name}
-                                        </label>
+                                        <span className="text-sm font-medium">{product.name}</span>
                                         {product.description && (
                                           <span className="text-xs text-muted-foreground line-clamp-2">
                                             {product.description}
                                           </span>
                                         )}
                                       </div>
-                                    </div>
-                                  </div>
-                                ))}
+                                    </label>
+                                  );
+                                })}
                               </div>
                               <FormMessage />
                             </FormItem>
@@ -535,6 +631,49 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
                 </FormItem>
               )}
             />
+
+            {mode === "create" && (
+              <div className="border-t pt-4 space-y-4">
+                <h3 className="font-semibold text-sm">Contato do Cliente</h3>
+                <p className="text-xs text-muted-foreground">
+                  Um email de convite será enviado automaticamente para este contato após a criação do cliente.
+                </p>
+
+                <div className="space-y-2">
+                  <Label htmlFor="admin-name">Nome Completo *</Label>
+                  <Input
+                    id="admin-name"
+                    value={adminContact.name}
+                    onChange={(e) => setAdminContact((f) => ({ ...f, name: e.target.value }))}
+                    placeholder="João Silva"
+                  />
+                  {adminContactErrors.name && <p className="text-sm text-destructive">{adminContactErrors.name}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="admin-email">Email *</Label>
+                  <Input
+                    id="admin-email"
+                    type="email"
+                    value={adminContact.email}
+                    onChange={(e) => setAdminContact((f) => ({ ...f, email: e.target.value.toLowerCase() }))}
+                    placeholder="contato@exemplo.com"
+                  />
+                  {adminContactErrors.email && <p className="text-sm text-destructive">{adminContactErrors.email}</p>}
+                </div>
+
+                <div className="space-y-2">
+                  <Label htmlFor="admin-phone">Telefone (opcional)</Label>
+                  <PhoneInput
+                    id="admin-phone"
+                    value={adminContact.phone}
+                    onChange={(e) => setAdminContact((f) => ({ ...f, phone: e.target.value }))}
+                    placeholder="(00) 00000-0000"
+                  />
+                  {adminContactErrors.phone && <p className="text-sm text-destructive">{adminContactErrors.phone}</p>}
+                </div>
+              </div>
+            )}
           </TabsContent>
 
           {mode === "edit" && client && (
@@ -620,68 +759,80 @@ export default function ClientForm({ mode, client, onSaved, onCancel }: ClientFo
           <TabsContent value="sla" className="space-y-6">
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">SLA Database (minutos)</h3>
-              {["p1", "p2", "p3", "p4"].map((priority) => (
-                <div key={priority} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`sla_db_${priority}_first_response` as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{priority.toUpperCase()} - Primeira Resposta</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} min={1} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`sla_db_${priority}_resolution` as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{priority.toUpperCase()} - Resolução</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} min={1} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              {PRIORITY_SEVERITY.map(({ priority, label, variant }) => (
+                <div key={priority} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={variant}>{priority.toUpperCase()}</Badge>
+                    <span className="text-sm text-muted-foreground">{label}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`sla_db_${priority}_first_response` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Primeira Resposta</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} min={1} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`sla_db_${priority}_resolution` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Resolução</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} min={1} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               ))}
             </div>
 
             <div className="space-y-4">
               <h3 className="text-lg font-semibold">SLA Aplicação (minutos)</h3>
-              {["p1", "p2", "p3", "p4"].map((priority) => (
-                <div key={priority} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <FormField
-                    control={form.control}
-                    name={`sla_app_${priority}_first_response` as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{priority.toUpperCase()} - Primeira Resposta</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} min={1} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name={`sla_app_${priority}_resolution` as any}
-                    render={({ field }) => (
-                      <FormItem>
-                        <FormLabel>{priority.toUpperCase()} - Resolução</FormLabel>
-                        <FormControl>
-                          <Input type="number" {...field} min={1} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
+              {PRIORITY_SEVERITY.map(({ priority, label, variant }) => (
+                <div key={priority} className="space-y-2">
+                  <div className="flex items-center gap-2">
+                    <Badge variant={variant}>{priority.toUpperCase()}</Badge>
+                    <span className="text-sm text-muted-foreground">{label}</span>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <FormField
+                      control={form.control}
+                      name={`sla_app_${priority}_first_response` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Primeira Resposta</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} min={1} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                    <FormField
+                      control={form.control}
+                      name={`sla_app_${priority}_resolution` as any}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Resolução</FormLabel>
+                          <FormControl>
+                            <Input type="number" {...field} min={1} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
                 </div>
               ))}
             </div>

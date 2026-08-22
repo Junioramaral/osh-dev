@@ -2,6 +2,7 @@ import { useState, useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useTicketComments } from "@/hooks/useTicketDetail";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
@@ -136,11 +137,9 @@ interface TicketCommentsProps {
   };
 }
 
-// Otimizzo client/tenant ID for client detection
-const OTIMIZZO_TENANT_ID = '00000000-0000-0000-0000-000000000001';
-
 export default function TicketComments({ ticketId, clientId, ticket }: TicketCommentsProps) {
-  const { user, profile, isOtimizzoUser, isSuperAdmin, isViewer, hasRole, tenantId } = useAuth();
+  const { user, profile } = useAuth();
+  const { isTenantStaff } = useTenant();
   const queryClient = useQueryClient();
   const { data: comments, isLoading } = useTicketComments(ticketId);
   const [newComment, setNewComment] = useState('');
@@ -167,21 +166,13 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
     return validEmails;
   };
   
-  // IMPROVED: Detect client using profile.client_id as PRIMARY indicator
-  // This is more reliable than tenantId from roles which may not be loaded yet
-  // A user is a client if their profile.client_id is NOT Otimizzo
-  const isClientByProfile = profile?.client_id !== null && 
-                            profile?.client_id !== undefined && 
-                            profile?.client_id !== OTIMIZZO_TENANT_ID;
-  const isClientByTenant = tenantId !== null && tenantId !== OTIMIZZO_TENANT_ID;
-  const isClientUser = isClientByProfile || isClientByTenant;
-  
+  // A user is a client contact if they are not tenant staff
+  const isClientUser = !isTenantStaff;
+
   // Debug logging for troubleshooting notification issues
   console.log('[TicketComments] Auth state:', {
     userId: user?.id,
-    tenantId,
-    isOtimizzoUser,
-    isSuperAdmin,
+    isTenantStaff,
     isClientUser,
     profileName: profile?.full_name
   });
@@ -389,9 +380,8 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
         </div>
       </div>
       
-      {/* Comment Form - Hidden for viewers */}
-      {!isViewer && (
-        <Card className="p-4">
+      {/* Comment Form */}
+      <Card className="p-4">
           <div className="space-y-2">
             <Textarea
               value={newComment}
@@ -496,16 +486,6 @@ export default function TicketComments({ ticketId, clientId, ticket }: TicketCom
             </div>
           </div>
         </Card>
-      )}
-
-      {/* Viewer read-only message */}
-      {isViewer && (
-        <Card className="p-4 border-purple-200 dark:border-purple-800 bg-purple-50 dark:bg-purple-950/30">
-          <p className="text-sm text-purple-600 dark:text-purple-400 text-center">
-            Modo somente leitura (Auditor) - Você não pode adicionar notas
-          </p>
-        </Card>
-      )}
     </div>
   );
 }

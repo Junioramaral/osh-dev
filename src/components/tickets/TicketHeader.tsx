@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { format } from "date-fns";
 import { calculateSLAStatus, getPriorityColor, getStatusColor } from "@/lib/ticketUtils";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useDeleteTickets } from "@/hooks/useDeleteTickets";
 import { DeleteTicketDialog } from "@/components/tickets/DeleteTicketDialog";
 
@@ -15,11 +15,11 @@ interface TicketHeaderProps {
 
 export default function TicketHeader({ ticket }: TicketHeaderProps) {
   const navigate = useNavigate();
-  const { isSuperAdmin, isTenantAdmin } = useAuth();
+  const { isTenantAdmin } = useTenant();
   const deleteTickets = useDeleteTickets();
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const slaStatus = calculateSLAStatus(ticket);
-  const canDelete = isSuperAdmin || isTenantAdmin;
+  const canDelete = isTenantAdmin;
 
   const handleDelete = () => {
     deleteTickets.mutate([ticket.id], {

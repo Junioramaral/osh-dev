@@ -7,6 +7,7 @@ import { useTicketHistory, useTicketComments, useTicketTimeLogs, useTicketRFCSte
 import { useMemo } from "react";
 import { formatSmartDate } from "@/lib/dateUtils";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { getTimeLogPermissions } from "@/lib/timeLogPermissions";
 import { TimeLogEditDialog } from "./TimeLogEditDialog";
 import { TimeLogDeleteDialog } from "./TimeLogDeleteDialog";
@@ -163,7 +164,8 @@ export default function TicketTimeline({ ticketId, clientId, recordType }: Ticke
   const { data: comments } = useTicketComments(ticketId);
   const { data: timeLogs } = useTicketTimeLogs(ticketId);
   const { data: rfcSteps } = useTicketRFCSteps(recordType === 'rfc' ? ticketId : undefined);
-  const { profile, isSuperAdmin, isTenantAdmin, isViewer, isOtimizzoUser } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantAdmin, isTenantStaff } = useTenant();
   
   const [editLog, setEditLog] = useState<any>(null);
   const [deleteLog, setDeleteLog] = useState<any>(null);
@@ -218,15 +220,13 @@ export default function TicketTimeline({ ticketId, clientId, recordType }: Ticke
   const getPermissionsForLog = (log: any) => {
     if (log.type !== 'time_logged') return undefined;
     
-    // Only show actions for Otimizzo users (analysts can only edit their own)
-    if (!isOtimizzoUser && !isSuperAdmin) return { canEdit: false, canDelete: false };
-    
+    // Only show actions for tenant staff (analysts can only edit their own)
+    if (!isTenantStaff && !isTenantAdmin) return { canEdit: false, canDelete: false };
+
     return getTimeLogPermissions(
       { analyst_id: log.analyst_id, logged_at: log.logged_at },
       profile?.id,
-      isSuperAdmin,
-      isTenantAdmin,
-      isViewer
+      isTenantAdmin
     );
   };
 

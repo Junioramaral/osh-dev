@@ -27,6 +27,7 @@ import {
   rangeFromSingle,
 } from "@/lib/reportPeriod";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useMyTimeLogsData } from "@/hooks/useMyTimeLogsData";
@@ -48,7 +49,8 @@ function fmtHours(h: number) {
 }
 
 const MyTimeLogsReport = ({ onBack }: Props) => {
-  const { profile, isSuperAdmin } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantAdmin } = useTenant();
   const [periodState, setPeriodState] = useState<ReportPeriodState>(defaultReportPeriodState());
   const [clientId, setClientId] = useState("all");
   const [projectId, setProjectId] = useState("all");
@@ -88,7 +90,7 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
   // Analysts list — only used by super admin
   const { data: analysts } = useQuery({
     queryKey: ["report-analysts-all"],
-    enabled: isSuperAdmin,
+    enabled: isTenantAdmin,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
@@ -107,7 +109,7 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
     analystId,
     clientId,
     projectId,
-    isSuperAdmin,
+    isTenantAdmin,
     currentUserId: profile?.id,
   });
 
@@ -169,10 +171,10 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
             <div>
               <h1 className="text-2xl font-bold flex items-center gap-2">
                 <Clock className="h-6 w-6 text-primary" />
-                {isSuperAdmin ? "Lançamentos de Horas (Geral)" : "Meus Lançamentos de Horas"}
+                {isTenantAdmin ? "Lançamentos de Horas (Geral)" : "Meus Lançamentos de Horas"}
               </h1>
               <p className="text-muted-foreground text-sm">
-                {isSuperAdmin
+                {isTenantAdmin
                   ? "Visualize lançamentos de qualquer analista e cliente."
                   : "Visualize seus próprios lançamentos por cliente, projeto e período."}
               </p>
@@ -228,7 +230,7 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
                   </SelectContent>
                 </Select>
               </div>
-              {isSuperAdmin && (
+              {isTenantAdmin && (
                 <div>
                   <label className="text-xs font-medium text-muted-foreground">Analista</label>
                   <Select value={analystId} onValueChange={setAnalystId}>
@@ -318,7 +320,7 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
                   <TableHeader>
                     <TableRow>
                       <TableHead>Data</TableHead>
-                      {isSuperAdmin && <TableHead>Analista</TableHead>}
+                      {isTenantAdmin && <TableHead>Analista</TableHead>}
                       <TableHead>Cliente</TableHead>
                       <TableHead>Ticket</TableHead>
                       <TableHead>Projeto</TableHead>
@@ -334,7 +336,7 @@ const MyTimeLogsReport = ({ onBack }: Props) => {
                         <TableCell className="whitespace-nowrap">
                           {format(parseISO(r.work_date), "dd/MM/yyyy", { locale: ptBR })}
                         </TableCell>
-                        {isSuperAdmin && <TableCell>{r.analyst_name ?? "-"}</TableCell>}
+                        {isTenantAdmin && <TableCell>{r.analyst_name ?? "-"}</TableCell>}
                         <TableCell>{r.client_name}</TableCell>
                         <TableCell className="font-mono">#{r.ticket_number}</TableCell>
                         <TableCell>{r.project_name ?? "-"}</TableCell>

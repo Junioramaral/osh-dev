@@ -33,7 +33,7 @@ export function useTicketActions() {
       // 2. Get complete ticket data
       const { data: ticket, error: ticketError } = await supabase
         .from("tickets")
-        .select("id, ticket_number, title, contact_email, contact_name, created_at, analyst_id, team_id, queue_id")
+        .select("id, ticket_number, title, contact_email, contact_name, created_at, analyst_id, team_id, queue_id, client_id")
         .eq("id", ticketId)
         .single();
 
@@ -120,8 +120,15 @@ export function useTicketActions() {
       const { data: { session } } = await supabase.auth.getSession();
 
       if (session?.access_token && ticket.contact_email) {
-        // Build CC list: creator (Otimizzo) + current resolver (Otimizzo), excluding contact
-        const OTIMIZZO_TENANT_ID = "00000000-0000-0000-0000-000000000001";
+        // Build CC list: creator (tenant staff) + current resolver (tenant staff), excluding contact
+        // "Tenant staff" here means staff of the SAME tenant that owns this ticket's
+        // client (resolved via clients.tenant_id), not a hardcoded tenant.
+        const { data: clientRow } = await supabase
+          .from("clients")
+          .select("tenant_id")
+          .eq("id", ticket.client_id)
+          .maybeSingle();
+        const ticketTenantId = clientRow?.tenant_id ?? null;
         const ccCandidates: string[] = [];
 
         try {
@@ -140,12 +147,13 @@ export function useTicketActions() {
           );
 
           for (const uid of candidateIds) {
-            const { data: roleRow } = await supabase
-              .from("user_roles")
+            if (!ticketTenantId) continue;
+            const { data: tenantUserRow } = await supabase
+              .from("tenant_users")
               .select("tenant_id")
               .eq("user_id", uid)
               .maybeSingle();
-            if (roleRow?.tenant_id !== OTIMIZZO_TENANT_ID) continue;
+            if (tenantUserRow?.tenant_id !== ticketTenantId) continue;
             const { data: email } = await supabase.rpc("get_user_email", { _user_id: uid });
             if (
               email &&
@@ -162,7 +170,7 @@ export function useTicketActions() {
 
         try {
           await fetch(
-            `https://ukrgzsntvddzwtmccwbf.supabase.co/functions/v1/send-resolution-notification`,
+            `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/send-resolution-notification`,
             {
               method: "POST",
               headers: {

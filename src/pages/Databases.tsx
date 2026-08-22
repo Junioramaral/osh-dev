@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import AppLayout from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -78,7 +79,8 @@ const ENVIRONMENT_CONFIG = {
 };
 
 export default function Databases() {
-  const { profile, isSuperAdmin, isViewer, hasRole } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantAdmin, hasTenantRole } = useTenant();
   const [engineFilter, setEngineFilter] = useState<string>("all");
   const [environmentFilter, setEnvironmentFilter] = useState<string>("all");
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -356,7 +358,7 @@ export default function Databases() {
             </div>
             <p className="text-muted-foreground">Catálogo de instâncias de banco de dados</p>
           </div>
-          {selectedClient && !isViewer && (isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
+          {selectedClient && (isTenantAdmin || hasTenantRole('analyst_db')) && (
             <Button onClick={handleNewDatabase}>
               <Plus className="mr-2 h-4 w-4" />
               Nova Instância
@@ -595,7 +597,7 @@ export default function Databases() {
                                           )}
                                         </TableCell>
                                         <TableCell>
-                                          {(isSuperAdmin || hasRole('tenant_admin') || hasRole('analyst_db')) && (
+                                          {(isTenantAdmin || hasTenantRole('analyst_db')) && (
                                             <Button
                                               variant="ghost"
                                               size="icon"

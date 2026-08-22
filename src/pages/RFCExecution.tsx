@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useAnalystQueues } from "@/hooks/useAnalystQueues";
 import AppLayout from "@/components/layout/AppLayout";
 import { Badge } from "@/components/ui/badge";
@@ -65,11 +66,12 @@ const RFCExecution = () => {
   const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
   const [localObservacoes, setLocalObservacoes] = useState<Record<string, string>>({});
   const queryClient = useQueryClient();
-  const { user, isSuperAdmin, isOtimizzoUser } = useAuth();
+  const { user } = useAuth();
+  const { isTenantStaff } = useTenant();
   const { queueIds, shouldRestrictView } = useAnalystQueues();
   const { startStep, toggleStep, updateObservacao } = useRFCStepActions(selectedRfcId);
 
-  const isAdmin = isSuperAdmin || isOtimizzoUser;
+  const isAdmin = isTenantStaff;
 
   const { data: rfcs = [], isLoading: rfcsLoading } = useQuery({
     queryKey: ["rfc-approved-list", user?.id, isAdmin, queueIds],

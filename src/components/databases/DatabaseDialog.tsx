@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { useQuery } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
-import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import {
   Dialog,
   DialogContent,
@@ -64,7 +64,7 @@ export default function DatabaseDialog({
   database,
   lockedClientId,
 }: DatabaseDialogProps) {
-  const { isSuperAdmin, profile } = useAuth();
+  const { isTenantAdmin, clientId } = useTenant();
   const createDatabase = useCreateDatabase();
   const updateDatabase = useUpdateDatabase();
   
@@ -87,7 +87,7 @@ export default function DatabaseDialog({
   const form = useForm<DatabaseFormData>({
     resolver: zodResolver(databaseSchema),
     defaultValues: {
-      client_id: lockedClientId || profile?.client_id || "",
+      client_id: lockedClientId || clientId || "",
       machine_id: "",
       engine: "PostgreSQL",
       version: "",
@@ -136,7 +136,7 @@ export default function DatabaseDialog({
   }, [selectedClientId, clients, currentEngine, availableEngines, database, form]);
 
   // Only reset the form on the open transition (false -> true), never when
-  // `profile` reference changes (e.g. on tab focus / session revalidation),
+  // `clientId` reference changes (e.g. on tab focus / session revalidation),
   // otherwise user input is wiped out.
   const wasOpenRef = useRef(false);
   useEffect(() => {
@@ -155,7 +155,7 @@ export default function DatabaseDialog({
         });
       } else {
         form.reset({
-          client_id: lockedClientId || profile?.client_id || "",
+          client_id: lockedClientId || clientId || "",
           machine_id: "",
           engine: "PostgreSQL",
           version: "",
@@ -224,7 +224,7 @@ export default function DatabaseDialog({
                   <Select
                     onValueChange={field.onChange}
                     value={field.value}
-                    disabled={!isSuperAdmin || !!lockedClientId}
+                    disabled={!isTenantAdmin || !!lockedClientId}
                   >
                     <FormControl>
                       <SelectTrigger>

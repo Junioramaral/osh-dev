@@ -22,7 +22,7 @@ SUPER ADMIN (otimizzo.com — dono da plataforma)
 | Super Admin | tabela `platform_admins` (user_id + is_active) | Global, não pertence a nenhum tenant |
 | `is_platform_owner` | coluna BOOLEAN na tabela `tenants` | Flag só de identificação do tenant otimizzo — **não** é controle de acesso |
 | Tenant | tabela `tenants` | Consultoria (inclui a própria otimizzo como tenant) |
-| Vínculo usuário↔tenant | tabela `tenant_users` (tenant_id, user_id, role: owner/admin/viewer) | Define a qual tenant o usuário pertence e seu papel |
+| Vínculo usuário↔tenant | tabela `tenant_users` (tenant_id, user_id, role: tenant_admin/analyst_db/analyst_app) | Define a qual tenant o usuário pertence e seu papel |
 | Client | tabela `clients` com `tenant_id` | Cliente de uma consultoria específica |
 
 ### ⚠️ Regra crítica #1 — Super Admin NÃO tem bypass de dados
@@ -35,6 +35,35 @@ clients, nem SLA, nem auditoria. Ele só gerencia:
 Nunca usar `OR is_platform_admin()` em policies RLS de tabelas
 operacionais (clients, tickets, teams, queues, projects, SLA,
 auditoria, FAQ, CSAT, RFC). Ver skill `rls-policy` e `tenant-audit`.
+
+**Lista fechada de exceções onde o bypass `OR is_platform_admin()` é
+válido** — só estas 3 tabelas, nenhuma outra sem nova decisão
+documentada aqui:
+1. `tenants` — o Super Admin precisa enxergar todos os tenants pra
+   operar a plataforma
+2. `platform_admins` — a própria lista de quem é Super Admin
+3. `tenant_users` — dado estrutural/administrativo de tenant (quem tem
+   acesso a qual tenant e com qual papel), não dado operacional do
+   negócio do tenant
+
+Nenhuma outra tabela (clients, tickets, teams, queues, projects, SLA,
+auditoria, FAQ, CSAT, RFC, `client_users`, `application_products`,
+`ticket_categories`, `ticket_subcategories`, `segments`,
+`database_engines`, `system_configs`, `sla_holidays`, etc.) deve usar
+esse bypass.
+
+**Histórico corrigido:** as migrations `020h`/`022` haviam classificado
+`application_products` e as outras 6 tabelas acima como "catálogo
+global da plataforma" (zero coluna `tenant_id`/`client_id`) e por isso
+as tratavam como uma 4ª exceção. Essa checagem olhou só a *estrutura*
+da tabela, não o *dado* — testando com um segundo tenant real, os
+produtos cadastrados (ContaDia, LexisFlow, Sec4File) eram específicos
+da Otimizzo, não um catálogo genérico da plataforma, e as outras 6
+tinham o mesmo problema (categorias de chamado, engines, horário
+comercial e feriados da Otimizzo vazando pra qualquer tenant). Migration
+`025`/`026` corrigiu isso: todas as 7 ganharam `tenant_id` e viraram
+tabelas operacionais normais, sem bypass nenhum — a lista fechada
+continua sendo só as 3 originais acima.
 
 ### ⚠️ Regra crítica #2 — otimizzo.com tem dupla identidade
 A otimizzo.com é, ao mesmo tempo:
@@ -90,20 +119,26 @@ caso de tenants).
   respeitando horário comercial America/Sao_Paulo e cooldown anti-spam
 
 ## Frontend — Contexto multi-tenant
-`TenantContext` expõe: `tenantId`, `tenant`, `currentClientId`,
-`setCurrentClient`, `isSuperAdmin`, `isLoading`.
+`TenantContext` (`src/contexts/TenantContext.tsx`) expõe: `tenant`,
+`tenantId`, `clientId`, `tenantRole` (`tenant_admin`/`analyst_db`/
+`analyst_app`/`null`), `isPlatformAdmin`, `isTenantStaff`,
+`isTenantAdmin`, `isAnalyst`, `hasTenantRole(role)`, `isLoading`.
+`AuthContext` só cuida de sessão/perfil (`user`, `session`, `profile`,
+`signIn`/`signUp`/`signOut`, `mustChangePassword`) — nenhum flag de
+permissão vem de lá.
 
-- `isSuperAdmin` vem de checar `platform_admins` — nunca comparar
+- `isPlatformAdmin` vem de checar `platform_admins` — nunca comparar
   e-mail/domínio direto no frontend
-- `currentClientId` persiste em `sessionStorage`
+- `tenantId` (equipe de um tenant) e `clientId` (contato de um client)
+  vêm de `tenant_users`/`client_users` respectivamente — nunca misturar
+  os dois nem aceitar um deles vindo de input do usuário/URL
 - Toda query Supabase que filtra por `client_id` também filtra por
-  `tenant_id` — `tenantId` sempre vindo do contexto, nunca de
-  input do usuário/URL
+  `tenant_id` quando aplicável
 
 ## Rotas e proteção
 - `/app/*` — exige tenant ativo
 - `/app/admin/*` — exige role `owner` ou `admin` no tenant atual
-- `/platform/*` — exige `isSuperAdmin === true`; outros usuários são
+- `/platform/*` — exige `isPlatformAdmin === true`; outros usuários são
   redirecionados para `/app`
 - `/platform/tenants/:id` nunca exibe dados internos do tenant (sem
   tickets, sem clients) — só metadados

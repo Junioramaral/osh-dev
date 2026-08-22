@@ -84,23 +84,25 @@ serve(async (req) => {
 
     console.log("✅ Current user:", user.id);
 
-    // Check if user is super_admin
-    const { data: userRoles, error: rolesError } = await userClient
-      .from("user_roles")
-      .select("role, tenant_id")
-      .eq("user_id", user.id);
+    // Permission: platform_admin (bypass, mirrors create-tenant/invite-tenant-user)
+    // OR tenant_admin of the tenant that owns the target client (checked below,
+    // once we know which tenant the target client_id/tenant_id param belongs to).
+    // RLS-respecting reads via userClient, not a raw legacy role-string compare.
+    const { data: adminRow } = await userClient
+      .from("platform_admins")
+      .select("id")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const isPlatformAdmin = !!adminRow;
 
-    if (rolesError) {
-      console.error("❌ Error fetching user roles:", rolesError);
-      return new Response(JSON.stringify({ error: "Error checking permissions" }), {
-        status: 500,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
-    }
+    const { data: tenantUserRow } = await userClient
+      .from("tenant_users")
+      .select("tenant_id, role")
+      .eq("user_id", user.id)
+      .maybeSingle();
+    const isOwnTenantAdmin = tenantUserRow?.role === "tenant_admin";
 
-    const isSuperAdmin = userRoles?.some((r) => r.role === "super_admin");
-
-    if (!isSuperAdmin) {
+    if (!isPlatformAdmin && !isOwnTenantAdmin) {
       console.error("❌ User does not have permission to invite users");
       return new Response(JSON.stringify({ error: "Insufficient permissions" }), {
         status: 403,
@@ -110,10 +112,11 @@ serve(async (req) => {
 
     console.log("✅ Permission check passed");
 
-    // Get tenant info to validate domain and max_users
+    // Get tenant info to validate domain, max_users, and (for tenant_admins)
+    // that this client actually belongs to the caller's own tenant.
     const { data: tenant, error: tenantError } = await adminClient
       .from("clients")
-      .select("domain, max_users, is_active, name")
+      .select("domain, max_users, is_active, name, tenant_id")
       .eq("id", tenant_id)
       .single();
 
@@ -125,6 +128,14 @@ serve(async (req) => {
       });
     }
 
+    if (!isPlatformAdmin && tenant.tenant_id !== tenantUserRow!.tenant_id) {
+      console.error("❌ Client belongs to a different tenant than the caller");
+      return new Response(JSON.stringify({ error: "Insufficient permissions" }), {
+        status: 403,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
+    }
+
     if (!tenant.is_active) {
       return new Response(JSON.stringify({ error: "Tenant is not active" }), {
         status: 400,
@@ -132,8 +143,8 @@ serve(async (req) => {
       });
     }
 
-    // Validate email domain matches tenant domain (only for tenant_admins, super_admins can invite anyone)
-    if (!isSuperAdmin && tenant.domain) {
+    // Validate email domain matches tenant domain (only for tenant_admins, platform admins can invite anyone)
+    if (!isPlatformAdmin && tenant.domain) {
       const emailDomain = email.split("@")[1].toLowerCase();
       const tenantDomain = tenant.domain.toLowerCase();
 
@@ -275,6 +286,18 @@ serve(async (req) => {
 
     if (roleError) {
       console.error("❌ Error creating user roles:", roleError);
+    }
+
+    // Link into client_users — this is what makes the new contact actually
+    // visible to TenantContext (client_id/isTenantStaff derive from this
+    // table, not from the legacy user_roles/profiles rows above).
+    const { error: clientUserError } = await adminClient.from("client_users").insert({
+      client_id: tenant_id,
+      user_id: newUser.user!.id,
+    });
+
+    if (clientUserError) {
+      console.error("❌ Error linking client_users:", clientUserError);
     }
 
     // Create contact entry automatically

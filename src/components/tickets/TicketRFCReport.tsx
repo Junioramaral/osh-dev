@@ -9,6 +9,7 @@ import { Clock, CheckCircle2, Play, Loader2, Save, Send, ChevronRight, ChevronDo
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { useAuth } from "@/contexts/AuthContext";
+import { useTenant } from "@/contexts/TenantContext";
 import { useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -46,11 +47,12 @@ interface TicketRFCReportProps {
 export default function TicketRFCReport({ ticket }: TicketRFCReportProps) {
   const ticketId = ticket.id;
   const { data: steps = [], isLoading } = useTicketRFCSteps(ticketId);
-  const { isOtimizzoUser, isSuperAdmin, profile } = useAuth();
+  const { profile } = useAuth();
+  const { isTenantStaff, isTenantAdmin } = useTenant();
   const queryClient = useQueryClient();
 
-  const isDraft = ticket.status === "rascunho" && (isOtimizzoUser || isSuperAdmin);
-  const canSeeScripts = isOtimizzoUser || isSuperAdmin;
+  const isDraft = ticket.status === "rascunho" && (isTenantStaff || isTenantAdmin);
+  const canSeeScripts = isTenantStaff || isTenantAdmin;
 
   const [editSteps, setEditSteps] = useState<RFCStep[]>([]);
   const [isSaving, setIsSaving] = useState(false);
